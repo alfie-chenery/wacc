@@ -117,12 +117,3 @@ lazy val escaped_char = ???
 lazy val array_liter = ???
 lazy val pair_liter = ???
 lazy val comment = ???
-
-
-
-
-|        ‘if’  ⟨expr ⟩  ‘then’  ⟨stat ⟩  ‘else’  ⟨stat ⟩  ‘fi’
-|        ‘while’  ⟨expr ⟩  ‘do’  ⟨stat ⟩  ‘done’
-|        ‘begin’  ⟨stat ⟩  ‘end’
-|        ⟨stat ⟩  ‘;’  ⟨stat ⟩
-
