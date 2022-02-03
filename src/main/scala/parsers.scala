@@ -29,6 +29,7 @@ object lexer {
   val CHAR_LITER: Parsley[Char] = token('\'') ~> anyChar <~ token('\'')
   val STR_LITER: Parsley[List[Char]] = token(many(CHAR_LITER))
   val PAIR_LITER: Parsley[String] = token("null")
+  val ESC_CHAR: Parsley[Char] = token('0') <|> token('b') <|> token('t') <|> token('n') <|> token('f') <|> token('r') <|> token('"') <|> token('\'') <|> token('\\')
 
   private def token[A](p: =>Parsley[A]): Parsley[A] = lexer.lexeme(attempt(p))
   def fully[A](p: =>Parsley[A]): Parsley[A] = lexer.whiteSpace ~> p <~ eof
@@ -117,10 +118,25 @@ object ast {
   case object Chr extends UnaryOp
 
   sealed trait BinaryOp
-  // TODO finish
+  case object Mult extends BinaryOp
+  case object Div extends BinaryOp
+  case object Mod extends BinaryOp
+  case object Plus extends BinaryOp
+  case object Minus extends BinaryOp
+  case object Greater extends BinaryOp
+  case object GreaterEq extends BinaryOp
+  case object Less extends BinaryOp
+  case object LessEq extends BinaryOp
+  case object Eq extends BinaryOp
+  case object NotEq extends BinaryOp
+  case object And extends BinaryOp
+  case object Or extends BinaryOp
+
+  case class ArrayElem(ident: Ident, exprs: List[Expr])
 
   case class ArrayLiter(exprs: List[Expr]) extends AssignRHS
 
-
   case class Comment(com: String)
+
+
 }
