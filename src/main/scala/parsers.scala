@@ -1,119 +1,126 @@
 import parsley.Parsley
 import Parsley._
-import parsley.character.{noneOf, oneOf, string}
-import parsley.combinator.{eof, many}
-import parsley.implicits.character.charLift
-import parsley.implicits.character.stringLift
+import parsley.character.anyChar
 
-/*
-⟨program ⟩      ::=   ‘begin’  ⟨func⟩*  ⟨stat ⟩  ‘end’
-⟨func⟩          ::=    ⟨type ⟩  ⟨ident ⟩  ‘(’  ⟨param-list ⟩?   ‘)’  ‘is’  ⟨stat ⟩  ‘end’
-⟨param-list ⟩   ::=    ⟨param ⟩  (  ‘,’  ⟨param ⟩  )*
-⟨param ⟩        ::=    ⟨type ⟩  ⟨ident ⟩ 
-⟨stat ⟩         ::=   ‘skip’
-    |        ⟨type ⟩  ⟨ident ⟩  ‘=’  ⟨assign-rhs ⟩
-    |        ⟨assign-lhs ⟩  ‘=’  ⟨assign-rhs ⟩
-    |        ‘read’  ⟨assign-lhs ⟩
-    |        ‘free’  ⟨expr ⟩
-    |        ‘return’  ⟨expr ⟩
-    |        ‘exit’  ⟨expr ⟩
-    |        ‘print’  ⟨expr ⟩
-    |        ‘println’  ⟨expr ⟩
-    |        ‘if’  ⟨expr ⟩  ‘then’  ⟨stat ⟩  ‘else’  ⟨stat ⟩  ‘fi’ 
-    |        ‘while’  ⟨expr ⟩  ‘do’  ⟨stat ⟩  ‘done’
-    |        ‘begin’  ⟨stat ⟩  ‘end’ 
-    |        ⟨stat ⟩  ‘;’  ⟨stat ⟩
-⟨assign-lhs ⟩    ::=    ⟨ident ⟩
-    |        ⟨array-elem ⟩ 
-    |        ⟨pair-elem ⟩
-⟨assign-rhs ⟩     ::=    ⟨expr ⟩
-    |        ⟨array-liter ⟩
-    |        ‘newpair’  ‘(’  ⟨expr ⟩  ‘,’  ⟨expr ⟩  ‘)’ 
-    |        ⟨pair-elem ⟩
-    |        ‘call’  ⟨ident ⟩  ‘(’  ⟨arg-list ⟩?   ‘)’
-⟨arg-list ⟩       ::=    ⟨expr ⟩  (‘,’  ⟨expr ⟩  )*
-⟨pair-elem ⟩      ::= ‘fst’ ⟨expr ⟩
-    |        ‘snd’  ⟨expr ⟩
-⟨type ⟩           ::=    ⟨base-type ⟩ 
-    |        ⟨array-type ⟩ 
-    |        ⟨pair-type ⟩
-⟨base-type ⟩      ::=   ‘int’
-    |        ‘bool’ 
-    |        ‘char’ 
-    |        ‘string’
-⟨array-type ⟩     ::=    ⟨type ⟩  ‘[’  ‘]’
-⟨pair-type ⟩      ::=   ‘pair’  ‘(’  ⟨pair-elem-type ⟩  ‘,’  ⟨pair-elem-type ⟩  ‘)’ 
-⟨pair-elem-type ⟩         ::=    ⟨base-type ⟩
-    |        ⟨array-type ⟩ 
-    |        ‘pair’
-⟨expr ⟩           ::=    ⟨int-liter ⟩
-    |        ⟨bool-liter ⟩
-    |        ⟨char-liter ⟩
-    |        ⟨str-liter ⟩
-    |        ⟨pair-liter ⟩
-    |        ⟨ident ⟩
-    |        ⟨array-elem ⟩
-    |        ⟨unary-oper ⟩  ⟨expr ⟩
-    |        ⟨expr ⟩  ⟨binary-oper ⟩  ⟨expr ⟩
-    |        ‘(’  ⟨expr ⟩  ‘)’
-⟨unary-oper ⟩     ::=   ‘!’  |  ‘-’  |  ‘len’  |  ‘ord’  |  ‘chr’
-⟨binary-oper ⟩    ::= ‘*’ | ‘/’ | ‘%’ | ‘+’ | ‘-’ | ‘>’ | ‘>=’ | ‘<’ | ‘<=’ | ‘==’ | ‘!=’ | ‘&&’ | ‘||’
-⟨ident ⟩          ::=   (  ‘_’  |  ‘a’-‘z’  |  ‘A’-‘Z’  )  (  ‘      ’  |  ‘a’-‘z’  |  ‘A’-‘Z’  |  ‘0’-‘9’  )*
-⟨array-elem ⟩     ::=    ⟨ident ⟩  (‘[’  ⟨expr ⟩  ‘]’)+
-⟨int-liter ⟩      ::=    ⟨int-sign ⟩?   ⟨digit ⟩+ 
-⟨digit ⟩          ::=   (‘0’-‘9’)
-⟨int-sign ⟩       ::=   ‘+’  |  ‘-’
-⟨bool-liter ⟩     ::=   ‘true’  |  ‘false’ 
-⟨char-liter ⟩     ::=   ‘'’  ⟨character ⟩  ‘'’ 
-⟨str-liter ⟩      ::=   ‘"’  ⟨character ⟩*  ‘"’
-⟨character ⟩      ::=    any-ASCII-character-except-‘\’-‘'’-‘"’  |  ‘\’  ⟨escaped-char ⟩
-⟨escaped-char ⟩   ::=   ‘0’  |  ‘b’  |  ‘t’  |  ‘n’  |  ‘f’  |  ‘r’  |  ‘"’  |  ‘'’  |  ‘\’ 
-⟨array-liter ⟩    ::=   ‘[’  (  ⟨expr ⟩  (‘,’  ⟨expr ⟩)*  )?   ‘]’
-⟨pair-liter ⟩     ::=   ‘null’
-⟨comment ⟩        ::=   ‘#’  (any-character-except-EOL)*  ⟨EOL⟩
-*/
+import scala.language.implicitConversions
 
-lazy val program = "begin" ~> many(func) ~> stat <~ "end" <~ eof
+object lexer {
+  import parsley.token.{LanguageDef, Lexer}
+  import parsley.implicits.character.{charLift, stringLift}
+  import parsley.combinator.{many, eof}
+  import parsley.character.{digit, isWhitespace}
+  import parsley.token.Predicate
 
-lazy val func = _type ~> ident ~> '(' ~> (noneOf(param_list) <|> oneOf(param_list)) ~> ')' ~> "is" ~> stat <~ "end"
+  private val lang = LanguageDef.plain.copy(
+    commentLine = "#",
+    nestedComments = false,
+    keywords = Set("begin", "end", "is", "skip", "read", "return", "if", "then", "else",
+      "if", "then", "else", "fi", "while", "do", "end"),
+    identStart = Predicate(c => c.isLetter || c == '_'),
+    identLetter = Predicate(c => c.isLetterOrDigit || c == '_'),
+    space = Predicate(isWhitespace),
+  )
 
-lazy val param_list = param <~> many(',' <~> param)
+  // Dont use number and string literal parsers!
+  val lexer = new Lexer(lang)
 
-lazy val param = _type <-> ident
+  val INT_LITER: Parsley[Int] = token(digit.foldLeft1(0)((x, d) => x * 10 + d.asDigit))
+  val BOOL_LITER: Parsley[String] = token("true") <|> token("false")
+  val CHAR_LITER: Parsley[Char] = token('\'') ~> anyChar <~ token('\'')
+  val STR_LITER: Parsley[List[Char]] = token(many(CHAR_LITER))
+  val PAIR_LITER: Parsley[String] = token("null")
 
-lazy val stat = attempt("skip") <|>
-                _type ~> ident ~> '=' ~> assign_rhs <|>
-                assign_lhs ~> '=' ~> assign_rhs <|>
-                "read" = assign_lhs <|>
-                "free" ~> expr <|>
-                "return" ~> expr <|>
-                "exit" ~> expr <|>
-                "print" ~> expr <|>
-                "println" ~> expr <|>
-                "if" ~> expr ~> "then" ~> stat
+  private def token[A](p: =>Parsley[A]): Parsley[A] = lexer.lexeme(attempt(p))
+  def fully[A](p: =>Parsley[A]): Parsley[A] = lexer.whiteSpace ~> p <~ eof
 
-lazy val assign_lhs = ???
-lazy val assign_rhs = ???
-lazy val arg_list = ???
-lazy val pair_elem = ???
-lazy val _type = ???
-lazy val base_type = ???
-lazy val array_type = ???
-lazy val pair_type = ???
-lazy val pair_elem_type = ???
-lazy val expr = ???
-lazy val unary_oper = ???
-lazy val binary_oper = ???
-lazy val ident = ???
-lazy val array_elem = ???
-lazy val int_liter = ???
-lazy val digit = ???
-lazy val int_sign = ???
-lazy val bool_liter = ???
-lazy val char_liter = ???
-lazy val str_liter = ???
-lazy val character = ???
-lazy val escaped_char = ???
-lazy val array_liter = ???
-lazy val pair_liter = ???
-lazy val comment = ???
+  object implicits {
+    implicit def tokenLift(c: Char): Parsley[Unit]
+    = void(lexer.symbol(c))
+    implicit def tokenLift(s: String): Parsley[Unit] = {
+      if (lang.keywords(s)) lexer.keyword(s)
+      else void(lexer.symbol(s))
+    }
+  }
+
+
+}
+
+object parser {
+  import parsley.combinator.{sepBy, sepBy1}
+
+  import lexer._
+  import implicits.tokenLift
+  import ast._
+
+}
+
+object ast {
+  case class Program(funcs: List[Func], stat: Stat)
+  case class Func(_type: Type, ident: Ident, params: ParamList, stat: Stat)
+  case class ParamList(params: List[Param])
+  case class Param(_type: Type, ident: Ident)
+
+  sealed trait Stat
+  case object Skip extends Stat
+  case class Decl(_type: Type, ident: Ident, rhs: AssignRHS) extends Stat
+  case class Assign(lhs: AssignLHS, rhs: AssignRHS) extends Stat
+  case class Read(lhs: AssignLHS) extends Stat
+  case class Free(expr: Expr) extends Stat
+  case class Return(expr: Expr) extends Stat
+  case class Exit(expr: Expr) extends Stat
+  case class Print(expr: Expr) extends Stat
+  case class Println(expr: Expr) extends Stat
+  case class IfElse(cond: Expr, then_stat: Stat, then_else: Stat) extends Stat
+  case class While(cond: Expr, body: Stat) extends Stat
+  case class Scope(stat: Stat) extends Stat
+  case class Combine(first: Stat, second: Stat) extends Stat
+
+  sealed trait AssignLHS
+
+  sealed trait AssignRHS
+  case class NewPair(fst: Expr, snd: Expr) extends AssignRHS
+  case class Call(ident: Ident, argList: ArgList)
+
+  case class ArgList(args: List[Expr])
+
+  sealed trait PairElem extends AssignLHS with AssignRHS
+  case class FstPair(fst: Expr) extends PairElem
+  case class SndPair(snd: Expr) extends PairElem
+
+  sealed trait Type
+  sealed trait BaseType extends Type with PairElemType
+  case object WInt extends BaseType
+  case object WBool extends BaseType
+  case object WChar extends BaseType
+  case class ArrayType(_type: Type) extends Type with PairElemType
+  case class PairType(fst_type: PairElemType, snd_type: PairElemType) extends Type
+  sealed trait PairElemType
+  case object Pair extends PairElemType
+
+  sealed trait Expr extends AssignRHS
+  case class IntLiter(x: Int) extends Expr
+  case class BoolLiter(b: Boolean) extends Expr
+  case class CharLiter(c: Char) extends Expr
+  case class StrLiter(s: String) extends Expr
+  case object PairLiter extends Expr
+  case class Ident(ident: String) extends Expr with AssignLHS
+  case class ArrayElem(ident: Ident, expr: Expr) extends Expr with AssignLHS
+  case class UnaryApp(op: UnaryOp, expr: Expr)
+  case class BinaryApp(lhs: Expr, op: BinaryOp, rhs: Expr)
+  case class ParensExpr(expr: Expr)
+
+  sealed trait UnaryOp
+  case object Not extends UnaryOp
+  case object Negate extends UnaryOp
+  case object Len extends UnaryOp
+  case object Ord extends UnaryOp
+  case object Chr extends UnaryOp
+
+  sealed trait BinaryOp
+  // TODO finish
+
+  case class ArrayLiter(exprs: List[Expr]) extends AssignRHS
+
+
+  case class Comment(com: String)
+}
