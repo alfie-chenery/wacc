@@ -1,6 +1,7 @@
 import parsley.Parsley
 import Parsley._
 import parsley.character.anyChar
+import parsley.implicit.zipped._
 
 import scala.language.implicitConversions
 
@@ -96,7 +97,7 @@ object ast {
   case class ArrayType(_type: Type) extends Type with PairElemType
   case class PairType(fst_type: PairElemType, snd_type: PairElemType) extends Type
   sealed trait PairElemType
-  case object Pair extends PairElemType
+  case object Pair extends PairElemType with ParserBuilder[PairElemType]{val parser = pure(Pair)}
 
   sealed trait Expr extends AssignRHS
   case class IntLiter(x: Int) extends Expr
@@ -111,11 +112,11 @@ object ast {
   case class ParensExpr(expr: Expr)
 
   sealed trait UnaryOp
-  case object Not extends UnaryOp
-  case object Negate extends UnaryOp
-  case object Len extends UnaryOp
-  case object Ord extends UnaryOp
-  case object Chr extends UnaryOp
+  case object Not extends UnaryOp with ParserBuilder[UnaryOp]{val parser = pure(Not)}
+  case object Negate extends UnaryOp with ParserBuilder[UnaryOp]{val parser = pure(Negate)}
+  case object Len extends UnaryOp with ParserBuilder[UnaryOp]{val parser = pure(Len)}
+  case object Ord extends UnaryOp with ParserBuilder[UnaryOp]{val parser = pure(Ord)}
+  case object Chr extends UnaryOp with ParserBuilder[UnaryOp]{val parser = pure(Chr)}
 
   sealed trait BinaryOp
   case object Mult extends BinaryOp
@@ -132,11 +133,24 @@ object ast {
   case object And extends BinaryOp
   case object Or extends BinaryOp
 
-  case class ArrayElem(ident: Ident, exprs: List[Expr])
-
   case class ArrayLiter(exprs: List[Expr]) extends AssignRHS
 
   case class Comment(com: String)
 
+  object Func{
+    def apply(type: Parsley[Type], ident: Parsley[Ident], params: Parsley[ParamList], stat: Parsley[Stat]) : Parsley[Func] = (type, ident, params, stat).zipped4(Func(_,_,_,_))
+  }
+
+  object Param{
+    def apply(type: Parsley[Type], ident: Parsley[Ident]) : Parsley[Param] = (type, ident).zipped(Param(_,_))
+  }
+
+  object ArgList{
+    def apply(expr: Parsley[Expr], exprs: Parsley[List[Expr]]) : Parsley[ArgList] = (expr, exprs).zipped(ArgList(_,_))
+  }
+
+  object ArrayType{
+    def apply(type: Parsley[Type]) : Parsley[ArrayType] = (type).map(ArrayType(_))
+  }
 
 }
