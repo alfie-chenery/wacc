@@ -6,52 +6,66 @@ import scala.language.implicitConversions
 
 object lexer {
   import parsley.token.{LanguageDef, Lexer}
-  import parsley.implicits.character.{charLift, stringLift}
-  import parsley.combinator.{many, eof}
+  import parsley.implicits.character.charLift
+  import parsley.combinator.eof
   import parsley.character.{digit, isWhitespace}
   import parsley.token.Predicate
+
+  val binaryOperators = Set("!", "-", "len", "ord", "chr")
+  val unaryOperators = Set("*", "/", "%", "+", ">", ">=", "<", "<", "<=", "==", "!=", "&&", "||")
 
   private val lang = LanguageDef.plain.copy(
     commentLine = "#",
     nestedComments = false,
     keywords = Set("begin", "end", "is", "skip", "read", "return", "if", "then", "else",
       "if", "then", "else", "fi", "while", "do", "end"),
+    operators = binaryOperators ++ unaryOperators,
     identStart = Predicate(c => c.isLetter || c == '_'),
     identLetter = Predicate(c => c.isLetterOrDigit || c == '_'),
     space = Predicate(isWhitespace),
   )
 
   // Dont use number and string literal parsers!
-  val lexer = new Lexer(lang)
+  val lex = new Lexer(lang)
 
   val INT_LITER: Parsley[Int] = token(digit.foldLeft1(0)((x, d) => x * 10 + d.asDigit))
-  val BOOL_LITER: Parsley[String] = token("true") <|> token("false")
+  // TODO come back to this
+  val BOOL_LITER: Parsley[Boolean] = token(pure(true)) <|> token(pure(false))
   val CHAR_LITER: Parsley[Char] = token('\'') ~> anyChar <~ token('\'')
-  val STR_LITER: Parsley[List[Char]] = token(many(CHAR_LITER))
-  val PAIR_LITER: Parsley[String] = token("null")
+  // TODO fix types
+  // val STR_LITER: Parsley[String] = token(many(CHAR_LITER))
+  val PAIR_LITER: Parsley[Null] = token(null)
   val ESC_CHAR: Parsley[Char] = token('0') <|> token('b') <|> token('t') <|> token('n') <|> token('f') <|> token('r') <|> token('"') <|> token('\'') <|> token('\\')
 
-  private def token[A](p: =>Parsley[A]): Parsley[A] = lexer.lexeme(attempt(p))
-  def fully[A](p: =>Parsley[A]): Parsley[A] = lexer.whiteSpace ~> p <~ eof
+  private def token[A](p: =>Parsley[A]): Parsley[A] = lex.lexeme(attempt(p))
+  def fully[A](p: =>Parsley[A]): Parsley[A] = lex.whiteSpace ~> p <~ eof
 
   object implicits {
     implicit def tokenLift(c: Char): Parsley[Unit]
-    = void(lexer.symbol(c))
+    = void(lex.symbol(c))
     implicit def tokenLift(s: String): Parsley[Unit] = {
-      if (lang.keywords(s)) lexer.keyword(s)
-      else void(lexer.symbol(s))
+      if (lang.keywords(s)) lex.keyword(s)
+      else void(lex.symbol(s))
     }
   }
-
-
 }
 
 object parser {
-  import parsley.combinator.{sepBy, sepBy1}
+  import parsley.combinator.some
 
   import lexer._
   import implicits.tokenLift
   import ast._
+
+
+  private val `<ident>`: Parsley[Ident] = Ident(lex.identifier)
+  private val `<array-elem>`: Parsley[ArrayElem] = ArrayElem(`<ident>`, some('[' ~> `<expr>` <~ ']'))
+  private val `<expr>`: Parsley[Expr] =
+    IntLiter(INT_LITER) <|> BoolLiter(BOOL_LITER) <|> CharLiter(CHAR_LITER) <|>
+      StrLiter(STR_LITER) /*<|> PairLiter Fix ast above*/ <|> Ident(lex.identifier) <|>
+      `<array-elem>` <|> /*<|> oneOf(unaryOperators) <~> `<expr>` <|>
+      `<expr>` <~ oneOf(binaryOperators) <~> `<expr>` find a way to do one of with sets*/
+      '(' ~> `<expr>` <~ ')'
 
 }
 
@@ -107,7 +121,7 @@ object ast {
   case class StrLiter(s: String) extends Expr
   case object PairLiter extends Expr
   case class Ident(ident: String) extends Expr with AssignLHS
-  case class ArrayElem(ident: Ident, expr: Expr) extends Expr with AssignLHS
+  case class ArrayElem(ident: Ident, expr: List[Expr]) extends Expr with AssignLHS
   case class UnaryApp(op: UnaryOp, expr: Expr)
   case class BinaryApp(lhs: Expr, op: BinaryOp, rhs: Expr)
   case class ParensExpr(expr: Expr)
@@ -220,6 +234,10 @@ object ast {
     = (fst_type, snd_type).zipped(PairType(_,_))
   }
 
+  object ArrayElem {
+    def apply(ident: Parsley[Ident], expr: Parsley[List[Expr]]): Parsley[ArrayElem]
+    = (ident, expr).zipped(ArrayElem(_,_))
+  }
   object IntLiter {
     def apply(x: Parsley[Int]): Parsley[IntLiter] = x.map(IntLiter(_))
   }
