@@ -1,7 +1,6 @@
 import parsley.Parsley
 import Parsley._
 import parsley.character.anyChar
-import parsley.implicit.zipped._
 
 import scala.language.implicitConversions
 
@@ -57,13 +56,15 @@ object parser {
 }
 
 object ast {
+  import parsley.implicits.zipped.{Zipped2, Zipped3, Zipped4}
+
   case class Program(funcs: List[Func], stat: Stat)
   case class Func(_type: Type, ident: Ident, params: ParamList, stat: Stat)
   case class ParamList(params: List[Param])
   case class Param(_type: Type, ident: Ident)
 
   sealed trait Stat
-  case object Skip extends Stat
+  case object Skip extends Stat with ParserBuilder[Stat] {val parser = pure(Skip)}
   case class Decl(_type: Type, ident: Ident, rhs: AssignRHS) extends Stat
   case class Assign(lhs: AssignLHS, rhs: AssignRHS) extends Stat
   case class Read(lhs: AssignLHS) extends Stat
@@ -91,9 +92,9 @@ object ast {
 
   sealed trait Type
   sealed trait BaseType extends Type with PairElemType
-  case object WInt extends BaseType
-  case object WBool extends BaseType
-  case object WChar extends BaseType
+  case object WInt extends BaseType with ParserBuilder[BaseType]{val parser = pure(WInt)}
+  case object WBool extends BaseType with ParserBuilder[BaseType]{val parser = pure(WBool)}
+  case object WChar extends BaseType with ParserBuilder[BaseType]{val parser = pure(WChar)}
   case class ArrayType(_type: Type) extends Type with PairElemType
   case class PairType(fst_type: PairElemType, snd_type: PairElemType) extends Type
   sealed trait PairElemType
@@ -119,38 +120,120 @@ object ast {
   case object Chr extends UnaryOp with ParserBuilder[UnaryOp]{val parser = pure(Chr)}
 
   sealed trait BinaryOp
-  case object Mult extends BinaryOp
-  case object Div extends BinaryOp
-  case object Mod extends BinaryOp
-  case object Plus extends BinaryOp
-  case object Minus extends BinaryOp
-  case object Greater extends BinaryOp
-  case object GreaterEq extends BinaryOp
-  case object Less extends BinaryOp
-  case object LessEq extends BinaryOp
-  case object Eq extends BinaryOp
-  case object NotEq extends BinaryOp
-  case object And extends BinaryOp
-  case object Or extends BinaryOp
+  case object Mult extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(Mult)}
+  case object Div extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(Div)}
+  case object Mod extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(Mod)}
+  case object Plus extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(Plus)}
+  case object Minus extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(Minus)}
+  case object Greater extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(Greater)}
+  case object GreaterEq extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(GreaterEq)}
+  case object Less extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(Less)}
+  case object LessEq extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(LessEq)}
+  case object Eq extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(Eq)}
+  case object NotEq extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(NotEq)}
+  case object And extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(And)}
+  case object Or extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(Or)}
 
   case class ArrayLiter(exprs: List[Expr]) extends AssignRHS
 
-  case class Comment(com: String)
-
+  trait ParserBuilder[T] {
+    val parser: Parsley[T]
+    final def <#(p: Parsley[_]): Parsley[T] = parser <* p
+  }
+  object Program {
+    def apply(funcs: Parsley[List[Func]], stat: Parsley[Stat]): Parsley[Program] = (funcs, stat).zipped(Program(_, _))
+  }
   object Func{
-    def apply(type: Parsley[Type], ident: Parsley[Ident], params: Parsley[ParamList], stat: Parsley[Stat]) : Parsley[Func] = (type, ident, params, stat).zipped4(Func(_,_,_,_))
+    def apply(_type: Parsley[Type], ident: Parsley[Ident], params: Parsley[ParamList], stat: Parsley[Stat]) : Parsley[Func] = (_type, ident, params, stat).zipped(Func(_,_,_,_))
+  }
+  object ParamList {
+    def apply(params: Parsley[List[Param]]): Parsley[ParamList] = params.map(ParamList(_))
+  }
+  object Param{
+    def apply(_type: Parsley[Type], ident: Parsley[Ident]) : Parsley[Param] = (_type, ident).zipped(Param(_,_))
   }
 
-  object Param{
-    def apply(type: Parsley[Type], ident: Parsley[Ident]) : Parsley[Param] = (type, ident).zipped(Param(_,_))
+  object Decl {
+    def apply(_type: Parsley[Type], ident: Parsley[Ident], rhs: Parsley[AssignRHS]): Parsley[Decl]
+      = (_type, ident, rhs).zipped(Decl(_, _, _))
+  }
+  object Assign {
+    def apply(lhs: Parsley[AssignLHS], rhs: Parsley[AssignRHS]): Parsley[Assign]
+      = (lhs, rhs).zipped(Assign(_, _))
+  }
+  object Read {
+    def apply(lhs: Parsley[AssignLHS]): Parsley[Read] = lhs.map(Read(_))
+  }
+  object Free {
+    def apply(expr: Parsley[Expr]): Parsley[Free] = expr.map(Free(_))
+  }
+  object Return {
+    def apply(expr: Parsley[Expr]): Parsley[Return] = expr.map(Return(_))
+  }
+  object Exit {
+    def apply(expr: Parsley[Expr]): Parsley[Exit] = expr.map(Exit(_))
+  }
+  object Print {
+    def apply(expr: Parsley[Expr]): Parsley[Print] = expr.map(Print(_))
+  }
+  object Println {
+    def apply(expr: Parsley[Expr]): Parsley[Println] = expr.map(Println(_))
+  }
+  object IfElse {
+    def apply(cond: Parsley[Expr], then_stat: Parsley[Stat], else_stat: Parsley[Stat]): Parsley[IfElse]
+    = (cond, then_stat, else_stat).zipped(IfElse(_, _, _))
+  }
+  object While {
+    def apply(cond: Parsley[Expr], body: Parsley[Stat]): Parsley[While]
+    = (cond, body).zipped(While(_, _))
+  }
+  object Scope {
+    def apply(stat: Parsley[Stat]): Parsley[Scope] = stat.map(Scope(_))
+  }
+  object Combine {
+    def apply(fst: Parsley[Stat], snd: Parsley[Stat]): Parsley[Combine] = (fst, snd).zipped(Combine(_, _))
+  }
+
+  object NewPair {
+    def apply(fst: Parsley[Expr], snd: Parsley[Expr]): Parsley[NewPair] = (fst, snd).zipped(NewPair(_,_))
+  }
+  object Call {
+    def apply(ident: Parsley[Ident], argList: Parsley[ArgList]): Parsley[Call] = (ident, argList).zipped(Call(_,_))
   }
 
   object ArgList{
-    def apply(expr: Parsley[Expr], exprs: Parsley[List[Expr]]) : Parsley[ArgList] = (expr, exprs).zipped(ArgList(_,_))
+    def apply(args: Parsley[List[Expr]]): Parsley[ArgList] = args.map(ArgList(_))
+  }
+
+  object FstPair {
+    def apply(fst: Parsley[Expr]): Parsley[FstPair] = fst.map(FstPair(_))
+  }
+  object SndPair {
+    def apply(snd: Parsley[Expr]): Parsley[SndPair] = snd.map(SndPair(_))
   }
 
   object ArrayType{
-    def apply(type: Parsley[Type]) : Parsley[ArrayType] = (type).map(ArrayType(_))
+    def apply(_type: Parsley[Type]) : Parsley[ArrayType] = _type.map(ArrayType(_))
+  }
+  object PairType {
+    def apply(fst_type: Parsley[PairElemType], snd_type: Parsley[PairElemType]): Parsley[PairType]
+    = (fst_type, snd_type).zipped(PairType(_,_))
+  }
+
+  object IntLiter {
+    def apply(x: Parsley[Int]): Parsley[IntLiter] = x.map(IntLiter(_))
+  }
+  object BoolLiter {
+    def apply(b: Parsley[Boolean]): Parsley[BoolLiter] = b.map(BoolLiter(_))
+  }
+  object CharLiter {
+    def apply(c: Parsley[Char]): Parsley[CharLiter] = c.map(CharLiter(_))
+  }
+  object StrLiter {
+    def apply(s: Parsley[String]): Parsley[StrLiter] = s.map(StrLiter(_))
+  }
+  object Ident {
+    def apply(ident: Parsley[String]): Parsley[Ident] = ident.map(Ident(_))
   }
 
 }
