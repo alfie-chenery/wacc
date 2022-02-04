@@ -1,5 +1,6 @@
 import parsley.Parsley
 import Parsley._
+import ast.ParserBuilder1
 import parsley.character.anyChar
 import parsley.combinator.sepBy1
 
@@ -7,7 +8,7 @@ import scala.language.implicitConversions
 
 object lexer {
   import parsley.token.{LanguageDef, Lexer}
-  import parsley.implicits.character.charLift
+  import parsley.implicits.character.{charLift, stringLift}
   import parsley.combinator.{eof, many}
   import parsley.character.{digit, isWhitespace}
   import parsley.token.Predicate
@@ -33,7 +34,7 @@ object lexer {
   val BOOL_LITER: Parsley[Boolean] = token(pure(true)) <|> token(pure(false))
   val CHAR_LITER: Parsley[Char] = token('\'') ~> anyChar <~ token('\'')
   val STR_LITER: Parsley[String] = token(many(CHAR_LITER).map(_.mkString))
-  // val PAIR_LITER: Parsley[Null] = token("null")
+  val PAIR_LITER: Parsley[String] = token("null")
   val ESC_CHAR: Parsley[Char] = token('0') <|> token('b') <|> token('t') <|> token('n') <|> token('f') <|> token('r') <|> token('"') <|> token('\'') <|> token('\\')
 
   private def token[A](p: =>Parsley[A]): Parsley[A] = lex.lexeme(attempt(p))
@@ -51,7 +52,7 @@ object lexer {
 
 object parser {
   import parsley.combinator.{some, many}
-  import parsley.expr.{precedence, Ops, InfixR, InfixL, NonAssoc, Prefix}
+  import parsley.expr.{precedence, Ops, SOps, InfixR, InfixL, NonAssoc, Prefix}
   import lexer._
   import implicits.tokenLift
   import ast._
@@ -59,27 +60,22 @@ object parser {
 
   private val `<ident>`: Parsley[Ident] = Ident(lex.identifier)
   private val `<array-liter>`: Parsley[ArrayLiter] = '[' ~> ArrayLiter(sepBy1(`<expr>`, ',')) <~ ']'
-  /* TODO these shouldn't be returning BinaryOp they should be building application
-      see <expr> in the spec e.g <expr> <binar-oper> <expr>
-   */
-  private lazy val `<binary-oper>`: Parsley[BinaryApp] =
-    precedence(Ops[BinaryOp](InfixR)(Or <# "||" ),
-               Ops[BinaryOp](InfixR)(And <# "&&"),
-               Ops[BinaryOp](NonAssoc)(NotEq <# "!=", Eq <# "=="),
-               Ops[BinaryOp](NonAssoc)(LessEq <# "<", Less <# "<",
+  private lazy val `<binary-oper>`: Parsley[Expr] =
+    precedence(`<expr>`)(SOps(InfixR)(Or <# "||"),
+                         SOps(InfixR)(And <# "&&"),
+                         SOps(NonAssoc)(NotEq <# "!=", Eq <# "=="),
+                         SOps(NonAssoc)(LessEq <# "<=", Less <# "<",
                              Greater <# ">", GreaterEq <# ">="),
-               Ops[BinaryOp](InfixL)(Minus <# "-", Plus <# "+"),
-               Ops[BinaryOp](InfixL)(Mod <# "%", Div <# "/", Mult <# "*"))
-  private lazy val `<unary-oper>`: Parsley[UnaryApp] =
-    precedence(Ops(Prefix)(Not <# "!", Negate <# "-",
+                         SOps(InfixL)(Minus <# "-", Plus <# "+"),
+                         SOps(InfixL)(Mod <# "%", Div <# "/", Mult <# "*"))
+  private lazy val `<unary-oper>`: Parsley[Expr] =
+    precedence(`<expr>`)(SOps(Prefix)(Not <# "!" , Negate <# "-",
                              Len <# "len", Ord <# "ord", Chr <# "chr"))
   private val `<array-elem>`: Parsley[ArrayElem] = ArrayElem(`<ident>`, some('[' ~> `<expr>` <~ ']'))
   private lazy val `<expr>`: Parsley[Expr] =
     IntLiter(INT_LITER) <|> BoolLiter(BOOL_LITER) <|> CharLiter(CHAR_LITER) <|>
-      StrLiter(STR_LITER) <|> Ident(lex.identifier) <|>
-      `<array-elem>` <|> `<binary-oper>` <~> `<expr>` <|>
-      `<expr>` <~ `<binary-oper>` <~> `<expr>`  <|>
-      '(' ~> `<expr>` <~ ')'
+      StrLiter(STR_LITER) <|> PAIR_LITER #> PairLiter <|> Ident(lex.identifier) <|>
+      `<array-elem>` <|> `<unary-oper>` <|> `<binary-oper>` <|> '(' ~> `<expr>` <~ ')'
   private val `<pair-elem-type>`: Parsley[PairElemType] = `<base-type>` <|> `<array-type>` <|> pure(Pair)
   private val `<pair-type>`: Parsley[PairType] =
     "pair" ~> '(' ~> PairType(`<pair-elem-type>` , ',' ~> `<pair-elem-type>`) <~ ')'
@@ -96,7 +92,7 @@ object parser {
       "newpair" ~> '(' ~> NewPair(`<expr>`, ',' ~> `<expr>`) <~ ')' <|>
       `<pair-elem>` <|> "call" ~> Call(`<ident>`, '(' ~> `<arg-list>`) <~ ')'
   private val `<assign-lhs>` = `<ident>` <|> `<array-elem>` <|> `<pair-elem>`
-  private val `<stat>` =
+  private lazy val `<stat>`: Parsley[Stat] =
     Skip <# "skip" <|> Decl(`<type>`, `<ident>`, '=' ~> `<assign-rhs>`) <|>
       Assign(`<assign-lhs>`, '=' ~> `<assign-rhs>`) <|>
       "read" ~> Read(`<assign-lhs>`) <|> "free" ~> Free(`<expr>`) <|>
@@ -170,27 +166,27 @@ object ast {
   case class BinaryApp(lhs: Expr, op: BinaryOp, rhs: Expr)
   case class ParensExpr(expr: Expr)
 
-  sealed trait UnaryOp
-  case object Not extends UnaryOp with ParserBuilder[UnaryOp]{val parser = pure(Not)}
-  case object Negate extends UnaryOp with ParserBuilder[UnaryOp]{val parser = pure(Negate)}
-  case object Len extends UnaryOp with ParserBuilder[UnaryOp]{val parser = pure(Len)}
-  case object Ord extends UnaryOp with ParserBuilder[UnaryOp]{val parser = pure(Ord)}
-  case object Chr extends UnaryOp with ParserBuilder[UnaryOp]{val parser = pure(Chr)}
+  sealed trait UnaryOp extends Expr
+  case class Not(expr: Expr) extends UnaryOp
+  case class Negate(expr: Expr) extends UnaryOp
+  case class Len(expr: Expr) extends UnaryOp
+  case class Ord(expr: Expr) extends UnaryOp
+  case class Chr(expr: Expr) extends UnaryOp
 
-  sealed trait BinaryOp
-  case object Mult extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(Mult)}
-  case object Div extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(Div)}
-  case object Mod extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(Mod)}
-  case object Plus extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(Plus)}
-  case object Minus extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(Minus)}
-  case object Greater extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(Greater)}
-  case object GreaterEq extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(GreaterEq)}
-  case object Less extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(Less)}
-  case object LessEq extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(LessEq)}
-  case object Eq extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(Eq)}
-  case object NotEq extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(NotEq)}
-  case object And extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(And)}
-  case object Or extends BinaryOp with ParserBuilder[BinaryOp]{val parser = pure(Or)}
+  sealed trait BinaryOp extends Expr
+  case class Mult(l_expr: Expr, r_expr: Expr) extends BinaryOp
+  case class Div(l_expr: Expr, r_expr: Expr) extends BinaryOp
+  case class Mod(l_expr: Expr, r_expr: Expr) extends BinaryOp
+  case class Plus(l_expr: Expr, r_expr: Expr) extends BinaryOp
+  case class Minus(l_expr: Expr, r_expr: Expr) extends BinaryOp
+  case class Greater(l_expr: Expr, r_expr: Expr) extends BinaryOp
+  case class GreaterEq(l_expr: Expr, r_expr: Expr) extends BinaryOp
+  case class Less(l_expr: Expr, r_expr: Expr) extends BinaryOp
+  case class LessEq(l_expr: Expr, r_expr: Expr) extends BinaryOp
+  case class Eq(l_expr: Expr, r_expr: Expr) extends BinaryOp
+  case class NotEq(l_expr: Expr, r_expr: Expr) extends BinaryOp
+  case class And(l_expr: Expr, r_expr: Expr) extends BinaryOp
+  case class Or(l_expr: Expr, r_expr: Expr) extends BinaryOp
 
   case class ArrayLiter(exprs: List[Expr]) extends AssignRHS
 
@@ -198,6 +194,15 @@ object ast {
     val parser: Parsley[T]
     final def <#(p: Parsley[_]): Parsley[T] = parser <* p
   }
+  trait ParserBuilder1[T1, R] extends ParserBuilder[T1 => R] {
+    def apply(x: T1): R
+    val parser = pure(apply(_))
+  }
+  trait ParserBuilder2[T1, T2, R] extends ParserBuilder[(T1, T2) => R] {
+    def apply(x: T1, y: T2): R
+    val parser = pure(apply(_, _))
+  }
+
   object Program {
     def apply(funcs: Parsley[List[Func]], stat: Parsley[Stat]): Parsley[Program] = (funcs, stat).zipped(Program(_, _))
   }
@@ -278,15 +283,6 @@ object ast {
       (fst_type, snd_type).zipped(PairType(_,_))
   }
 
-  object UnaryApp {
-    def apply(op: Parsley[UnaryOp], expr: Parsley[Expr]): Parsley[UnaryApp] =
-      (op, expr).zipped(UnaryApp(_, _))
-  }
-  object BinaryApp {
-    def apply(lhs: Parsley[Expr], op: Parsley[BinaryOp], rhs: Parsley[Expr]): Parsley[BinaryApp] =
-      (lhs, op, rhs).zipped(BinaryApp(_, _, _))
-  }
-
   object ArrayElem {
     def apply(ident: Parsley[Ident], expr: Parsley[List[Expr]]): Parsley[ArrayElem] =
       (ident, expr).zipped(ArrayElem(_,_))
@@ -310,5 +306,25 @@ object ast {
   object Ident {
     def apply(ident: Parsley[String]): Parsley[Ident] = ident.map(Ident(_))
   }
+
+  object Not extends ParserBuilder1[Expr, Not]
+  object Negate extends ParserBuilder1[Expr, Negate]
+  object Len extends ParserBuilder1[Expr, Len]
+  object Ord extends ParserBuilder1[Expr, Ord]
+  object Chr extends ParserBuilder1[Expr, Chr]
+
+  object Mult extends ParserBuilder2[Expr, Expr, Mult]
+  object Div extends ParserBuilder2[Expr, Expr, Div]
+  object Mod extends ParserBuilder2[Expr, Expr, Mod]
+  object Plus extends ParserBuilder2[Expr, Expr, Plus]
+  object Minus extends ParserBuilder2[Expr, Expr, Minus]
+  object Greater extends ParserBuilder2[Expr, Expr, Greater]
+  object GreaterEq extends ParserBuilder2[Expr, Expr, GreaterEq]
+  object Less extends ParserBuilder2[Expr, Expr, Less]
+  object LessEq extends ParserBuilder2[Expr, Expr, LessEq]
+  object Eq extends ParserBuilder2[Expr, Expr, Eq]
+  object NotEq extends ParserBuilder2[Expr, Expr, NotEq]
+  object And extends ParserBuilder2[Expr, Expr, And]
+  object Or extends ParserBuilder2[Expr, Expr, Or]
 
 }
