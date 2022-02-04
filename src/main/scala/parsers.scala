@@ -1,13 +1,14 @@
 import parsley.Parsley
 import Parsley._
 import parsley.character.anyChar
+import parsley.combinator.sepBy1
 
 import scala.language.implicitConversions
 
 object lexer {
   import parsley.token.{LanguageDef, Lexer}
   import parsley.implicits.character.charLift
-  import parsley.combinator.eof
+  import parsley.combinator.{eof, many}
   import parsley.character.{digit, isWhitespace}
   import parsley.token.Predicate
 
@@ -29,12 +30,10 @@ object lexer {
   val lex = new Lexer(lang)
 
   val INT_LITER: Parsley[Int] = token(digit.foldLeft1(0)((x, d) => x * 10 + d.asDigit))
-  // TODO come back to this
   val BOOL_LITER: Parsley[Boolean] = token(pure(true)) <|> token(pure(false))
   val CHAR_LITER: Parsley[Char] = token('\'') ~> anyChar <~ token('\'')
-  // TODO fix types
-  // val STR_LITER: Parsley[String] = token(many(CHAR_LITER))
-  val PAIR_LITER: Parsley[Null] = token(null)
+  val STR_LITER: Parsley[String] = token(many(CHAR_LITER).map(_.mkString))
+  // val PAIR_LITER: Parsley[Null] = token("null")
   val ESC_CHAR: Parsley[Char] = token('0') <|> token('b') <|> token('t') <|> token('n') <|> token('f') <|> token('r') <|> token('"') <|> token('\'') <|> token('\\')
 
   private def token[A](p: =>Parsley[A]): Parsley[A] = lex.lexeme(attempt(p))
@@ -51,22 +50,66 @@ object lexer {
 }
 
 object parser {
-  import parsley.combinator.some
-
+  import parsley.combinator.{some, many}
+  import parsley.expr.{precedence, Ops, InfixR, InfixL, NonAssoc, Prefix}
   import lexer._
   import implicits.tokenLift
   import ast._
 
 
   private val `<ident>`: Parsley[Ident] = Ident(lex.identifier)
+  private val `<array-liter>`: Parsley[ArrayLiter] = '[' ~> ArrayLiter(sepBy1(`<expr>`, ',')) <~ ']'
+  /* TODO these shouldn't be returning BinaryOp they should be building application
+      see <expr> in the spec e.g <expr> <binar-oper> <expr>
+   */
+  private lazy val `<binary-oper>`: Parsley[BinaryApp] =
+    precedence(Ops[BinaryOp](InfixR)(Or <# "||" ),
+               Ops[BinaryOp](InfixR)(And <# "&&"),
+               Ops[BinaryOp](NonAssoc)(NotEq <# "!=", Eq <# "=="),
+               Ops[BinaryOp](NonAssoc)(LessEq <# "<", Less <# "<",
+                             Greater <# ">", GreaterEq <# ">="),
+               Ops[BinaryOp](InfixL)(Minus <# "-", Plus <# "+"),
+               Ops[BinaryOp](InfixL)(Mod <# "%", Div <# "/", Mult <# "*"))
+  private lazy val `<unary-oper>`: Parsley[UnaryApp] =
+    precedence(Ops(Prefix)(Not <# "!", Negate <# "-",
+                             Len <# "len", Ord <# "ord", Chr <# "chr"))
   private val `<array-elem>`: Parsley[ArrayElem] = ArrayElem(`<ident>`, some('[' ~> `<expr>` <~ ']'))
-  private val `<expr>`: Parsley[Expr] =
+  private lazy val `<expr>`: Parsley[Expr] =
     IntLiter(INT_LITER) <|> BoolLiter(BOOL_LITER) <|> CharLiter(CHAR_LITER) <|>
-      StrLiter(STR_LITER) /*<|> PairLiter Fix ast above*/ <|> Ident(lex.identifier) <|>
-      `<array-elem>` <|> /*<|> oneOf(unaryOperators) <~> `<expr>` <|>
-      `<expr>` <~ oneOf(binaryOperators) <~> `<expr>` find a way to do one of with sets*/
+      StrLiter(STR_LITER) <|> Ident(lex.identifier) <|>
+      `<array-elem>` <|> `<binary-oper>` <~> `<expr>` <|>
+      `<expr>` <~ `<binary-oper>` <~> `<expr>`  <|>
       '(' ~> `<expr>` <~ ')'
-
+  private val `<pair-elem-type>`: Parsley[PairElemType] = `<base-type>` <|> `<array-type>` <|> pure(Pair)
+  private val `<pair-type>`: Parsley[PairType] =
+    "pair" ~> '(' ~> PairType(`<pair-elem-type>` , ',' ~> `<pair-elem-type>`) <~ ')'
+  private val `<array-type>`: Parsley[ArrayType] = ArrayType(`<type>`) <~ '[' <~ ']'
+  // TODO figure out why or if we need parser builder for W types
+  private val `<base-type>`: Parsley[BaseType] =
+    (WInt <# "int") <|> (WBool <# "bool") <|> (WChar <# "char") <|> (WString <# "string")
+  private val `<type>`: Parsley[Type] = `<base-type>` <|> `<array-type>` <|> `<pair-type>`
+  private val `<pair-elem>`: Parsley[PairElem] =
+    "fst" ~> FstPair(`<expr>`) <|> "snd" ~> SndPair(`<expr>`)
+  private val `<arg-list>`: Parsley[ArgList] = ArgList(sepBy1(`<expr>`, ','))
+  private val `<assign-rhs>`: Parsley[AssignRHS] =
+    `<expr>` <|> `<array-liter>` <|>
+      "newpair" ~> '(' ~> NewPair(`<expr>`, ',' ~> `<expr>`) <~ ')' <|>
+      `<pair-elem>` <|> "call" ~> Call(`<ident>`, '(' ~> `<arg-list>`) <~ ')'
+  private val `<assign-lhs>` = `<ident>` <|> `<array-elem>` <|> `<pair-elem>`
+  private val `<stat>` =
+    Skip <# "skip" <|> Decl(`<type>`, `<ident>`, '=' ~> `<assign-rhs>`) <|>
+      Assign(`<assign-lhs>`, '=' ~> `<assign-rhs>`) <|>
+      "read" ~> Read(`<assign-lhs>`) <|> "free" ~> Free(`<expr>`) <|>
+      "return" ~> Return(`<expr>`) <|> "exit" ~> Exit(`<expr>`) <|>
+      "print" ~> Print(`<expr>`) <|> "println" ~> Println(`<expr>`) <|>
+      "if" ~> IfElse(`<expr>`, "then" ~> `<stat>`, "else" ~> `<stat>`) <~ "fi" <|>
+      "while" ~> While(`<expr>`, "do" ~> `<stat>`) <~ "done" <|>
+      "begin" ~> Scope(`<stat>`) <~ "end" <|> Combine(`<stat>`, ';' ~> `<stat>`)
+  private val `<param>` = Param(`<type>`, `<ident>`)
+  private val `<param-list>` = ParamList(sepBy1(`<param>`, ','))
+  private val `<func>` =
+    Func(`<type>`, `<ident>`, '(' ~> `<param-list>`, ')' ~> "is" ~> `<stat>`) <~ "end"
+  private val `<program>` = fully("begin" ~> Program(many(`<func>`), `<stat>`) <~ "end")
 }
 
 object ast {
@@ -96,7 +139,7 @@ object ast {
 
   sealed trait AssignRHS
   case class NewPair(fst: Expr, snd: Expr) extends AssignRHS
-  case class Call(ident: Ident, argList: ArgList)
+  case class Call(ident: Ident, argList: ArgList) extends AssignRHS
 
   case class ArgList(args: List[Expr])
 
@@ -109,6 +152,7 @@ object ast {
   case object WInt extends BaseType with ParserBuilder[BaseType]{val parser = pure(WInt)}
   case object WBool extends BaseType with ParserBuilder[BaseType]{val parser = pure(WBool)}
   case object WChar extends BaseType with ParserBuilder[BaseType]{val parser = pure(WChar)}
+  case object WString extends BaseType with ParserBuilder[BaseType]{val parser = pure(WChar)}
   case class ArrayType(_type: Type) extends Type with PairElemType
   case class PairType(fst_type: PairElemType, snd_type: PairElemType) extends Type
   sealed trait PairElemType
@@ -230,13 +274,26 @@ object ast {
     def apply(_type: Parsley[Type]) : Parsley[ArrayType] = _type.map(ArrayType(_))
   }
   object PairType {
-    def apply(fst_type: Parsley[PairElemType], snd_type: Parsley[PairElemType]): Parsley[PairType]
-    = (fst_type, snd_type).zipped(PairType(_,_))
+    def apply(fst_type: Parsley[PairElemType], snd_type: Parsley[PairElemType]): Parsley[PairType] =
+      (fst_type, snd_type).zipped(PairType(_,_))
+  }
+
+  object UnaryApp {
+    def apply(op: Parsley[UnaryOp], expr: Parsley[Expr]): Parsley[UnaryApp] =
+      (op, expr).zipped(UnaryApp(_, _))
+  }
+  object BinaryApp {
+    def apply(lhs: Parsley[Expr], op: Parsley[BinaryOp], rhs: Parsley[Expr]): Parsley[BinaryApp] =
+      (lhs, op, rhs).zipped(BinaryApp(_, _, _))
   }
 
   object ArrayElem {
-    def apply(ident: Parsley[Ident], expr: Parsley[List[Expr]]): Parsley[ArrayElem]
-    = (ident, expr).zipped(ArrayElem(_,_))
+    def apply(ident: Parsley[Ident], expr: Parsley[List[Expr]]): Parsley[ArrayElem] =
+      (ident, expr).zipped(ArrayElem(_,_))
+  }
+  object ArrayLiter {
+    def apply(exprs: Parsley[List[Expr]]): Parsley[ArrayLiter] =
+      exprs.map(ArrayLiter(_))
   }
   object IntLiter {
     def apply(x: Parsley[Int]): Parsley[IntLiter] = x.map(IntLiter(_))
