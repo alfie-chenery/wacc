@@ -2,7 +2,7 @@ package parsers
 
 import parsley.Parsley._
 import parsley.combinator.sepBy1
-import parsley.{Failure, Parsley, Result, Success}
+import parsley.{Parsley, Result}
 
 import java.io.File
 import scala.language.implicitConversions
@@ -66,23 +66,22 @@ object parser {
   // TODO Make sure this means identifiers can't be keywords
   private [parsers] lazy val `<ident>`: Parsley[Ident] = attempt(Ident(lex.identifier))
   private [parsers] lazy val `<array-liter>`: Parsley[ArrayLiter] = ArrayLiter('[' ~> sepBy1(`<expr>`, ',') <~ ']')
-  private [parsers] lazy val `<binary-oper>`: Parsley[Expr] =
-    precedence(`<expr>`)(SOps(InfixR)(Or <# "||"),
-                         SOps(InfixR)(And <# "&&"),
-                         SOps(NonAssoc)(NotEq <# "!=", Eq <# "=="),
-                         SOps(NonAssoc)(LessEq <# "<=", Less <# "<",
-                             Greater <# ">", GreaterEq <# ">="),
-                         SOps(InfixL)(Minus <# "-", Plus <# "+"),
-                         SOps(InfixL)(Mod <# "%", Div <# "/", Mult <# "*"))
-  private [parsers] lazy val `<unary-oper>`: Parsley[Expr] =
-    precedence(`<expr>`)(SOps(Prefix)(Not <# "!" , Negate <# "-",
-                             Len <# "len", Ord <# "ord", Chr <# "chr"))
-  private [parsers] lazy val `<array-elem>`: Parsley[ArrayElem] = ArrayElem(`<ident>`, some('[' ~> `<expr>` <~ ']'))
   private [parsers] lazy val `<expr>`: Parsley[Expr] =
-    attempt(IntLiter(INT_LITER)) <|>
-      BoolLiter(BOOL_LITER) <|> CharLiter(CHAR_LITER) <|> attempt(StrLiter(STR_LITER)) <|>
-      (PAIR_LITER #> PairLiter) <|> attempt(`<ident>`) <|> `<array-elem>` <|>
-      attempt(`<unary-oper>`) <|> attempt(`<binary-oper>`) <|>('(' ~> `<expr>` <~ ')')
+    precedence(SOps(InfixR)(Or <# "||") +:
+                         SOps(InfixR)(And <# "&&") +:
+                         SOps(NonAssoc)(NotEq <# "!=", Eq <# "==") +:
+                         SOps(NonAssoc)(LessEq <# "<=", Less <# "<",
+                             Greater <# ">", GreaterEq <# ">=") +:
+                         SOps(InfixL)(Minus <# "-", Plus <# "+") +:
+                         SOps(InfixL)(Mod <# "%", Div <# "/", Mult <# "*") +:
+                         SOps(Prefix)(Not <# "!" , Negate <# "-",
+                         Len <# "len", Ord <# "ord", Chr <# "chr") +:
+                         Atoms(`<expr-atoms>`))
+  private [parsers] lazy val `<array-elem>`: Parsley[ArrayElem] = ArrayElem(`<ident>`, some('[' ~> `<expr>` <~ ']'))
+  private [parsers] lazy val `<expr-atoms>`: Parsley[Term] =
+    attempt(IntLiter(INT_LITER)) <|> BoolLiter(BOOL_LITER) <|> CharLiter(CHAR_LITER) <|>
+      attempt(StrLiter(STR_LITER)) <|> (PAIR_LITER #> PairLiter) <|> attempt(`<ident>`) <|>
+      `<array-elem>` <|> ParensExpr('(' ~> `<expr>` <~ ')')
   private [parsers] lazy val `<pair-elem-type>`: Parsley[PairElemType] =
     attempt(Pair <# "pair") <|> attempt(`<array-type>`) <|> attempt(`<base-type>`)
   private [parsers] lazy val `<pair-type>`: Parsley[PairType] =
@@ -119,6 +118,11 @@ object parser {
     `<program>`.parse(input)
   def parse[Err: ErrorBuilder](input: File): Result[Err, Program] =
     `<program>`.parseFromFile(input).get
+
+  def main(args: Array[String]): Unit = {
+    println(parse("begin int i = (5 + 3) * 5 end"))
+    println(parse(new File("../wacc_examples/valid/expressions/intCalc.wacc")))
+  }
 
 }
 
@@ -169,38 +173,44 @@ object ast {
   case object Pair extends PairElemType with ParserBuilder[PairElemType]{val parser = pure(Pair)}
 
   sealed trait Expr extends AssignRHS
-  case class IntLiter(x: Int) extends Expr
-  case class BoolLiter(b: Boolean) extends Expr
-  case class CharLiter(c: Char) extends Expr
-  case class StrLiter(s: String) extends Expr
-  case object PairLiter extends Expr
-  case class Ident(ident: String) extends Expr with AssignLHS
-  case class ArrayElem(ident: Ident, expr: List[Expr]) extends Expr with AssignLHS
-  case class UnaryApp(op: UnaryOp, expr: Expr)
-  case class BinaryApp(lhs: Expr, op: BinaryOp, rhs: Expr)
-  case class ParensExpr(expr: Expr)
+  case class IntLiter(x: Int) extends Term
+  case class BoolLiter(b: Boolean) extends Term
+  case class CharLiter(c: Char) extends Term
+  case class StrLiter(s: String) extends Term
+  case object PairLiter extends Term
+  case class Ident(ident: String) extends Term with AssignLHS
+  case class ArrayElem(ident: Ident, expr: List[Expr]) extends Term with AssignLHS
+  case class ParensExpr(expr: Expr) extends Term
 
-  sealed trait UnaryOp extends Expr
-  case class Not(expr: Expr) extends UnaryOp
-  case class Negate(expr: Expr) extends UnaryOp
-  case class Len(expr: Expr) extends UnaryOp
-  case class Ord(expr: Expr) extends UnaryOp
-  case class Chr(expr: Expr) extends UnaryOp
+  sealed trait Term extends Expr7_
+  case class StrongApp(f: Expr7_, arg: Term) extends Expr7_
+  sealed trait Expr7_ extends Expr7
+  sealed trait Expr7 extends Expr6
+  case class Not(expr: Expr7) extends Expr7
+  case class Negate(expr: Expr7) extends Expr7
+  case class Len(expr: Expr7) extends Expr7
+  case class Ord(expr: Expr7) extends Expr7
+  case class Chr(expr: Expr7) extends Expr7
 
-  sealed trait BinaryOp extends Expr
-  case class Mult(l_expr: Expr, r_expr: Expr) extends BinaryOp
-  case class Div(l_expr: Expr, r_expr: Expr) extends BinaryOp
-  case class Mod(l_expr: Expr, r_expr: Expr) extends BinaryOp
-  case class Plus(l_expr: Expr, r_expr: Expr) extends BinaryOp
-  case class Minus(l_expr: Expr, r_expr: Expr) extends BinaryOp
-  case class Greater(l_expr: Expr, r_expr: Expr) extends BinaryOp
-  case class GreaterEq(l_expr: Expr, r_expr: Expr) extends BinaryOp
-  case class Less(l_expr: Expr, r_expr: Expr) extends BinaryOp
-  case class LessEq(l_expr: Expr, r_expr: Expr) extends BinaryOp
-  case class Eq(l_expr: Expr, r_expr: Expr) extends BinaryOp
-  case class NotEq(l_expr: Expr, r_expr: Expr) extends BinaryOp
-  case class And(l_expr: Expr, r_expr: Expr) extends BinaryOp
-  case class Or(l_expr: Expr, r_expr: Expr) extends BinaryOp
+  sealed trait Expr6 extends Expr5
+  case class Mult(l_expr: Expr6, r_expr: Expr7) extends Expr6
+  case class Div(l_expr: Expr6, r_expr: Expr7) extends Expr6
+  case class Mod(l_expr: Expr6, r_expr: Expr7) extends Expr6
+  sealed trait Expr5 extends Expr4
+  case class Plus(l_expr: Expr5, r_expr: Expr6) extends Expr5
+  case class Minus(l_expr: Expr5, r_expr: Expr6) extends Expr5
+  sealed trait Expr4 extends Expr3
+  case class Greater(l_expr: Expr5, r_expr: Expr4) extends Expr4
+  case class GreaterEq(l_expr: Expr5, r_expr: Expr4) extends Expr4
+  case class Less(l_expr: Expr5, r_expr: Expr4) extends Expr4
+  case class LessEq(l_expr: Expr5, r_expr: Expr4) extends Expr4
+  sealed trait Expr3 extends Expr2
+  case class Eq(l_expr: Expr4, r_expr: Expr3) extends Expr3
+  case class NotEq(l_expr: Expr4, r_expr: Expr3) extends Expr3
+  sealed trait Expr2 extends Expr1
+  case class And(l_expr: Expr3, r_expr: Expr2) extends Expr2
+  sealed trait Expr1 extends Expr
+  case class Or(l_expr: Expr2, r_expr: Expr1) extends Expr1
 
   case class ArrayLiter(exprs: List[Expr]) extends AssignRHS
 
@@ -320,24 +330,27 @@ object ast {
   object Ident {
     def apply(ident: Parsley[String]): Parsley[Ident] = ident.map(Ident(_))
   }
+  object ParensExpr {
+    def apply(expr: Parsley[Expr]): Parsley[ParensExpr] = expr.map(ParensExpr(_))
+  }
 
-  object Not extends ParserBuilder1[Expr, Not]
-  object Negate extends ParserBuilder1[Expr, Negate]
-  object Len extends ParserBuilder1[Expr, Len]
-  object Ord extends ParserBuilder1[Expr, Ord]
-  object Chr extends ParserBuilder1[Expr, Chr]
+  object Not extends ParserBuilder1[Expr7, Expr7]
+  object Negate extends ParserBuilder1[Expr7, Expr7]
+  object Len extends ParserBuilder1[Expr7, Expr7]
+  object Ord extends ParserBuilder1[Expr7, Expr7]
+  object Chr extends ParserBuilder1[Expr7, Expr7]
 
-  object Mult extends ParserBuilder2[Expr, Expr, Mult]
-  object Div extends ParserBuilder2[Expr, Expr, Div]
-  object Mod extends ParserBuilder2[Expr, Expr, Mod]
-  object Plus extends ParserBuilder2[Expr, Expr, Plus]
-  object Minus extends ParserBuilder2[Expr, Expr, Minus]
-  object Greater extends ParserBuilder2[Expr, Expr, Greater]
-  object GreaterEq extends ParserBuilder2[Expr, Expr, GreaterEq]
-  object Less extends ParserBuilder2[Expr, Expr, Less]
-  object LessEq extends ParserBuilder2[Expr, Expr, LessEq]
-  object Eq extends ParserBuilder2[Expr, Expr, Eq]
-  object NotEq extends ParserBuilder2[Expr, Expr, NotEq]
-  object And extends ParserBuilder2[Expr, Expr, And]
-  object Or extends ParserBuilder2[Expr, Expr, Or]
+  object Mult extends ParserBuilder2[Expr6, Expr7, Expr6]
+  object Div extends ParserBuilder2[Expr6, Expr7, Expr6]
+  object Mod extends ParserBuilder2[Expr6, Expr7, Expr6]
+  object Plus extends ParserBuilder2[Expr5, Expr6, Expr5]
+  object Minus extends ParserBuilder2[Expr5, Expr6, Expr5]
+  object Greater extends ParserBuilder2[Expr5, Expr4, Expr4]
+  object GreaterEq extends ParserBuilder2[Expr5, Expr4, Expr4]
+  object Less extends ParserBuilder2[Expr5, Expr4, Expr4]
+  object LessEq extends ParserBuilder2[Expr5, Expr4, Expr4]
+  object Eq extends ParserBuilder2[Expr4, Expr3, Expr3]
+  object NotEq extends ParserBuilder2[Expr4, Expr3, Expr3]
+  object And extends ParserBuilder2[Expr3, Expr2, Expr2]
+  object Or extends ParserBuilder2[Expr2, Expr1, Expr1]
 }

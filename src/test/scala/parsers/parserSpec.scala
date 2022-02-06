@@ -92,7 +92,6 @@ class parserSpec extends AnyFlatSpec{
     assert(`<expr>`.parse("test[12]").get == ArrayElem(Ident("test"), List(IntLiter(12))))
     assert(`<expr>`.parse("array[12][34]").get == ArrayElem(Ident("array"), List(IntLiter(12), IntLiter(34))))
   }
-  /*
   it should "parse unary application" in {
     assert(`<expr>`.parse("!true").get == Not(BoolLiter(true)))
     assert(`<expr>`.parse("-536").get == Negate(IntLiter(536)))
@@ -108,7 +107,6 @@ class parserSpec extends AnyFlatSpec{
     assert(`<expr>`.parse("(5435)").get == IntLiter(5435))
     assert(`<expr>`.parse("(test[12])").get == ArrayElem(Ident("test"), List(IntLiter(12))))
   }
-  */
 
   behavior of "<pair-elem-type>"
   it should "parse base type" in {
@@ -166,7 +164,6 @@ class parserSpec extends AnyFlatSpec{
   }
    */
 
-  /*
   behavior of "<pair-elem>"
   it should "parse fst elements" in {
     info("May fail if <expr> fails")
@@ -178,7 +175,6 @@ class parserSpec extends AnyFlatSpec{
     assert(`<pair-elem>`.parse("snd 352").get == FstPair(IntLiter(352)))
     assert(`<pair-elem>`.parse("snd \"test\"").get == FstPair(StrLiter("test")))
   }
-   */
 
   "<arg-list>" should "parse multiple comma seperated expressions" in {
     // TODO add more arg list tests
@@ -191,11 +187,9 @@ class parserSpec extends AnyFlatSpec{
     info("May fail if <expr> fails")
     assert(`<assign-rhs>`.parse("364634").get == IntLiter(364634))
   }
-  /*
   it should "parse array literals" in {
     assert(`<assign-rhs>`.parse("[1,2,3]").get == ArrayLiter(List(IntLiter(1), IntLiter(2), IntLiter(3))))
   }
-  */
   it should "parse new pairs" in {
     assert(`<assign-rhs>`.parse("newpair(325,643)").get == NewPair(IntLiter(325), IntLiter(643)))
   }
