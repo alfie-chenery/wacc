@@ -68,20 +68,20 @@ object parser {
   private [parsers] lazy val `<array-liter>`: Parsley[ArrayLiter] = ArrayLiter('[' ~> sepBy1(`<expr>`, ',') <~ ']')
   private [parsers] lazy val `<expr>`: Parsley[Expr] =
     precedence(SOps(InfixR)(Or <# "||") +:
-                         SOps(InfixR)(And <# "&&") +:
-                         SOps(NonAssoc)(NotEq <# "!=", Eq <# "==") +:
-                         SOps(NonAssoc)(LessEq <# "<=", Less <# "<",
-                             Greater <# ">", GreaterEq <# ">=") +:
-                         SOps(InfixL)(Minus <# "-", Plus <# "+") +:
-                         SOps(InfixL)(Mod <# "%", Div <# "/", Mult <# "*") +:
-                         SOps(Prefix)(Not <# "!" , Negate <# "-",
-                         Len <# "len", Ord <# "ord", Chr <# "chr") +:
-                         Atoms(`<expr-atoms>`))
-  private [parsers] lazy val `<array-elem>`: Parsley[ArrayElem] = ArrayElem(`<ident>`, some('[' ~> `<expr>` <~ ']'))
+               SOps(InfixR)(And <# "&&") +:
+               SOps(NonAssoc)(NotEq <# "!=", Eq <# "==") +:
+               SOps(NonAssoc)(LessEq <# "<=", Less <# "<",
+                              Greater <# ">", GreaterEq <# ">=") +:
+               SOps(InfixL)(Minus <# "-", Plus <# "+") +:
+               SOps(InfixL)(Mod <# "%", Div <# "/", Mult <# "*") +:
+               SOps(Prefix)(Not <# "!" , Negate <# "-",
+                            Len <# "len", Ord <# "ord", Chr <# "chr") +:
+               Atoms(`<expr-atoms>`))
   private [parsers] lazy val `<expr-atoms>`: Parsley[Term] =
     attempt(IntLiter(INT_LITER)) <|> BoolLiter(BOOL_LITER) <|> CharLiter(CHAR_LITER) <|>
       attempt(StrLiter(STR_LITER)) <|> (PAIR_LITER #> PairLiter) <|> attempt(`<ident>`) <|>
       `<array-elem>` <|> ParensExpr('(' ~> `<expr>` <~ ')')
+  private [parsers] lazy val `<array-elem>`: Parsley[ArrayElem] = ArrayElem(`<ident>`, some('[' ~> `<expr>` <~ ']'))
   private [parsers] lazy val `<pair-elem-type>`: Parsley[PairElemType] =
     attempt(Pair <# "pair") <|> attempt(`<array-type>`) <|> attempt(`<base-type>`)
   private [parsers] lazy val `<pair-type>`: Parsley[PairType] =
@@ -100,6 +100,8 @@ object parser {
       `<pair-elem>` <|> Call("call" ~> `<ident>`, '(' ~> `<arg-list>` <~ ')')
   private [parsers] lazy val `<assign-lhs>` = attempt(`<ident>`) <|> attempt(`<array-elem>`) <|> `<pair-elem>`
   private [parsers] lazy val `<stat>`: Parsley[Stat] =
+    precedence( Atoms(`<stat-atoms>`) :+ SOps(InfixR)(";" #> ((stat:StatAtom, atom:Stat) => Combine.apply(stat, atom))))
+  private [parsers] lazy val `<stat-atoms>`: Parsley[StatAtom] =
     attempt(Skip <# "skip") <|> Decl(`<type>`, `<ident>`, '=' ~> `<assign-rhs>`) <|>
       attempt(Assign(`<assign-lhs>`, '=' ~> `<assign-rhs>`)) <|>
       Read("read" ~> `<assign-lhs>`) <|> Free("free" ~> `<expr>`) <|>
@@ -120,7 +122,7 @@ object parser {
     `<program>`.parseFromFile(input).get
 
   def main(args: Array[String]): Unit = {
-    println(parse("begin int i = (5 + 3) * 5 end"))
+    println(parse("begin int x = 42; int y = 30 ; int z = x + y; println z end"))
     println(parse(new File("../wacc_examples/valid/expressions/intCalc.wacc")))
   }
 
@@ -135,19 +137,20 @@ object ast {
   case class Param(_type: Type, ident: Ident)
 
   sealed trait Stat
-  case object Skip extends Stat with ParserBuilder[Stat] {val parser = pure(Skip)}
-  case class Decl(_type: Type, ident: Ident, rhs: AssignRHS) extends Stat
-  case class Assign(lhs: AssignLHS, rhs: AssignRHS) extends Stat
-  case class Read(lhs: AssignLHS) extends Stat
-  case class Free(expr: Expr) extends Stat
-  case class Return(expr: Expr) extends Stat
-  case class Exit(expr: Expr) extends Stat
-  case class Print(expr: Expr) extends Stat
-  case class Println(expr: Expr) extends Stat
-  case class IfElse(cond: Expr, then_stat: Stat, then_else: Stat) extends Stat
-  case class While(cond: Expr, body: Stat) extends Stat
-  case class Scope(stat: Stat) extends Stat
-  case class Combine(first: Stat, second: Stat) extends Stat
+  sealed trait StatAtom extends Stat
+  case object Skip extends StatAtom with ParserBuilder[StatAtom] {val parser = pure(Skip)}
+  case class Decl(_type: Type, ident: Ident, rhs: AssignRHS) extends StatAtom
+  case class Assign(lhs: AssignLHS, rhs: AssignRHS) extends StatAtom
+  case class Read(lhs: AssignLHS) extends StatAtom
+  case class Free(expr: Expr) extends StatAtom
+  case class Return(expr: Expr) extends StatAtom
+  case class Exit(expr: Expr) extends StatAtom
+  case class Print(expr: Expr) extends StatAtom
+  case class Println(expr: Expr) extends StatAtom
+  case class IfElse(cond: Expr, then_stat: Stat, then_else: Stat) extends StatAtom
+  case class While(cond: Expr, body: Stat) extends StatAtom
+  case class Scope(stat: Stat) extends StatAtom
+  case class Combine(first: StatAtom, second: Stat) extends Stat
 
   sealed trait AssignLHS
 
@@ -182,35 +185,32 @@ object ast {
   case class ArrayElem(ident: Ident, expr: List[Expr]) extends Term with AssignLHS
   case class ParensExpr(expr: Expr) extends Term
 
-  sealed trait Term extends Expr7_
-  case class StrongApp(f: Expr7_, arg: Term) extends Expr7_
-  sealed trait Expr7_ extends Expr7
+  sealed trait Expr1 extends Expr
+  case class Or(l_expr: Expr2, r_expr: Expr1) extends Expr1
+  sealed trait Expr2 extends Expr1
+  case class And(l_expr: Expr3, r_expr: Expr2) extends Expr2
+  sealed trait Expr3 extends Expr2
+  case class Eq(l_expr: Expr4, r_expr: Expr3) extends Expr3
+  case class NotEq(l_expr: Expr4, r_expr: Expr3) extends Expr3
+  sealed trait Expr4 extends Expr3
+  case class Greater(l_expr: Expr5, r_expr: Expr4) extends Expr4
+  case class GreaterEq(l_expr: Expr5, r_expr: Expr4) extends Expr4
+  case class Less(l_expr: Expr5, r_expr: Expr4) extends Expr4
+  case class LessEq(l_expr: Expr5, r_expr: Expr4) extends Expr4
+  sealed trait Expr5 extends Expr4
+  case class Plus(l_expr: Expr5, r_expr: Expr6) extends Expr5
+  case class Minus(l_expr: Expr5, r_expr: Expr6) extends Expr5
+  sealed trait Expr6 extends Expr5
+  case class Mult(l_expr: Expr6, r_expr: Expr7) extends Expr6
+  case class Div(l_expr: Expr6, r_expr: Expr7) extends Expr6
+  case class Mod(l_expr: Expr6, r_expr: Expr7) extends Expr6
   sealed trait Expr7 extends Expr6
   case class Not(expr: Expr7) extends Expr7
   case class Negate(expr: Expr7) extends Expr7
   case class Len(expr: Expr7) extends Expr7
   case class Ord(expr: Expr7) extends Expr7
   case class Chr(expr: Expr7) extends Expr7
-
-  sealed trait Expr6 extends Expr5
-  case class Mult(l_expr: Expr6, r_expr: Expr7) extends Expr6
-  case class Div(l_expr: Expr6, r_expr: Expr7) extends Expr6
-  case class Mod(l_expr: Expr6, r_expr: Expr7) extends Expr6
-  sealed trait Expr5 extends Expr4
-  case class Plus(l_expr: Expr5, r_expr: Expr6) extends Expr5
-  case class Minus(l_expr: Expr5, r_expr: Expr6) extends Expr5
-  sealed trait Expr4 extends Expr3
-  case class Greater(l_expr: Expr5, r_expr: Expr4) extends Expr4
-  case class GreaterEq(l_expr: Expr5, r_expr: Expr4) extends Expr4
-  case class Less(l_expr: Expr5, r_expr: Expr4) extends Expr4
-  case class LessEq(l_expr: Expr5, r_expr: Expr4) extends Expr4
-  sealed trait Expr3 extends Expr2
-  case class Eq(l_expr: Expr4, r_expr: Expr3) extends Expr3
-  case class NotEq(l_expr: Expr4, r_expr: Expr3) extends Expr3
-  sealed trait Expr2 extends Expr1
-  case class And(l_expr: Expr3, r_expr: Expr2) extends Expr2
-  sealed trait Expr1 extends Expr
-  case class Or(l_expr: Expr2, r_expr: Expr1) extends Expr1
+  sealed trait Term extends Expr7
 
   case class ArrayLiter(exprs: List[Expr]) extends AssignRHS
 
@@ -278,7 +278,7 @@ object ast {
     def apply(stat: Parsley[Stat]): Parsley[Scope] = stat.map(Scope(_))
   }
   object Combine {
-    def apply(fst: Parsley[Stat], snd: Parsley[Stat]): Parsley[Combine] = (fst, snd).zipped(Combine(_, _))
+    def apply(fst: Parsley[StatAtom], snd: Parsley[Stat]): Parsley[Combine] = (fst, snd).zipped(Combine(_, _))
   }
 
   object NewPair {
