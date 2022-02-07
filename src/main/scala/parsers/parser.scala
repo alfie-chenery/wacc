@@ -444,8 +444,11 @@ object semanticAnalysis{
           return null
         }
       }
-
-
+      //case NewPair(fst, snd) => PairType(checkExprType(fst), checkExprType(snd))
+      case FstPair(expr) => checkExprType(expr)
+      case SndPair(expr) => checkExprType(expr)
+      //case Call(ident, argList) => st.lookupAll(ident)
+      //case _ => checkExprType(rhs)
     }
   }
 
