@@ -1,5 +1,6 @@
 package parsers
 
+import parsers.ast.{Ident, Skip}
 import parsley.Parsley._
 import parsley.combinator.sepBy1
 import parsley.{Parsley, Result}
@@ -130,6 +131,7 @@ object parser {
 
   private [parsers] lazy val `<param-list>` = ParamList(sepBy1(`<param>`, ','))
 
+  //TODO return or exit needed before end
   private [parsers] lazy val `<func>` =
     Func(`<type>`, `<ident>`, '(' ~> option(`<param-list>`) <~ ')', "is" ~> `<stat>` <~ "end")
 
@@ -145,7 +147,7 @@ object parser {
     `<program>`.parseFromFile(input).get
 
   def main(args: Array[String]): Unit = {
-    println(parse("begin int j =5; int k =3 end"))
+    println(parse("begin skip end"))
     //println(parse(new File("../wacc_examples/valid/expressions/intCalc.wacc")))
   }
 
@@ -154,12 +156,14 @@ object parser {
 object ast {
   import parsley.implicits.zipped.{Zipped2, Zipped3, Zipped4}
 
-  case class Program(funcs: List[Func], stat: Stat)
-  case class Func(_type: Type, ident: Ident, params: Option[ParamList], stat: Stat)
-  case class ParamList(params: List[Param])
-  case class Param(_type: Type, ident: Ident)
+  sealed trait AstNode
 
-  sealed trait Stat
+  case class Program(funcs: List[Func], stat: Stat) extends AstNode
+  case class Func(_type: Type, ident: Ident, params: Option[ParamList], stat: Stat) extends AstNode
+  case class ParamList(params: List[Param]) extends AstNode
+  case class Param(_type: Type, ident: Ident) extends AstNode
+
+  sealed trait Stat extends AstNode
   sealed trait StatAtom extends Stat
   case object Skip extends StatAtom with ParserBuilder[StatAtom] {val parser = pure(Skip)}
   case class Decl(_type: Type, ident: Ident, rhs: AssignRHS) extends StatAtom
@@ -175,19 +179,19 @@ object ast {
   case class Scope(stat: Stat) extends StatAtom
   case class Combine(first: StatAtom, second: Stat) extends Stat
 
-  sealed trait AssignLHS
+  sealed trait AssignLHS extends AstNode
 
-  sealed trait AssignRHS
+  sealed trait AssignRHS extends AstNode
   case class NewPair(fst: Expr, snd: Expr) extends AssignRHS
   case class Call(ident: Ident, argList: ArgList) extends AssignRHS
 
-  case class ArgList(args: List[Expr])
+  case class ArgList(args: List[Expr]) extends AstNode
 
   sealed trait PairElem extends AssignLHS with AssignRHS
   case class FstPair(fst: Expr) extends PairElem
   case class SndPair(snd: Expr) extends PairElem
 
-  sealed trait Type
+  sealed trait Type extends AstNode
   sealed trait BaseType extends Type with PairElemType
   case object WInt extends BaseType with ParserBuilder[BaseType]{val parser = pure(WInt)}
   case object WBool extends BaseType with ParserBuilder[BaseType]{val parser = pure(WBool)}
@@ -376,4 +380,124 @@ object ast {
   object NotEq extends ParserBuilder2[Expr4, Expr3, Expr3]
   object And extends ParserBuilder2[Expr3, Expr2, Expr2]
   object Or extends ParserBuilder2[Expr2, Expr1, Expr1]
+}
+
+class SymbolTable(val encSymTab: SymbolTable){
+
+  import parsers.ast.AstNode
+
+  //TODO types for dictionary
+  //TODO inheritable node???
+  val dictionary:scala.collection.immutable.Map[Ident, AstNode] = Map()
+
+  //types as before
+  def add(name: Ident, obj: AstNode) = dictionary += (obj -> name)
+
+  def lookup(name: Ident) = dictionary(name)
+
+  def lookupAll(name: Ident): Unit ={
+    var s: SymbolTable = this
+    while (s != null){
+      var obj = s.lookup(name)
+      if (obj != null){
+        return obj
+      }
+      s = s.encSymTab
+    }
+  }
+
+}
+
+object semanticAnalysis{
+
+  import parsers.ast._
+
+  def traverse(node: AstNode, st: SymbolTable): Unit ={
+    node match{
+      case Decl(_type, ident, rhs) => {
+        if (st.lookup(ident) != null){
+          println("scope error")
+        }else{
+          if (checkType(rhs) != _type){
+            println("type error")
+          }else{
+            st.add(ident, node)
+          }
+        }
+      }
+      case Assign(lhs, rhs) => {
+        val t: Type = checkType(rhs)
+    }
+  }
+
+  def checkType (rhs: AssignRHS): Type = {
+    rhs match{
+      case ArrayLiter(exprs) => {
+        var types: List[Type] = List()
+        for (expr <- exprs){
+          types = checkType(expr) +: types
+        }
+        val same: Boolean = types.forall(_ == types.head)
+        if (same){
+          return types.head
+        }else{
+          return null
+        }
+      }
+
+
+    }
+  }
+
+  def checkExprType(expr: Expr): Type={
+    case IntLiter(_) => WInt
+    case BoolLiter(_) => WBool
+    case CharLiter(_) => WChar
+    case StrLiter(_) => WString
+    //case PairLiter => PairType()
+    case Ident(_) => null
+    //case ArrayElem(_, exprs) => checkType(exprs.head)
+    case Len(expr) => {
+      if (operatorCheck(Len(expr))){
+        return WInt
+      }else{
+        return null
+      }
+    }
+    case Ord(expr) => {
+      if (operatorCheck(Ord(expr))){
+        return WInt
+      }else{
+        return null
+      }
+    }
+    case Chr(expr) => {
+      if (operatorCheck(Chr(expr))){
+        return WChar
+      }else{
+        return null
+      }
+    }
+    case Negate(expr) => {
+      if (operatorCheck(Negate(expr))){
+        return WInt
+      }else{
+        return null
+      }
+    }
+    //TODO pattern match binary operators
+    case Not(expr) => {
+      if (operatorCheck(Not(expr))){
+        return WBool
+      }else{
+        return null
+      }
+    }
+  }
+
+  def operatorCheck(expr: Expr): Boolean = {
+    //TODO
+    true
+  }
+
 }
