@@ -156,7 +156,7 @@ class parserSpec extends AnyFlatSpec{
     info("will fail if <type> fails")
     assert(`<type>`.parse("int[]").get == ArrayType(WInt))
     assert(`<type>`.parse("bool[][]").get == ArrayType(ArrayType(WBool)))
-    // assert(`<type>`.parse("pair(int, char)[][]").get == WInt)
+    assert(`<type>`.parse("pair(int, char)[][]").get == ArrayType(ArrayType(PairType(WInt, WChar))))
   }
   /*
   it should "parse pair types" in {
