@@ -456,6 +456,7 @@ object semanticAnalysis{
     case StrLiter(_) => WString
     //case PairLiter => PairType()
     case Ident(_) => null
+    case ParensExpr(expr) => checkExprType(expr)
     //case ArrayElem(_, exprs) => checkType(exprs.head)
     case Len(expr) => {
       if (operatorCheck(Len(expr))){
@@ -485,7 +486,97 @@ object semanticAnalysis{
         return null
       }
     }
-    //TODO pattern match binary operators
+    case Mult(expr1, expr2) => {
+      if (operatorCheck(Mult(expr1, expr2))){
+        return WInt
+      }else{
+        return null;
+      }
+    }
+    case Div(expr1, expr2) => {
+      if (operatorCheck(Div(expr1, expr2))){
+        return WInt
+      }else{
+        return null;
+      }
+    }
+    case Mod(expr1, expr2) => {
+      if (operatorCheck(Mod(expr1, expr2))){
+        return WInt
+      }else{
+        return null;
+      }
+    }
+    case Plus(expr1, expr2) => {
+      if (operatorCheck(Plus(expr1, expr2))){
+        return WInt
+      }else{
+        return null;
+      }
+    }
+    case Minus(expr1, expr2) => {
+      if (operatorCheck(Minus(expr1, expr2))){
+        return WInt
+      }else{
+        return null;
+      }
+    }
+    case Greater(expr1, expr2) => {
+      if (operatorCheck(Greater(expr1, expr2))){
+        return WInt
+      }else{
+        return null;
+      }
+    }
+    case GreaterEq(expr1, expr2) => {
+      if (operatorCheck(GreaterEq(expr1, expr2))){
+        return WInt
+      }else{
+        return null;
+      }
+    }
+    case Less(expr1, expr2) => {
+      if (operatorCheck(Less(expr1, expr2))){
+        return WInt
+      }else{
+        return null;
+      }
+    }
+    case LessEq(expr1, expr2) => {
+      if (operatorCheck(LessEq(expr1, expr2))){
+        return WInt
+      }else{
+        return null;
+      }
+    }
+    case Eq(expr1, expr2) => {
+      if (operatorCheck(Eq(expr1, expr2))){
+        return WInt
+      }else{
+        return null;
+      }
+    }
+    case NotEq(expr1, expr2) => {
+      if (operatorCheck(NotEq(expr1, expr2))){
+        return WInt
+      }else{
+        return null;
+      }
+    }
+    case And(expr1, expr2) => {
+      if (operatorCheck(And(expr1, expr2))){
+        return WBool
+      }else{
+        return null;
+      }
+    }
+    case Or(expr1, expr2) => {
+      if (operatorCheck(Or(expr1, expr2))){
+        return WBool
+      }else{
+        return null;
+      }
+    }
     case Not(expr) => {
       if (operatorCheck(Not(expr))){
         return WBool
