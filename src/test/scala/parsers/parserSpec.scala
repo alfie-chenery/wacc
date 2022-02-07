@@ -7,6 +7,7 @@ class parserSpec extends AnyFlatSpec{
   import lexer._
   import ast._
 
+  /*
   behavior of "<int-liter>"
   it should "parse positive numbers" in {
     assert(INT_LITER.parse("0").get == 0)
@@ -212,4 +213,5 @@ class parserSpec extends AnyFlatSpec{
     assert(`<assign-lhs>`.parse("fst 1").get == FstPair(IntLiter(1)))
     assert(`<assign-lhs>`.parse("snd 65").get == FstPair(IntLiter(65)))
   }
+   */
 }

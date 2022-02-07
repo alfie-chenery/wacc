@@ -1,7 +1,6 @@
 #ignore output directories
 .idea
 target
-project
 
 #ignore Java class files
 *.class
