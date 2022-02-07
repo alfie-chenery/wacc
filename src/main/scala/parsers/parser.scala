@@ -65,56 +65,79 @@ object parser {
 
   // TODO Make sure this means identifiers can't be keywords
   private [parsers] lazy val `<ident>`: Parsley[Ident] = attempt(Ident(lex.identifier))
+
   private [parsers] lazy val `<array-liter>`: Parsley[ArrayLiter] = ArrayLiter('[' ~> sepBy1(`<expr>`, ',') <~ ']')
+
   private [parsers] lazy val `<expr>`: Parsley[Expr] =
-    precedence(SOps(InfixR)(Or <# "||") +:
-               SOps(InfixR)(And <# "&&") +:
+    precedence(SOps(InfixR)  (Or <# "||") +:
+               SOps(InfixR)  (And <# "&&") +:
                SOps(NonAssoc)(NotEq <# "!=", Eq <# "==") +:
                SOps(NonAssoc)(LessEq <# "<=", Less <# "<",
                               Greater <# ">", GreaterEq <# ">=") +:
-               SOps(InfixL)(Minus <# "-", Plus <# "+") +:
-               SOps(InfixL)(Mod <# "%", Div <# "/", Mult <# "*") +:
-               SOps(Prefix)(Not <# "!" , Negate <# "-",
-                            Len <# "len", Ord <# "ord", Chr <# "chr") +:
+               SOps(InfixL)  (Minus <# "-", Plus <# "+") +:
+               SOps(InfixL)  (Mod <# "%", Div <# "/", Mult <# "*") +:
+               SOps(Prefix)  (Not <# "!" , Negate <# "-",
+                              Len <# "len", Ord <# "ord", Chr <# "chr") +:
                Atoms(`<expr-atoms>`))
+
   private [parsers] lazy val `<expr-atoms>`: Parsley[Term] =
-    attempt(IntLiter(INT_LITER)) <|> BoolLiter(BOOL_LITER) <|> CharLiter(CHAR_LITER) <|>
-      attempt(StrLiter(STR_LITER)) <|> (PAIR_LITER #> PairLiter) <|> attempt(`<ident>`) <|>
-      `<array-elem>` <|> ParensExpr('(' ~> `<expr>` <~ ')')
+    attempt(IntLiter(INT_LITER))   <|> BoolLiter(BOOL_LITER)     <|> CharLiter(CHAR_LITER) <|>
+      attempt(StrLiter(STR_LITER)) <|> (PAIR_LITER #> PairLiter) <|> attempt(`<ident>`)    <|>
+      `<array-elem>`               <|> ParensExpr('(' ~> `<expr>` <~ ')')
+
   private [parsers] lazy val `<array-elem>`: Parsley[ArrayElem] = ArrayElem(`<ident>`, some('[' ~> `<expr>` <~ ']'))
+
   private [parsers] lazy val `<pair-elem-type>`: Parsley[PairElemType] =
     attempt(Pair <# "pair") <|> attempt(`<array-type>`) <|> attempt(`<base-type>`)
+
   private [parsers] lazy val `<pair-type>`: Parsley[PairType] =
     PairType("pair" ~> '(' ~> `<pair-elem-type>` , ',' ~> `<pair-elem-type>` <~ ')')
+
   private [parsers] lazy val `<array-type>`: Parsley[ArrayType] = ArrayType(`<type>` <~ '[' <~ ']')
+
   // TODO figure out why or if we need parser.parser builder for W types
   private [parsers] lazy val `<base-type>`: Parsley[BaseType] =
     (WInt <# "int") <|> (WBool <# "bool") <|> (WChar <# "char") <|> (WString <# "string")
+
   private [parsers] lazy val `<type>`: Parsley[Type] = `<base-type>` <|>  attempt(`<array-type>`) <|> `<pair-type>`
+
   private [parsers] lazy val `<pair-elem>`: Parsley[PairElem] =
     FstPair("fst" ~> `<expr>`) <|> SndPair("snd" ~> `<expr>`)
+
   private [parsers] lazy val `<arg-list>`: Parsley[ArgList] = ArgList(sepBy1(`<expr>`, ','))
+
   private [parsers] lazy val `<assign-rhs>`: Parsley[AssignRHS] =
     `<expr>` <|> `<array-liter>` <|>
       NewPair("newpair" ~> '(' ~> `<expr>`, ',' ~> `<expr>` <~ ')') <|>
       `<pair-elem>` <|> Call("call" ~> `<ident>`, '(' ~> `<arg-list>` <~ ')')
+
   private [parsers] lazy val `<assign-lhs>` = attempt(`<ident>`) <|> attempt(`<array-elem>`) <|> `<pair-elem>`
+
   private [parsers] lazy val `<stat>`: Parsley[Stat] =
-    precedence( Atoms(`<stat-atoms>`) :+ SOps(InfixR)(";" #> ((stat:StatAtom, atom:Stat) => Combine.apply(stat, atom))))
+    precedence( Atoms(`<stat-atoms>`) :+ SOps(InfixR)(";" #> ((stat:StatAtom, atom:Stat) => Combine(stat, atom))))
+
   private [parsers] lazy val `<stat-atoms>`: Parsley[StatAtom] =
     attempt(Skip <# "skip") <|> Decl(`<type>`, `<ident>`, '=' ~> `<assign-rhs>`) <|>
-      attempt(Assign(`<assign-lhs>`, '=' ~> `<assign-rhs>`)) <|>
-      Read("read" ~> `<assign-lhs>`) <|> Free("free" ~> `<expr>`) <|>
-      Return("return" ~> `<expr>`) <|> Exit("exit" ~> `<expr>`) <|>
-      attempt(Print("print" ~> `<expr>`)) <|> Println("println" ~> `<expr>`) <|>
-      IfElse("if" ~> `<expr>`, "then" ~> `<stat>`, "else" ~> `<stat>` <~ "fi") <|>
+      attempt(Assign(`<assign-lhs>`, '=' ~> `<assign-rhs>`))                     <|>
+      Read("read" ~> `<assign-lhs>`)      <|> Free("free" ~> `<expr>`)           <|>
+      Return("return" ~> `<expr>`)        <|> Exit("exit" ~> `<expr>`)           <|>
+      attempt(Print("print" ~> `<expr>`)) <|> Println("println" ~> `<expr>`)     <|>
+      IfElse("if" ~> `<expr>`, "then" ~> `<stat>`, "else" ~> `<stat>` <~ "fi")   <|>
       While("while" ~> `<expr>`, "do" ~> `<stat>` <~ "done") <|>
-      Scope("begin" ~> `<stat>` <~ "end") //<|> Combine(`<stat>`, ';' ~> `<stat>`) //This causes infinite recursion
+      Scope("begin" ~> `<stat>` <~ "end")
+
   private [parsers] lazy val `<param>` = Param(`<type>`, `<ident>`)
+
   private [parsers] lazy val `<param-list>` = ParamList(sepBy1(`<param>`, ','))
+
   private [parsers] lazy val `<func>` =
     Func(`<type>`, `<ident>`, '(' ~> option(`<param-list>`) <~ ')', "is" ~> `<stat>` <~ "end")
+
   private [parsers] lazy val `<program>` = fully(Program("begin" ~> many(attempt(`<func>`)), `<stat>` <~ "end"))
+
+
+
+
 
   def parse[Err: ErrorBuilder](input: String): Result[Err, Program] =
     `<program>`.parse(input)
@@ -122,8 +145,8 @@ object parser {
     `<program>`.parseFromFile(input).get
 
   def main(args: Array[String]): Unit = {
-    println(parse("begin int x = 42; int y = 30 ; int z = x + y; println z end"))
-    println(parse(new File("../wacc_examples/valid/expressions/intCalc.wacc")))
+    println(parse("begin int j =5; int k =3 end"))
+    //println(parse(new File("../wacc_examples/valid/expressions/intCalc.wacc")))
   }
 
 }
