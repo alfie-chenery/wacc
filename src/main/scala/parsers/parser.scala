@@ -1,13 +1,13 @@
 package parsers
 
 import parsers.ast.Ident
-import parsers.parser.`<expr>`
 import parsley.Parsley._
-import parsley.combinator.{sepBy, sepBy1}
+import parsley.combinator.sepBy1
 import parsley.{Parsley, Result}
 
 import java.io.File
 import scala.annotation.tailrec
+import scala.collection.mutable
 import scala.language.implicitConversions
 
 object lexer {
@@ -59,11 +59,11 @@ object lexer {
 object parser {
   import ast._
   import lexer._
-  import parsley.combinator.{many, some, option}
+  import implicits.tokenLift
+  import parsley.combinator.{many, option, some}
   import parsley.errors.ErrorBuilder
   import parsley.expr._
   import parsley.io.ParseFromIO
-  import implicits.tokenLift
 
 
   // TODO Make sure this means identifiers can't be keywords
@@ -394,7 +394,7 @@ class SymbolTable(val encSymTab: SymbolTable){
 
   import parsers.ast.AstNode
 
-  val dictionary= scala.collection.mutable.Map[Ident, AstNode]()
+  val dictionary: mutable.Map[Ident, AstNode] = scala.collection.mutable.Map[Ident, AstNode]()
 
   //types as before
   def add(name: Ident, obj: AstNode): Any = dictionary += (name -> obj)
@@ -431,16 +431,42 @@ object semanticAnalysis {
             st.add(ident, node)
           }
         }
-      case Assign(_, rhs) =>
-        //val t: Type = checkType(rhs)
-        //need to find ident for lookup then also pull type
-        //val n: AstNode = st.lookup(lhs)
-        //compare types
-        //if types match, add to st
+      case Decl(_type, ident, NewPair(fst, snd)) =>
+        _type match{
+          case PairType(_,_) =>
+            //TODO maybe check inner types?
+          st.add(ident, NewPair(fst, snd))
+          case _ => println("type error")
+        }
+      case Assign(Ident(ident), NewPair(fst, snd)) =>
+        val n : AstNode = st.lookupAll(Ident(ident))
+        n match{
+          case NewPair(fst1, snd1) =>
+            if (checkExprType(fst1) != checkExprType(fst) || checkExprType(snd1) != checkExprType(snd)){
+              println("type error")
+            }else{
+              //TODO replace in st
+            }
+          case _ => println("type error")
+        }
+      case Assign(_, NewPair(_, _)) => println("type error")
+      case Assign(lhs, rhs) =>
+        lhs match{
+          case Ident(ident) =>
+            if (checkType(st.lookupAll(Ident(ident))) != checkType(rhs)){
+              println("type error")
+            }
+          case _ =>
+            if (checkType(rhs) != checkType(lhs)){
+              println("type error")
+            }else{
+              //TODO replace in st
+            }
+        }
     }
 
-    def checkType(rhs: AssignRHS): Type = {
-      rhs match {
+    def checkType(node: AstNode): Type = {
+      node match {
         case ArrayLiter(exprs) =>
           var types: List[Type] = List()
           for (expr <- exprs) {
@@ -452,25 +478,25 @@ object semanticAnalysis {
           } else {
             null
           }
-        //case NewPair(fst, snd) => PairType(checkExprType(fst), checkExprType(snd))
         case FstPair(expr) => checkExprType(expr)
         case SndPair(expr) => checkExprType(expr)
         //case Call(ident, argList) => st.lookupAll(ident)
-        //case _ => checkExprType(rhs)
+
+        case _ => checkExprType(node)
       }
     }
 
     @tailrec
-    def checkExprType(expr: Expr): Type = {
+    def checkExprType(expr: AstNode): Type = {
       expr match {
         case IntLiter(_) => WInt
         case BoolLiter(_) => WBool
         case CharLiter(_) => WChar
         case StrLiter(_) => WString
-        //case PairLiter => PairType()
+        case PairLiter => null
         case Ident(_) => null
         case ParensExpr(expr) => checkExprType(expr)
-        //case ArrayElem(_, exprs) => checkType(exprs.head)
+        case ArrayElem(ident, _) => checkType(st.lookupAll(ident))
         case Len(expr) =>
           if (unaryOperatorCheck(Len(expr))) {
             WInt
@@ -599,14 +625,6 @@ object semanticAnalysis {
       }
     }
 
-    def nodeType(node: AstNode): Type ={
-      node match{
-        //case NewPair(fst, snd) => PairType(checkType(fst), checkType(snd))
-        case FstPair(expr) => checkType(expr)
-        case SndPair(expr) => checkType(expr)
-
-      }
-    }
 
   }
 }
