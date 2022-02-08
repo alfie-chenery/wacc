@@ -387,10 +387,10 @@ class SymbolTable(val encSymTab: SymbolTable){
 
   import parsers.ast.AstNode
 
-  val dictionary:scala.collection.immutable.Map[Ident, AstNode] = Map()
+  val dictionary= scala.collection.mutable.Map[Ident, AstNode]()
 
   //types as before
-  def add(name: Ident, obj: AstNode): Any = dictionary += (obj -> name)
+  def add(name: Ident, obj: AstNode): Any = dictionary += (name -> obj)
 
   def lookup(name: Ident): AstNode = dictionary(name)
 
@@ -589,6 +589,15 @@ object semanticAnalysis {
         case Len(expr)    => checkExprType(expr) == WString
         case Ord(expr)    => checkExprType(expr) == WChar
         case Chr(expr)    => checkExprType(expr) == WInt
+      }
+    }
+
+    def nodeType(node: AstNode): Type ={
+      node match{
+        //case NewPair(fst, snd) => PairType(checkType(fst), checkType(snd))
+        case FstPair(expr) => checkType(expr)
+        case SndPair(expr) => checkType(expr)
+
       }
     }
 
