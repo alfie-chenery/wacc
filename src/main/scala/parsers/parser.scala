@@ -1,11 +1,12 @@
 package parsers
 
-import parsers.ast.{Ident, Skip}
+import parsers.ast.Ident
 import parsley.Parsley._
 import parsley.combinator.sepBy1
 import parsley.{Parsley, Result}
 
 import java.io.File
+import scala.annotation.tailrec
 import scala.language.implicitConversions
 
 object lexer {
@@ -28,7 +29,7 @@ object lexer {
     space = Predicate(isWhitespace),
   )
 
-  // Dont use number and string literal parsers!
+  // Don't use number and string literal parsers!
   val lex = new Lexer(lang)
 
   // TODO implement negatives
@@ -165,7 +166,7 @@ object ast {
 
   sealed trait Stat extends AstNode
   sealed trait StatAtom extends Stat
-  case object Skip extends StatAtom with ParserBuilder[StatAtom] {val parser = pure(Skip)}
+  case object Skip extends StatAtom with ParserBuilder[StatAtom] {val parser: Parsley[Skip.type] = pure(Skip)}
   case class Decl(_type: Type, ident: Ident, rhs: AssignRHS) extends StatAtom
   case class Assign(lhs: AssignLHS, rhs: AssignRHS) extends StatAtom
   case class Read(lhs: AssignLHS) extends StatAtom
@@ -193,14 +194,14 @@ object ast {
 
   sealed trait Type extends AstNode
   sealed trait BaseType extends Type with PairElemType
-  case object WInt extends BaseType with ParserBuilder[BaseType]{val parser = pure(WInt)}
-  case object WBool extends BaseType with ParserBuilder[BaseType]{val parser = pure(WBool)}
-  case object WChar extends BaseType with ParserBuilder[BaseType]{val parser = pure(WChar)}
-  case object WString extends BaseType with ParserBuilder[BaseType]{val parser = pure(WChar)}
+  case object WInt extends BaseType with ParserBuilder[BaseType]{val parser: Parsley[WInt.type] = pure(WInt)}
+  case object WBool extends BaseType with ParserBuilder[BaseType]{val parser: Parsley[WBool.type] = pure(WBool)}
+  case object WChar extends BaseType with ParserBuilder[BaseType]{val parser: Parsley[WChar.type] = pure(WChar)}
+  case object WString extends BaseType with ParserBuilder[BaseType]{val parser: Parsley[WChar.type] = pure(WChar)}
   case class ArrayType(_type: Type) extends Type with PairElemType
   case class PairType(fst_type: PairElemType, snd_type: PairElemType) extends Type
   sealed trait PairElemType
-  case object Pair extends PairElemType with ParserBuilder[PairElemType]{val parser = pure(Pair)}
+  case object Pair extends PairElemType with ParserBuilder[PairElemType]{val parser: Parsley[Pair.type] = pure(Pair)}
 
   sealed trait Expr extends AssignRHS
   case class IntLiter(x: Int) extends Term
@@ -247,11 +248,11 @@ object ast {
   }
   trait ParserBuilder1[T1, R] extends ParserBuilder[T1 => R] {
     def apply(x: T1): R
-    val parser = pure(apply(_))
+    val parser: Parsley[T1 => R] = pure(apply)
   }
   trait ParserBuilder2[T1, T2, R] extends ParserBuilder[(T1, T2) => R] {
     def apply(x: T1, y: T2): R
-    val parser = pure(apply(_, _))
+    val parser: Parsley[(T1, T2) => R] = pure(apply)
   }
 
   object Program {
@@ -386,24 +387,23 @@ class SymbolTable(val encSymTab: SymbolTable){
 
   import parsers.ast.AstNode
 
-  //TODO types for dictionary
-  //TODO inheritable node???
   val dictionary:scala.collection.immutable.Map[Ident, AstNode] = Map()
 
   //types as before
-  def add(name: Ident, obj: AstNode) = dictionary += (obj -> name)
+  def add(name: Ident, obj: AstNode): Any = dictionary += (obj -> name)
 
-  def lookup(name: Ident) = dictionary(name)
+  def lookup(name: Ident): AstNode = dictionary(name)
 
-  def lookupAll(name: Ident): Unit ={
+  def lookupAll(name: Ident): AstNode ={
     var s: SymbolTable = this
     while (s != null){
-      var obj = s.lookup(name)
+      val obj: AstNode = s.lookup(name)
+      s = s.encSymTab
       if (obj != null){
         return obj
       }
-      s = s.encSymTab
     }
+    null
   }
 
 }
@@ -414,7 +414,7 @@ object semanticAnalysis {
 
   def traverse(node: AstNode, st: SymbolTable): Unit = {
     node match {
-      case Decl(_type, ident, rhs) => {
+      case Decl(_type, ident, rhs) =>
         if (st.lookup(ident) != null) {
           println("scope error")
         } else {
@@ -424,26 +424,27 @@ object semanticAnalysis {
             st.add(ident, node)
           }
         }
-      }
-      case Assign(lhs, rhs) => {
-        val t: Type = checkType(rhs)
-      }
+      case Assign(_, rhs) =>
+        //val t: Type = checkType(rhs)
+        //need to find ident for lookup then also pull type
+        //val n: AstNode = st.lookup(lhs)
+        //compare types
+        //if types match, add to st
     }
 
     def checkType(rhs: AssignRHS): Type = {
       rhs match {
-        case ArrayLiter(exprs) => {
+        case ArrayLiter(exprs) =>
           var types: List[Type] = List()
           for (expr <- exprs) {
             types = checkType(expr) +: types
           }
           val same: Boolean = types.forall(_ == types.head)
           if (same) {
-            return types.head
+            types.head
           } else {
-            return null
+            null
           }
-        }
         //case NewPair(fst, snd) => PairType(checkExprType(fst), checkExprType(snd))
         case FstPair(expr) => checkExprType(expr)
         case SndPair(expr) => checkExprType(expr)
@@ -452,6 +453,7 @@ object semanticAnalysis {
       }
     }
 
+    @tailrec
     def checkExprType(expr: Expr): Type = {
       expr match {
         case IntLiter(_) => WInt
@@ -462,132 +464,114 @@ object semanticAnalysis {
         case Ident(_) => null
         case ParensExpr(expr) => checkExprType(expr)
         //case ArrayElem(_, exprs) => checkType(exprs.head)
-        case Len(expr) => {
+        case Len(expr) =>
           if (unaryOperatorCheck(Len(expr))) {
-            return WInt
+            WInt
           } else {
-            return null
+            null
           }
-        }
-        case Ord(expr) => {
+        case Ord(expr) =>
           if (unaryOperatorCheck(Ord(expr))) {
-            return WInt
+            WInt
           } else {
-            return null
+            null
           }
-        }
-        case Chr(expr) => {
+        case Chr(expr) =>
           if (unaryOperatorCheck(Chr(expr))) {
-            return WChar
+            WChar
           } else {
-            return null
+            null
           }
-        }
-        case Negate(expr) => {
+        case Negate(expr) =>
           if (unaryOperatorCheck(Negate(expr))) {
-            return WInt
+            WInt
           } else {
-            return null
+            null
           }
-        }
-        case Mult(expr1, expr2) => {
+        case Mult(expr1, expr2) =>
           if (binaryOperatorCheck(expr1, expr2, Mult(expr1, expr2))) {
-            return WInt
+            WInt
           } else {
-            return null;
+            null
           }
-        }
-        case Div(expr1, expr2) => {
+        case Div(expr1, expr2) =>
           if (binaryOperatorCheck(expr1, expr2, Div(expr1, expr2))) {
-            return WInt
+            WInt
           } else {
-            return null;
+            null
           }
-        }
-        case Mod(expr1, expr2) => {
+        case Mod(expr1, expr2) =>
           if (binaryOperatorCheck(expr1, expr2, Mod(expr1, expr2))) {
-            return WInt
+            WInt
           } else {
-            return null;
+            null
           }
-        }
-        case Plus(expr1, expr2) => {
+        case Plus(expr1, expr2) =>
           if (binaryOperatorCheck(expr1, expr2, Plus(expr1, expr2))) {
-            return WInt
+            WInt
           } else {
-            return null;
+            null
           }
-        }
-        case Minus(expr1, expr2) => {
+        case Minus(expr1, expr2) =>
           if (binaryOperatorCheck(expr1, expr2, Minus(expr1, expr2))) {
-            return WInt
+            WInt
           } else {
-            return null;
+            null
           }
-        }
-        case Greater(expr1, expr2) => {
+        case Greater(expr1, expr2) =>
           if (binaryOperatorCheck(expr1, expr2, Greater(expr1, expr2))) {
-            return WInt
+            WInt
           } else {
-            return null;
+            null
           }
-        }
-        case GreaterEq(expr1, expr2) => {
+        case GreaterEq(expr1, expr2) =>
           if (binaryOperatorCheck(expr1, expr2, GreaterEq(expr1, expr2))) {
-            return WInt
+            WInt
           } else {
-            return null;
+            null
           }
-        }
-        case Less(expr1, expr2) => {
+        case Less(expr1, expr2) =>
           if (binaryOperatorCheck(expr1, expr2, Less(expr1, expr2))) {
-            return WInt
+            WInt
           } else {
-            return null;
+            null
           }
-        }
-        case LessEq(expr1, expr2) => {
+        case LessEq(expr1, expr2) =>
           if (binaryOperatorCheck(expr1, expr2, LessEq(expr1, expr2))) {
-            return WInt
+            WInt
           } else {
-            return null;
+            null
           }
-        }
-        case Eq(expr1, expr2) => {
+        case Eq(expr1, expr2) =>
           if (binaryOperatorCheck(expr1, expr2, Eq(expr1, expr2))) {
-            return WInt
+            WInt
           } else {
-            return null;
+            null
           }
-        }
-        case NotEq(expr1, expr2) => {
+        case NotEq(expr1, expr2) =>
           if (binaryOperatorCheck(expr1, expr2, NotEq(expr1, expr2))) {
-            return WInt
+            WInt
           } else {
-            return null;
+            null
           }
-        }
-        case And(expr1, expr2) => {
+        case And(expr1, expr2) =>
           if (binaryOperatorCheck(expr1, expr2, And(expr1, expr2))) {
-            return WBool
+            WBool
           } else {
-            return null;
+            null
           }
-        }
-        case Or(expr1, expr2) => {
+        case Or(expr1, expr2) =>
           if (binaryOperatorCheck(expr1, expr2, Or(expr1, expr2))) {
-            return WBool
+            WBool
           } else {
-            return null;
+            null
           }
-        }
-        case Not(expr) => {
+        case Not(expr) =>
           if (unaryOperatorCheck(Not(expr))) {
-            return WBool
+            WBool
           } else {
-            return null
+            null
           }
-        }
       }
     }
 
