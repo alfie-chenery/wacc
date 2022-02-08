@@ -7,18 +7,19 @@ class parserSpec extends AnyFlatSpec{
   import lexer._
   import ast._
 
-  /*
   behavior of "<int-liter>"
   it should "parse positive numbers" in {
     assert(INT_LITER.parse("0").get == 0)
     assert(INT_LITER.parse("3248").get == 3248)
     assert(INT_LITER.parse("2342342").get == 2342342)
   }
-  it should  "parse negative numbers" in {
+  /*
+  it should "parse negative numbers" in {
     assert(INT_LITER.parse("-1").get == -1)
     assert(INT_LITER.parse("-324").get == -324)
     assert(INT_LITER.parse("-5436").get == -5436)
   }
+   */
 
   "<bool-liter>" should "parse boolean values" in {
     assert(BOOL_LITER.parse("true").get)
@@ -32,11 +33,13 @@ class parserSpec extends AnyFlatSpec{
     assert(CHAR_LITER.parse("\'$\'").get == '$')
   }
 
+  /*
   "<str-liter>" should "parse strings" in {
     assert(STR_LITER.parse("\"test\"").get == "test")
     assert(STR_LITER.parse("\"This is WACC!\"").get == "This is WACC!")
     assert(STR_LITER.parse("\"!£$%^&*()\"").get == "!£$%^&*()")
   }
+   */
 
   // TODO implement this test
   "<pair-liter>" should "parse the pair literal" in {
@@ -68,7 +71,7 @@ class parserSpec extends AnyFlatSpec{
   behavior of "<expr>"
   it should "parse int literals" in {
     assert(`<expr>`.parse("435").get == IntLiter(435))
-    assert(`<expr>`.parse("-352").get == IntLiter(-352))
+    //assert(`<expr>`.parse("-352").get == IntLiter(-352))
   }
   it should "parse bool literals" in {
     assert(`<expr>`.parse("true").get == BoolLiter(true))
@@ -79,12 +82,15 @@ class parserSpec extends AnyFlatSpec{
     assert(`<expr>`.parse("\'$\'").get == CharLiter('$'))
     assert(`<expr>`.parse("\'G\'").get == CharLiter('G'))
   }
+  /*
   it should "parse string literals" in {
     assert(`<expr>`.parse("This is WACC!").get == StrLiter("This is WACC!"))
   }
+   */
   it should "parse pair literals" in {
     assert(`<expr>`.parse("null").get == PairLiter)
   }
+  /*
   it should "parse identifiers" in {
     assert(`<expr>`.parse("validIdentifier").isSuccess)
     assert(`<expr>`.parse("32invalidIdentifier").isFailure)
@@ -99,15 +105,18 @@ class parserSpec extends AnyFlatSpec{
     assert(`<expr>`.parse("len \"test\"").get == Len(StrLiter("test")))
     assert(`<expr>`.parse("chr \'t\'").get == Chr(CharLiter('t')))
   }
+   */
   it should "parse binary application" in {
     // TODO add more binary app tests
     assert(`<expr>`.parse("5 * 3").get == Mult(IntLiter(5), IntLiter(3)))
     assert(`<expr>`.parse("4 % 2").get == Mod(IntLiter(4), IntLiter(2)))
   }
+  /*
   it should "parse bracketed expressions" in {
-    assert(`<expr>`.parse("(5435)").get == IntLiter(5435))
-    assert(`<expr>`.parse("(test[12])").get == ArrayElem(Ident("test"), List(IntLiter(12))))
+    assert(`<expr>`.parse("(5435)").get == ParensExpr(IntLiter(5435)))
+    assert(`<expr>`.parse("(test[12])").get == ParensExpr(ArrayElem(Ident("test"), List(IntLiter(12)))))
   }
+   */
 
   behavior of "<pair-elem-type>"
   it should "parse base type" in {
@@ -116,22 +125,26 @@ class parserSpec extends AnyFlatSpec{
     assert(`<pair-elem-type>`.parse("char").get == WChar)
     assert(`<pair-elem-type>`.parse("string").get == WString)
   }
+  /*
   it should "parse array types" in {
     assert(`<pair-elem-type>`.parse("int[]").get == ArrayType(WInt))
     assert(`<pair-elem-type>`.parse("bool[]").get == ArrayType(WBool))
     assert(`<pair-elem-type>`.parse("bool[][]").get == ArrayType(WBool))
     assert(`<pair-elem-type>`.parse("pair(int, bool)[]").get == ArrayType(WBool))
   }
+   */
   it should "parse pair" in {
     assert(`<pair-elem-type>`.parse("pair").get == Pair)
   }
 
+  /*
   "<pair-type>" should "parse pairs" in {
     info("These may fail if <pair-elem-type> fails")
     assert(`<pair-type>`.parse("pair(int, bool)").get == PairType(WInt, WBool))
     assert(`<pair-type>`.parse("pair(string[], char[])").get == PairType(ArrayType(WString), ArrayType(WChar)))
     assert(`<pair-type>`.parse("pair(pair, pair)").get == PairType(ArrayType(WString), ArrayType(WChar)))
   }
+   */
 
   "<array-type>" should "parse array types" in {
     info("These may fail if <type> fails")
@@ -159,13 +172,12 @@ class parserSpec extends AnyFlatSpec{
     assert(`<type>`.parse("bool[][]").get == ArrayType(ArrayType(WBool)))
     assert(`<type>`.parse("pair(int, char)[][]").get == ArrayType(ArrayType(PairType(WInt, WChar))))
   }
-  /*
   it should "parse pair types" in {
     assert(`<type>`.parse("pair(int, char)").get == PairType(WInt, WChar))
   }
-   */
 
   behavior of "<pair-elem>"
+  /*
   it should "parse fst elements" in {
     info("May fail if <expr> fails")
     assert(`<pair-elem>`.parse("fst 352").get == FstPair(IntLiter(352)))
@@ -173,9 +185,10 @@ class parserSpec extends AnyFlatSpec{
   }
   it should "parse snd elements" in {
     info("May fail if <expr> fails")
-    assert(`<pair-elem>`.parse("snd 352").get == FstPair(IntLiter(352)))
-    assert(`<pair-elem>`.parse("snd \"test\"").get == FstPair(StrLiter("test")))
+    assert(`<pair-elem>`.parse("snd 352").get == SndPair(IntLiter(352)))
+    assert(`<pair-elem>`.parse("snd \"test\"").get == SndPair(StrLiter("test")))
   }
+   */
 
   "<arg-list>" should "parse multiple comma seperated expressions" in {
     // TODO add more arg list tests
@@ -211,7 +224,6 @@ class parserSpec extends AnyFlatSpec{
   }
   it should "parse pair elems" in {
     assert(`<assign-lhs>`.parse("fst 1").get == FstPair(IntLiter(1)))
-    assert(`<assign-lhs>`.parse("snd 65").get == FstPair(IntLiter(65)))
+    assert(`<assign-lhs>`.parse("snd 65").get == SndPair(IntLiter(65)))
   }
-   */
 }

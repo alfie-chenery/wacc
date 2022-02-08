@@ -1,8 +1,9 @@
 package parsers
 
 import parsers.ast.Ident
+import parsers.parser.`<expr>`
 import parsley.Parsley._
-import parsley.combinator.sepBy1
+import parsley.combinator.{sepBy, sepBy1}
 import parsley.{Parsley, Result}
 
 import java.io.File
@@ -90,18 +91,23 @@ object parser {
   private [parsers] lazy val `<array-elem>`: Parsley[ArrayElem] = ArrayElem(`<ident>`, some('[' ~> `<expr>` <~ ']'))
 
   private [parsers] lazy val `<pair-elem-type>`: Parsley[PairElemType] =
-    attempt(Pair <# "pair") <|> attempt(`<array-type>`) <|> attempt(`<base-type>`)
+    attempt(Pair <# "pair") <|> `<base-type>` <|> `<array-type-pair-elem>`
 
   private [parsers] lazy val `<pair-type>`: Parsley[PairType] =
     PairType("pair" ~> '(' ~> `<pair-elem-type>` , ',' ~> `<pair-elem-type>` <~ ')')
 
-  private [parsers] lazy val `<array-type>`: Parsley[ArrayType] = ArrayType(`<type>` <~ '[' <~ ']')
+  private [parsers] lazy val `<array-type>`: Parsley[Type] =
+    chain.postfix(`<type-atoms>`, '[' ~> ']' #> ((_type: Type) => ArrayType(_type)))
+
+  private [parsers] lazy val `<array-type-pair-elem>`: Parsley[PairElemType] =
+    chain.postfix1(`<type-atoms>`, '[' ~> ']' #> ((_type: Type) => ArrayType(_type)))
 
   // TODO figure out why or if we need parser.parser builder for W types
   private [parsers] lazy val `<base-type>`: Parsley[BaseType] =
     (WInt <# "int") <|> (WBool <# "bool") <|> (WChar <# "char") <|> (WString <# "string")
 
-  private [parsers] lazy val `<type>`: Parsley[Type] = `<base-type>` <|>  attempt(`<array-type>`) <|> `<pair-type>`
+  private [parsers] lazy val `<type>`: Parsley[Type] = `<array-type>`
+  private [parsers] lazy val `<type-atoms>`: Parsley[TypeAtom] = `<base-type>` <|> `<pair-type>`
 
   private [parsers] lazy val `<pair-elem>`: Parsley[PairElem] =
     FstPair("fst" ~> `<expr>`) <|> SndPair("snd" ~> `<expr>`)
@@ -109,23 +115,23 @@ object parser {
   private [parsers] lazy val `<arg-list>`: Parsley[ArgList] = ArgList(sepBy1(`<expr>`, ','))
 
   private [parsers] lazy val `<assign-rhs>`: Parsley[AssignRHS] =
-    `<expr>` <|> `<array-liter>` <|>
-      NewPair("newpair" ~> '(' ~> `<expr>`, ',' ~> `<expr>` <~ ')') <|>
-      `<pair-elem>` <|> Call("call" ~> `<ident>`, '(' ~> `<arg-list>` <~ ')')
+    `<array-liter>` <|> NewPair("newpair" ~> '(' ~> `<expr>`, ',' ~> `<expr>` <~ ')') <|>
+      `<pair-elem>` <|> Call("call" ~> `<ident>`, '(' ~> `<arg-list>` <~ ')') <|> `<expr>`
 
-  private [parsers] lazy val `<assign-lhs>` = attempt(`<ident>`) <|> attempt(`<array-elem>`) <|> `<pair-elem>`
+  private [parsers] lazy val `<assign-lhs>` =
+    `<pair-elem>` <|> attempt(`<array-elem>`) <|> attempt(`<ident>`)
 
-  private [parsers] lazy val `<stat>`: Parsley[Stat] =
-    precedence( Atoms(`<stat-atoms>`) :+ SOps(InfixR)(";" #> ((stat:StatAtom, atom:Stat) => Combine(stat, atom))))
+  private [parsers] lazy val `<stat>`: Parsley[Stat] = Combine(sepBy1(`<stat-atoms>`, ';'))
 
   private [parsers] lazy val `<stat-atoms>`: Parsley[StatAtom] =
-    attempt(Skip <# "skip") <|> Decl(`<type>`, `<ident>`, '=' ~> `<assign-rhs>`) <|>
-      attempt(Assign(`<assign-lhs>`, '=' ~> `<assign-rhs>`))                     <|>
-      Read("read" ~> `<assign-lhs>`)      <|> Free("free" ~> `<expr>`)           <|>
-      Return("return" ~> `<expr>`)        <|> Exit("exit" ~> `<expr>`)           <|>
-      attempt(Print("print" ~> `<expr>`)) <|> Println("println" ~> `<expr>`)     <|>
-      IfElse("if" ~> `<expr>`, "then" ~> `<stat>`, "else" ~> `<stat>` <~ "fi")   <|>
-      While("while" ~> `<expr>`, "do" ~> `<stat>` <~ "done") <|>
+    attempt(Skip <# "skip")                                                    <|>
+      attempt(Assign(`<assign-lhs>`, '=' ~> `<assign-rhs>`))                   <|>
+      Decl(`<type>`, `<ident>`, '=' ~> `<assign-rhs>`)                         <|>
+      Read("read" ~> `<assign-lhs>`)      <|> Free("free" ~> `<expr>`)         <|>
+      Return("return" ~> `<expr>`)        <|> Exit("exit" ~> `<expr>`)         <|>
+      attempt(Print("print" ~> `<expr>`)) <|> Println("println" ~> `<expr>`)   <|>
+      IfElse("if" ~> `<expr>`, "then" ~> `<stat>`, "else" ~> `<stat>` <~ "fi") <|>
+      While("while" ~> `<expr>`, "do" ~> `<stat>` <~ "done")                   <|>
       Scope("begin" ~> `<stat>` <~ "end")
 
   private [parsers] lazy val `<param>` = Param(`<type>`, `<ident>`)
@@ -148,7 +154,7 @@ object parser {
     `<program>`.parseFromFile(input).get
 
   def main(args: Array[String]): Unit = {
-    println(parse("begin skip end"))
+    println(parse("begin int i = 5; int[5][6] = 9; pair(int, bool) pairTest = newpair(5, true) end"))
     //println(parse(new File("../wacc_examples/valid/expressions/intCalc.wacc")))
   }
 
@@ -178,7 +184,7 @@ object ast {
   case class IfElse(cond: Expr, then_stat: Stat, then_else: Stat) extends StatAtom
   case class While(cond: Expr, body: Stat) extends StatAtom
   case class Scope(stat: Stat) extends StatAtom
-  case class Combine(first: StatAtom, second: Stat) extends Stat
+  case class Combine(stats: List[StatAtom]) extends Stat
 
   sealed trait AssignLHS extends AstNode
 
@@ -193,13 +199,14 @@ object ast {
   case class SndPair(snd: Expr) extends PairElem
 
   sealed trait Type extends AstNode
-  sealed trait BaseType extends Type with PairElemType
+  sealed trait TypeAtom extends Type
+  sealed trait BaseType extends TypeAtom with PairElemType
   case object WInt extends BaseType with ParserBuilder[BaseType]{val parser: Parsley[WInt.type] = pure(WInt)}
   case object WBool extends BaseType with ParserBuilder[BaseType]{val parser: Parsley[WBool.type] = pure(WBool)}
   case object WChar extends BaseType with ParserBuilder[BaseType]{val parser: Parsley[WChar.type] = pure(WChar)}
-  case object WString extends BaseType with ParserBuilder[BaseType]{val parser: Parsley[WChar.type] = pure(WChar)}
+  case object WString extends BaseType with ParserBuilder[BaseType]{val parser: Parsley[WString.type] = pure(WString)}
   case class ArrayType(_type: Type) extends Type with PairElemType
-  case class PairType(fst_type: PairElemType, snd_type: PairElemType) extends Type
+  case class PairType(fst_type: PairElemType, snd_type: PairElemType) extends TypeAtom
   sealed trait PairElemType
   case object Pair extends PairElemType with ParserBuilder[PairElemType]{val parser: Parsley[Pair.type] = pure(Pair)}
 
@@ -306,7 +313,7 @@ object ast {
     def apply(stat: Parsley[Stat]): Parsley[Scope] = stat.map(Scope(_))
   }
   object Combine {
-    def apply(fst: Parsley[StatAtom], snd: Parsley[Stat]): Parsley[Combine] = (fst, snd).zipped(Combine(_, _))
+    def apply(stats: Parsley[List[StatAtom]]): Parsley[Combine] = stats.map(Combine(_))
   }
 
   object NewPair {
