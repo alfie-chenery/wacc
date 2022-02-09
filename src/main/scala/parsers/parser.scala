@@ -83,7 +83,7 @@ object parser {
                SOps(InfixL)  (Minus <# "-", Plus <# "+") +:
                SOps(InfixL)  (Mod <# "%", Div <# "/", Mult <# "*") +:
                SOps(Prefix)  (Not <# "!" , Negate <# "-",
-                              Len <# "len", Ord <# "ord", Chr <# attempt("chr")) +:
+                              Len <# "len ", Ord <# "ord ", Chr <# attempt("chr ")) +:
                Atoms(`<expr-atoms>`))
 
   // TODO refactor this to put ident at the top and reduce backtracking
@@ -160,10 +160,11 @@ object parser {
     `<program>`.parseFromFile(input).get
 
   def main(args: Array[String]): Unit = {
+    /*
     val program = "begin int chrtest = 5; int j = chrtest end"
     println(parse(program))
     println(renamingPass.rename(parse(program).get))
-    /*
+    */
     val validPrograms = new File("../wacc_examples/valid")
     def findPrograms(file: File) {
       val files: List[File] = file.listFiles().toList
@@ -181,7 +182,6 @@ object parser {
       }
     }
     findPrograms(validPrograms)
-     */
   }
 }
 
