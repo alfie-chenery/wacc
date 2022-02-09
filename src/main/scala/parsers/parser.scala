@@ -2,7 +2,7 @@ package parsers
 
 import parsers.ast.Ident
 import parsley.Parsley._
-import parsley.combinator.sepBy1
+import parsley.combinator.{sepBy, sepBy1, endBy}
 import parsley.{Parsley, Result}
 
 import java.io.File
@@ -12,7 +12,7 @@ import scala.util.control.Breaks.break
 
 object lexer {
   import parsley.character.{anyChar, digit, isWhitespace}
-  import parsley.combinator.{eof, many}
+  import parsley.combinator.{eof, manyUntil,optional}
   import parsley.implicits.character.{charLift, stringLift}
   import parsley.token.{LanguageDef, Lexer, Predicate}
 
@@ -32,15 +32,18 @@ object lexer {
 
   val lex = new Lexer(lang)
 
-  // TODO implement negatives
-  private [parsers] val INT_LITER: Parsley[Int] = token(digit.foldLeft1(0)((x, d) => x * 10 + d.asDigit))
+  // TODO implement negatives values
+  private [parsers] val INT_LITER: Parsley[Int] = token(optional("+" <|> "-") ~> digit.foldLeft1(0)((x, d) => x * 10 + d.asDigit))
   private [parsers] val BOOL_LITER: Parsley[Boolean] =
     (token("true") #> true) <|> (token("false") #> false)
-  private [parsers] val CHAR_LITER: Parsley[Char] = token('\'') ~> anyChar <~ token('\'')
-  private [parsers] val STR_LITER: Parsley[String] = token('\"') ~> token(many(anyChar).map(_.mkString)) <~ token('\"')
+  private [parsers] val CHAR_LITER: Parsley[Char] = token('\'' ~> CHAR <~ '\'')
+  private [parsers] val CHAR: Parsley[Char] = ESC_CHAR <|> anyChar
+  private [parsers] val STR_LITER: Parsley[String] = token('\"') ~> token(manyUntil(CHAR, '\"').map(_.mkString))
   private [parsers] val PAIR_LITER: Parsley[String] = token("null")
   // TODO make this its own case class holding the char
-  private [parsers] val ESC_CHAR: Parsley[Char] = token('0') <|> token('b') <|> token('t') <|> token('n') <|> token('f') <|> token('r') <|> token('"') <|> token('\'') <|> token('\\')
+  private [parsers] val ESC_CHAR: Parsley[Char] =
+    token('\\' ~> (('0' #> '\u0000') <|> ('b' #> '\b') <|> ('t' #> '\t') <|> ('n' #> '\n') <|>
+      ('f' #> '\f') <|> ('r' #> '\r') <|> '\"' <|> '\'' <|> '\\'))
 
   private def token[A](p: =>Parsley[A]): Parsley[A] = lex.lexeme(attempt(p))
   def fully[A](p: =>Parsley[A]): Parsley[A] = lex.whiteSpace ~> p <~ eof
@@ -68,29 +71,31 @@ object parser {
   // TODO Make sure this means identifiers can't be keywords
   private [parsers] lazy val `<ident>`: Parsley[Ident] = attempt(Ident(lex.identifier))
 
-  private [parsers] lazy val `<array-liter>`: Parsley[ArrayLiter] = ArrayLiter('[' ~> sepBy1(`<expr>`, ',') <~ ']')
+  private [parsers] lazy val `<array-liter>`: Parsley[ArrayLiter] = ArrayLiter('[' ~> sepBy(`<expr>`, ',') <~ ']')
 
   private [parsers] lazy val `<expr>`: Parsley[Expr] =
     precedence(SOps(InfixR)  (Or <# "||") +:
                SOps(InfixR)  (And <# "&&") +:
-               SOps(NonAssoc)(NotEq <# "!=", Eq <# "==") +:
-               SOps(NonAssoc)(LessEq <# "<=", Less <# "<",
-                              Greater <# ">", GreaterEq <# ">=") +:
+               SOps(NonAssoc)(NotEq <# attempt("!="), Eq <# attempt("==")) +:
+               SOps(NonAssoc)(LessEq <# attempt("<="), Less <# "<",
+                              GreaterEq <# attempt(">="), Greater <# ">") +:
                SOps(InfixL)  (Minus <# "-", Plus <# "+") +:
                SOps(InfixL)  (Mod <# "%", Div <# "/", Mult <# "*") +:
                SOps(Prefix)  (Not <# "!" , Negate <# "-",
-                              Len <# "len", Ord <# "ord", Chr <# "chr") +:
+                              Len <# "len", Ord <# "ord", Chr <# attempt("chr")) +:
                Atoms(`<expr-atoms>`))
 
+  // TODO refactor this to put ident at the top and reduce backtracking
   private [parsers] lazy val `<expr-atoms>`: Parsley[Term] =
-    attempt(IntLiter(INT_LITER))   <|> BoolLiter(BOOL_LITER)     <|> CharLiter(CHAR_LITER) <|>
-      attempt(StrLiter(STR_LITER)) <|> (PAIR_LITER #> PairLiter) <|> attempt(`<ident>`)    <|>
-      `<array-elem>`               <|> ParensExpr('(' ~> `<expr>` <~ ')')
+    attempt(IntLiter(INT_LITER))     <|> attempt(BoolLiter(BOOL_LITER)) <|>
+      attempt(CharLiter(CHAR_LITER)) <|> attempt(StrLiter(STR_LITER))   <|>
+      attempt(PAIR_LITER #> PairLiter)      <|> attempt(`<array-elem>`)        <|>
+      `<ident>`                      <|> ParensExpr('(' ~> `<expr>` <~ ')')
 
   private [parsers] lazy val `<array-elem>`: Parsley[ArrayElem] = ArrayElem(`<ident>`, some('[' ~> `<expr>` <~ ']'))
 
   private [parsers] lazy val `<pair-elem-type>`: Parsley[PairElemType] =
-    attempt(Pair <# "pair") <|> `<base-type>` <|> `<array-type-pair-elem>`
+    attempt(Pair <# "pair") <|> attempt(`<array-type-pair-elem>`) <|> `<base-type>`
 
   private [parsers] lazy val `<pair-type>`: Parsley[PairType] =
     PairType("pair" ~> '(' ~> `<pair-elem-type>` , ',' ~> `<pair-elem-type>` <~ ')')
@@ -111,35 +116,36 @@ object parser {
   private [parsers] lazy val `<pair-elem>`: Parsley[PairElem] =
     FstPair("fst" ~> `<expr>`) <|> SndPair("snd" ~> `<expr>`)
 
-  private [parsers] lazy val `<arg-list>`: Parsley[ArgList] = ArgList(sepBy1(`<expr>`, ','))
+  private [parsers] lazy val `<arg-list>`: Parsley[ArgList] = ArgList(sepBy(`<expr>`, ','))
 
   private [parsers] lazy val `<assign-rhs>`: Parsley[AssignRHS] =
-    `<array-liter>` <|> NewPair("newpair" ~> '(' ~> `<expr>`, ',' ~> `<expr>` <~ ')') <|>
-      `<pair-elem>` <|> Call("call" ~> `<ident>`, '(' ~> `<arg-list>` <~ ')') <|> `<expr>`
+    `<array-liter>` <|> attempt(NewPair("newpair" ~> '(' ~> `<expr>`, ',' ~> `<expr>` <~ ')')) <|>
+      attempt(`<pair-elem>`) <|> attempt(Call("call" ~> `<ident>`, '(' ~> `<arg-list>`) <~ ')') <|>
+      `<expr>`
 
   private [parsers] lazy val `<assign-lhs>` =
-    `<pair-elem>` <|> attempt(`<array-elem>`) <|> attempt(`<ident>`)
+    attempt(`<pair-elem>`) <|> attempt(`<array-elem>`) <|> `<ident>`
 
   private [parsers] lazy val `<stat>`: Parsley[Stat] = Combine(sepBy1(`<stat-atoms>`, ';'))
 
   private [parsers] lazy val `<stat-atoms>`: Parsley[StatAtom] =
-    attempt(Skip <# "skip")                                                    <|>
-      attempt(Assign(`<assign-lhs>`, '=' ~> `<assign-rhs>`))                   <|>
-      Decl(`<type>`, `<ident>`, '=' ~> `<assign-rhs>`)                         <|>
-      Read("read" ~> `<assign-lhs>`)      <|> Free("free" ~> `<expr>`)         <|>
-      Return("return" ~> `<expr>`)        <|> Exit("exit" ~> `<expr>`)         <|>
-      attempt(Print("print" ~> `<expr>`)) <|> Println("println" ~> `<expr>`)   <|>
+    attempt(Assign(`<assign-lhs>`, '=' ~> `<assign-rhs>`))                            <|>
+      attempt(Decl(`<type>`, `<ident>`, '=' ~> `<assign-rhs>`))                       <|>
+      attempt(Skip <# "skip")                                                         <|>
+      attempt(Read("read" ~> `<assign-lhs>`))      <|> Free("free" ~> `<expr>`)         <|>
+      Return("return" ~> `<expr>`)        <|> Exit("exit" ~> `<expr>`)                  <|>
+      attempt(Print("print" ~> `<expr>`)) <|>Println("println" ~> `<expr>`)   <|>
       IfElse("if" ~> `<expr>`, "then" ~> `<stat>`, "else" ~> `<stat>` <~ "fi") <|>
-      While("while" ~> `<expr>`, "do" ~> `<stat>` <~ "done")                   <|>
+      While("while" ~> `<expr>`, "do" ~> `<stat>` <~ "done")                            <|>
       Scope("begin" ~> `<stat>` <~ "end")
 
   private [parsers] lazy val `<param>` = Param(`<type>`, `<ident>`)
 
-  private [parsers] lazy val `<param-list>` = ParamList(sepBy1(`<param>`, ','))
+  private [parsers] lazy val `<param-list>` = ParamList(sepBy(`<param>`, ','))
 
   //TODO return or exit needed before end
   private [parsers] lazy val `<func>` =
-    Func(`<type>`, `<ident>`, '(' ~> option(`<param-list>`) <~ ')', "is" ~> `<stat>` <~ "end")
+    Func(`<type>`, `<ident>`, '(' ~> `<param-list>`  <~ ')', "is" ~> `<stat>` <~ "end")
 
   private [parsers] lazy val `<program>` = fully(Program("begin" ~> many(attempt(`<func>`)), `<stat>` <~ "end"))
 
@@ -153,8 +159,22 @@ object parser {
     `<program>`.parseFromFile(input).get
 
   def main(args: Array[String]): Unit = {
-    println(parse("begin int i = 5; int[5][6] = 9; pair(int, bool) pairTest = newpair(5, true) end"))
-    //println(parse(new File("../wacc_examples/valid/expressions/intCalc.wacc")))
+    val validPrograms = new File("../wacc_examples/valid")
+    def findPrograms(file: File) {
+      var correct = 0
+      var totalFiles = 0
+      val files: List[File] = file.listFiles().toList
+      for (currFile: File <- files) {
+        if (currFile.isFile) {
+          totalFiles += 1
+          val result = parse(currFile)
+          if (result.isSuccess) correct += 1
+          println(currFile.getName + ": " + result)
+        }
+        else findPrograms(currFile)
+      }
+    }
+    findPrograms(validPrograms)
   }
 
 }
@@ -165,7 +185,7 @@ object ast {
   sealed trait AstNode
 
   case class Program(funcs: List[Func], stat: Stat) extends AstNode
-  case class Func(_type: Type, ident: Ident, params: Option[ParamList], stat: Stat) extends AstNode
+  case class Func(_type: Type, ident: Ident, params: ParamList, stat: Stat) extends AstNode
   case class ParamList(params: List[Param]) extends AstNode
   case class Param(_type: Type, ident: Ident) extends AstNode
 
@@ -265,7 +285,7 @@ object ast {
     def apply(funcs: Parsley[List[Func]], stat: Parsley[Stat]): Parsley[Program] = (funcs, stat).zipped(Program(_, _))
   }
   object Func{
-    def apply(_type: Parsley[Type], ident: Parsley[Ident], params: Parsley[Option[ParamList]], stat: Parsley[Stat]) : Parsley[Func] = (_type, ident, params, stat).zipped(Func(_,_,_,_))
+    def apply(_type: Parsley[Type], ident: Parsley[Ident], params: Parsley[ParamList], stat: Parsley[Stat]) : Parsley[Func] = (_type, ident, params, stat).zipped(Func(_,_,_,_))
   }
   object ParamList {
     def apply(params: Parsley[List[Param]]): Parsley[ParamList] = params.map(ParamList(_))
@@ -496,11 +516,11 @@ object semanticAnalysis {
         n match{
           case Func(_type, _, p, _) =>
             val l: Int = al.args.length
-            if (l != p.get.params.length) {
+            if (l != p.params.length) {
               println("wrong number of parameters")
             }else{
               for (i <- 0 to l){
-                if (checkType(p.get.params(i)) != checkType(al.args(i))){
+                if (checkType(p.params(i)) != checkType(al.args(i))){
                   println("incorrect argument types")
                   break
                 }
