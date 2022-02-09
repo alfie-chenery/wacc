@@ -166,7 +166,7 @@ object parser {
     println(renamingPass.rename(parse(program).get))
     */
     val validPrograms = new File("../wacc_examples/valid")
-    def findPrograms(file: File) {
+    def findPrograms(file: File): Unit = {
       val files: List[File] = file.listFiles().toList
       for (currFile: File <- files) {
         if (currFile.isFile) {
