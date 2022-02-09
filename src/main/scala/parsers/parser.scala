@@ -160,11 +160,6 @@ object parser {
     `<program>`.parseFromFile(input).get
 
   def main(args: Array[String]): Unit = {
-    /*
-    val program = "begin int chrtest = 5; int j = chrtest end"
-    println(parse(program))
-    println(renamingPass.rename(parse(program).get))
-    */
     val validPrograms = new File("../wacc_examples/valid")
     def findPrograms(file: File): Unit = {
       val files: List[File] = file.listFiles().toList
@@ -173,7 +168,9 @@ object parser {
           val program = parse(currFile)
           if (program.isSuccess) {
             println(currFile.getName + ": " + program.get)
-            println(currFile.getName + " (transform):" + renamingPass.rename(program.get))
+            val renamedProgram = renamingPass.rename(program.get)
+            println(currFile.getName + " (transform): " + renamedProgram)
+            //println(currFile.getName + " (type checked):" + renamedProgram)
           } else {
             println(currFile.getName + ": " + program)
           }
@@ -662,42 +659,39 @@ object renamingPass {
 }
 
 object semanticAnalysis {
-
   import parsers.ast._
 
-  def traverse(node: AstNode, st: SymbolTable): Unit = {
+  val st: mutable.Map[Ident, AstNode] = scala.collection.mutable.Map[Ident, AstNode]()
+
+  def traverse(node: AstNode): Unit = {
     node match {
       case Decl(_type, ident, rhs) =>
-        if (st.lookup(ident) != null) {
-          println("scope error")
+        if (checkType(rhs) != _type) {
+          println("type error")
         } else {
-          if (checkType(rhs) != _type) {
-            println("type error")
-          } else {
-            st.add(ident, node)
-          }
+          st += (ident -> node)
         }
       case Decl(_type, ident, NewPair(fst, snd)) =>
         _type match{
           case PairType(_,_) =>
             //TODO maybe check inner types?
-          st.add(ident, NewPair(fst, snd))
+          st += (ident -> NewPair(fst, snd))
           case _ => println("type error")
         }
       case Assign(Ident(ident), NewPair(fst, snd)) =>
-        val n : AstNode = st.lookupAll(Ident(ident))
+        val n : AstNode = st(Ident(ident))
         n match{
           case NewPair(fst1, snd1) =>
             if (checkExprType(fst1) != checkExprType(fst) || checkExprType(snd1) != checkExprType(snd)){
               println("type error")
             }else{
-              st.replace(Ident(ident), NewPair(fst, snd))
+              st += (Ident(ident) -> NewPair(fst, snd))
             }
           case _ => println("type error")
         }
       case Assign(_, NewPair(_, _)) => println("type error")
       case Assign(lhs, Call(ident, al)) =>
-        val n : AstNode = st.lookupAll(ident)
+        val n : AstNode = st(ident)
         n match{
           case Func(_type, _, p, _) =>
             val l: Int = al.args.length
@@ -707,7 +701,7 @@ object semanticAnalysis {
               for (i <- 0 to l){
                 if (checkType(p.params(i)) != checkType(al.args(i))){
                   println("incorrect argument types")
-                  break
+                  break()
                 }
               }
             }
@@ -719,39 +713,39 @@ object semanticAnalysis {
       case Assign(lhs, rhs) =>
         lhs match {
           case Ident(ident) =>
-            if (checkType(st.lookupAll(Ident(ident))) != checkType(rhs)) {
+            if (checkType(st(Ident(ident))) != checkType(rhs)) {
               println("type error")
             } else {
-              st.replace(Ident(ident), rhs)
+              st += (Ident(ident) -> rhs)
             }
           case ArrayElem(ident, _) =>
-            if (checkType(st.lookupAll(ident)) != checkType(rhs)){
+            if (checkType(st(ident)) != checkType(rhs)){
               println("type error")
             }else{
-              st.replace(ident, rhs)
+              st += (ident -> rhs)
             }
           case FstPair(fst) =>
             fst match{
               case Ident(i) =>
-                if(checkType(st.lookup(Ident(i))) != checkType(rhs)){
+                if(checkType(st(Ident(i))) != checkType(rhs)){
                   println("type error")
                 }else{
-                  st.replace(Ident(i), rhs)
+                  st += (Ident(i) -> rhs)
                 }
               case _ => println("incorrect assignment form")
             }
           case SndPair(snd) =>
             snd match{
               case Ident(i) =>
-                if(checkType(st.lookup(Ident(i))) != checkType(rhs)){
+                if(checkType(st(Ident(i))) != checkType(rhs)){
                   println("type error")
                 }else{
-                  st.replace(Ident(i), rhs)
+                  st += (Ident(i) -> rhs)
                 }
               case _ => println("incorrect assignment form")
             }
         }
-      case Func(_type, ident, params, stat) => st.add(ident, Func(_type, ident, params,stat))
+      case Func(_type, ident, params, stat) => st += (ident -> Func(_type, ident, params,stat))
       case IfElse(cond, _, _) =>
         if (checkExprType(cond) != WBool){
           println("type error")
@@ -760,7 +754,7 @@ object semanticAnalysis {
         if (checkExprType(cond) != WBool){
           println("type error")
         }
-      case _ => traverse(node, st)
+      case _ => traverse(node)
     }
 
     def checkType(node: AstNode): Type = {
@@ -778,7 +772,7 @@ object semanticAnalysis {
           }
         case FstPair(expr) => checkExprType(expr)
         case SndPair(expr) => checkExprType(expr)
-        case Call(ident, _) => checkType(st.lookupAll(ident))
+        case Call(ident, _) => checkType(st(ident))
         case _ => checkExprType(node)
       }
     }
@@ -792,7 +786,7 @@ object semanticAnalysis {
         case PairLiter => null
         case Ident(_) => null
         case ParensExpr(expr) => checkExprType(expr)
-        case ArrayElem(ident, _) => checkType(st.lookupAll(ident))
+        case ArrayElem(ident, _) => checkType(st(ident))
         case Unary(x) => unaryOperatorCheck(x)
         case MathBinary(x, y) =>
           if(checkExprType(x) == WInt && checkExprType(y) == WInt){
