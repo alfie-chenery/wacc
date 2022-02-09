@@ -6,9 +6,9 @@ import parsley.combinator.sepBy1
 import parsley.{Parsley, Result}
 
 import java.io.File
-import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.language.implicitConversions
+import scala.util.control.Breaks.break
 
 object lexer {
   import parsley.character.{anyChar, digit, isWhitespace}
@@ -30,7 +30,6 @@ object lexer {
     space = Predicate(isWhitespace),
   )
 
-  // Don't use number and string literal parsers!
   val lex = new Lexer(lang)
 
   // TODO implement negatives
@@ -399,6 +398,10 @@ class SymbolTable(val encSymTab: SymbolTable){
   //types as before
   def add(name: Ident, obj: AstNode): Any = dictionary += (name -> obj)
 
+  def replace(name: Ident, obj: AstNode): Unit ={
+    dictionary(name) = obj
+  }
+
   def lookup(name: Ident): AstNode = dictionary(name)
 
   def lookupAll(name: Ident): AstNode ={
@@ -412,7 +415,45 @@ class SymbolTable(val encSymTab: SymbolTable){
     }
     null
   }
+}
 
+object Unary{
+  import parsers.ast._
+  def unapply(expr: Expr): Option[Expr] = expr match{
+    case Not(x)    => Some(x)
+    case Negate(x) => Some(x)
+    case Len(x)    => Some(x)
+    case Ord(x)    => Some(x)
+    case Chr(x)    => Some(x)
+    case _         => None
+  }
+}
+
+object MathBinary{
+  import parsers.ast._
+  def unapply(expr: Expr): Option[(Expr, Expr)] = expr match{
+    case Mult(x, y)      => Some(x, y)
+    case Div(x, y)       => Some(x, y)
+    case Mod(x, y)       => Some(x, y)
+    case Plus(x, y)      => Some(x, y)
+    case Minus(x, y)     => Some(x, y)
+    case Greater(x, y)   => Some(x, y)
+    case GreaterEq(x, y) => Some(x, y)
+    case Less(x, y)      => Some(x, y)
+    case LessEq(x, y)    => Some(x, y)
+    case Eq(x, y)        => Some(x, y)
+    case NotEq(x, y)     => Some(x, y)
+    case _               => None
+  }
+}
+
+object LogicBinary{
+  import parsers.ast._
+  def unapply(expr: Expr): Option[(Expr, Expr)] = expr match{
+    case And(x, y)      => Some(x, y)
+    case Or(x, y)       => Some(x, y)
+    case _              => None
+  }
 }
 
 object semanticAnalysis {
@@ -445,24 +486,76 @@ object semanticAnalysis {
             if (checkExprType(fst1) != checkExprType(fst) || checkExprType(snd1) != checkExprType(snd)){
               println("type error")
             }else{
-              //TODO replace in st
+              st.replace(Ident(ident), NewPair(fst, snd))
             }
           case _ => println("type error")
         }
       case Assign(_, NewPair(_, _)) => println("type error")
-      case Assign(lhs, rhs) =>
-        lhs match{
-          case Ident(ident) =>
-            if (checkType(st.lookupAll(Ident(ident))) != checkType(rhs)){
+      case Assign(lhs, Call(ident, al)) =>
+        val n : AstNode = st.lookupAll(ident)
+        n match{
+          case Func(_type, _, p, _) =>
+            val l: Int = al.args.length
+            if (l != p.get.params.length) {
+              println("wrong number of parameters")
+            }else{
+              for (i <- 0 to l){
+                if (checkType(p.get.params(i)) != checkType(al.args(i))){
+                  println("incorrect argument types")
+                  break
+                }
+              }
+            }
+            if (checkType(lhs) != _type){
               println("type error")
             }
-          case _ =>
-            if (checkType(rhs) != checkType(lhs)){
+          case _ => println("type error")
+        }
+      case Assign(lhs, rhs) =>
+        lhs match {
+          case Ident(ident) =>
+            if (checkType(st.lookupAll(Ident(ident))) != checkType(rhs)) {
+              println("type error")
+            } else {
+              st.replace(Ident(ident), rhs)
+            }
+          case ArrayElem(ident, _) =>
+            if (checkType(st.lookupAll(ident)) != checkType(rhs)){
               println("type error")
             }else{
-              //TODO replace in st
+              st.replace(ident, rhs)
+            }
+          case FstPair(fst) =>
+            fst match{
+              case Ident(i) =>
+                if(checkType(st.lookup(Ident(i))) != checkType(rhs)){
+                  println("type error")
+                }else{
+                  st.replace(Ident(i), rhs)
+                }
+              case _ => println("incorrect assignment form")
+            }
+          case SndPair(snd) =>
+            snd match{
+              case Ident(i) =>
+                if(checkType(st.lookup(Ident(i))) != checkType(rhs)){
+                  println("type error")
+                }else{
+                  st.replace(Ident(i), rhs)
+                }
+              case _ => println("incorrect assignment form")
             }
         }
+      case Func(_type, ident, params, stat) => st.add(ident, Func(_type, ident, params,stat))
+      case IfElse(cond, _, _) =>
+        if (checkExprType(cond) != WBool){
+          println("type error")
+        }
+      case While(cond, _) =>
+        if (checkExprType(cond) != WBool){
+          println("type error")
+        }
+      case _ => traverse(node, st)
     }
 
     def checkType(node: AstNode): Type = {
@@ -480,13 +573,11 @@ object semanticAnalysis {
           }
         case FstPair(expr) => checkExprType(expr)
         case SndPair(expr) => checkExprType(expr)
-        //case Call(ident, argList) => st.lookupAll(ident)
-
+        case Call(ident, _) => checkType(st.lookupAll(ident))
         case _ => checkExprType(node)
       }
     }
 
-    @tailrec
     def checkExprType(expr: AstNode): Type = {
       expr match {
         case IntLiter(_) => WInt
@@ -497,131 +588,54 @@ object semanticAnalysis {
         case Ident(_) => null
         case ParensExpr(expr) => checkExprType(expr)
         case ArrayElem(ident, _) => checkType(st.lookupAll(ident))
-        case Len(expr) =>
-          if (unaryOperatorCheck(Len(expr))) {
+        case Unary(x) => unaryOperatorCheck(x)
+        case MathBinary(x, y) =>
+          if(checkExprType(x) == WInt && checkExprType(y) == WInt){
             WInt
-          } else {
+          }else{
             null
           }
-        case Ord(expr) =>
-          if (unaryOperatorCheck(Ord(expr))) {
-            WInt
-          } else {
+        case LogicBinary(x, y) =>
+          if(checkExprType(x) == WBool && checkExprType(y) == WBool){
+            WBool
+          }else{
             null
           }
-        case Chr(expr) =>
-          if (unaryOperatorCheck(Chr(expr))) {
-            WChar
-          } else {
+      }
+    }
+
+    def unaryOperatorCheck(op: Expr): Type ={
+      op match{
+        case Not(expr)    =>
+          if(checkExprType(expr) == WBool){
+            WBool
+          }else{
             null
           }
         case Negate(expr) =>
-          if (unaryOperatorCheck(Negate(expr))) {
-            WInt
-          } else {
-            null
-          }
-        case Mult(expr1, expr2) =>
-          if (binaryOperatorCheck(expr1, expr2, Mult(expr1, expr2))) {
-            WInt
-          } else {
-            null
-          }
-        case Div(expr1, expr2) =>
-          if (binaryOperatorCheck(expr1, expr2, Div(expr1, expr2))) {
-            WInt
-          } else {
-            null
-          }
-        case Mod(expr1, expr2) =>
-          if (binaryOperatorCheck(expr1, expr2, Mod(expr1, expr2))) {
-            WInt
-          } else {
-            null
-          }
-        case Plus(expr1, expr2) =>
-          if (binaryOperatorCheck(expr1, expr2, Plus(expr1, expr2))) {
-            WInt
-          } else {
-            null
-          }
-        case Minus(expr1, expr2) =>
-          if (binaryOperatorCheck(expr1, expr2, Minus(expr1, expr2))) {
-            WInt
-          } else {
-            null
-          }
-        case Greater(expr1, expr2) =>
-          if (binaryOperatorCheck(expr1, expr2, Greater(expr1, expr2))) {
-            WInt
-          } else {
-            null
-          }
-        case GreaterEq(expr1, expr2) =>
-          if (binaryOperatorCheck(expr1, expr2, GreaterEq(expr1, expr2))) {
-            WInt
-          } else {
-            null
-          }
-        case Less(expr1, expr2) =>
-          if (binaryOperatorCheck(expr1, expr2, Less(expr1, expr2))) {
-            WInt
-          } else {
-            null
-          }
-        case LessEq(expr1, expr2) =>
-          if (binaryOperatorCheck(expr1, expr2, LessEq(expr1, expr2))) {
-            WInt
-          } else {
-            null
-          }
-        case Eq(expr1, expr2) =>
-          if (binaryOperatorCheck(expr1, expr2, Eq(expr1, expr2))) {
-            WInt
-          } else {
-            null
-          }
-        case NotEq(expr1, expr2) =>
-          if (binaryOperatorCheck(expr1, expr2, NotEq(expr1, expr2))) {
-            WInt
-          } else {
-            null
-          }
-        case And(expr1, expr2) =>
-          if (binaryOperatorCheck(expr1, expr2, And(expr1, expr2))) {
+          if(checkExprType(expr) == WBool){
             WBool
-          } else {
+          }else{
             null
           }
-        case Or(expr1, expr2) =>
-          if (binaryOperatorCheck(expr1, expr2, Or(expr1, expr2))) {
+        case Len(expr)    =>
+          if(checkExprType(expr) == WBool){
             WBool
-          } else {
+          }else{
             null
           }
-        case Not(expr) =>
-          if (unaryOperatorCheck(Not(expr))) {
+        case Ord(expr)    =>
+          if(checkExprType(expr) == WBool){
             WBool
-          } else {
+          }else{
             null
           }
-      }
-    }
-
-    def binaryOperatorCheck(expr1: Expr, expr2: Expr, op: Expr): Boolean = {
-      op match{
-        case And(_,_) | Or(_,_) => checkExprType(expr1) == WBool && checkExprType(expr2) == WBool
-        case _                  => checkExprType(expr1) == WInt  && checkExprType(expr2) == WInt
-      }
-    }
-
-    def unaryOperatorCheck(op: Expr): Boolean ={
-      op match{
-        case Not(expr)    => checkExprType(expr) == WBool
-        case Negate(expr) => checkExprType(expr) == WInt
-        case Len(expr)    => checkExprType(expr) == WString
-        case Ord(expr)    => checkExprType(expr) == WChar
-        case Chr(expr)    => checkExprType(expr) == WInt
+        case Chr(expr)    =>
+          if(checkExprType(expr) == WBool){
+            WBool
+          }else{
+            null
+          }
       }
     }
 
