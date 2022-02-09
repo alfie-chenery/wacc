@@ -18,6 +18,6 @@ lazy val root = (project in file("."))
     sbtAssemblySetting,
 
     scalacOptions ++= Seq("-deprecation", "-unchecked", "-feature"),
-    libraryDependencies ++= Seq("com.github.j-mie6" %% "parsley" % "3.3.4",
+    libraryDependencies ++= Seq("com.github.j-mie6" %% "parsley" % "3.3.5",
       "org.scalatest" %% "scalatest" % "3.2.10" % Test)
   )

@@ -1,12 +1,13 @@
 package parsers
 
-import parsers.ast.Ident
+import parsers.ast.{AstNode, Ident}
 import parsley.Parsley._
-import parsley.combinator.{sepBy, sepBy1, endBy}
+import parsley.combinator.{endBy, sepBy, sepBy1}
 import parsley.{Parsley, Result}
 
 import java.io.File
 import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 import scala.language.implicitConversions
 import scala.util.control.Breaks.break
 
@@ -33,7 +34,7 @@ object lexer {
   val lex = new Lexer(lang)
 
   // TODO implement negatives values
-  private [parsers] val INT_LITER: Parsley[Int] = token(optional("+" <|> "-") ~> digit.foldLeft1(0)((x, d) => x * 10 + d.asDigit))
+  private [parsers] val INT_LITER: Parsley[Int] = token(optional("+") ~> digit.foldLeft1(0)((x, d) => x * 10 + d.asDigit))
   private [parsers] val BOOL_LITER: Parsley[Boolean] =
     (token("true") #> true) <|> (token("false") #> false)
   private [parsers] val CHAR_LITER: Parsley[Char] = token('\'' ~> CHAR <~ '\'')
@@ -159,6 +160,10 @@ object parser {
     `<program>`.parseFromFile(input).get
 
   def main(args: Array[String]): Unit = {
+    val program = "begin int i = 0; begin i = 2; int i = 1; i = 5 end; i = 6 end"
+    println(parse(program).get)
+    println(renamingPass.rename(parse(program).get))
+    /*
     val validPrograms = new File("../wacc_examples/valid")
     def findPrograms(file: File) {
       var correct = 0
@@ -175,6 +180,7 @@ object parser {
       }
     }
     findPrograms(validPrograms)
+     */
   }
 
 }
@@ -474,6 +480,133 @@ object LogicBinary{
     case Or(x, y)       => Some(x, y)
     case _              => None
   }
+}
+
+object renamingPass {
+
+  import parsers.ast._
+
+  def renameIdent(ident: String, localScope: mutable.Map[String,String], varsInScope: mutable.Map[String, String]): Ident = {
+    if (localScope.contains(ident)) {
+      throw new IllegalArgumentException(s"identifier $ident already declared in the current scope")
+    }
+    var renamedIdent = ""
+    if(varsInScope.contains(ident)) {
+      val nextIdentInt = varsInScope(ident).split('$')(1).toInt+1
+      renamedIdent = ident+"$"+s"$nextIdentInt"
+    } else {
+      renamedIdent = ident + "$0"
+    }
+    varsInScope += (ident -> renamedIdent)
+    localScope += (ident -> renamedIdent)
+    Ident(localScope(ident))
+  }
+
+  private def rename(program: AstNode, localScope: mutable.Map[String, String], varsInScope: mutable.Map[String, String]): AstNode = {
+    program match {
+      case Program(funcs, stat) =>
+        val renamedFuncs: ListBuffer[Func] = ListBuffer[Func]()
+        funcs.foreach(renamedFuncs += rename(_, localScope, varsInScope).asInstanceOf[Func])
+        Program(renamedFuncs.toList, rename(stat, localScope, varsInScope).asInstanceOf[Stat])
+
+      case Func(_type, Ident(ident), ParamList(params), stat) =>
+        val renamedParams: ListBuffer[Param] = ListBuffer()
+        for (param <- params) {
+          param match {
+            case Param(_type, Ident(ident)) =>
+              renamedParams += Param(_type, renameIdent(ident, localScope, varsInScope))
+            case _ =>
+          }
+        }
+        Func(_type, renameIdent(ident, localScope, varsInScope), ParamList(renamedParams.toList),
+          rename(stat, localScope, varsInScope).asInstanceOf[Stat])
+
+
+      case Decl(_type, Ident(ident), rhs) =>
+        // TODO lookup variable to see if it's declared in current scope, if not, add it
+        Decl(_type, renameIdent(ident, localScope, varsInScope),
+          rename(rhs, localScope, varsInScope).asInstanceOf[AssignRHS])
+
+      case Assign(lhs, rhs) =>
+        Assign(rename(lhs, localScope, varsInScope).asInstanceOf[AssignLHS],
+               rename(rhs, localScope, varsInScope).asInstanceOf[AssignRHS])
+        // TODO check that lhs is declared in the current or higher scope
+
+      case Ident(ident) =>
+        if (!varsInScope.contains(ident)) {
+          throw new IllegalArgumentException(s"variable $ident not declared")
+        }
+        Ident(varsInScope(ident))
+
+      case ArrayElem(ident, exprs) =>
+        val renamedExprs: ListBuffer[Expr] = ListBuffer[Expr]()
+        exprs.foreach(renamedExprs += rename(_, localScope, varsInScope).asInstanceOf[Expr])
+        ArrayElem(rename(ident, localScope, varsInScope).asInstanceOf[Ident], renamedExprs.toList)
+
+      case FstPair(expr) => FstPair(rename(expr, localScope, varsInScope).asInstanceOf[Expr])
+
+      case SndPair(expr) => SndPair(rename(expr, localScope, varsInScope).asInstanceOf[Expr])
+
+      case Read(lhs) => Read(rename(lhs, localScope, varsInScope).asInstanceOf[AssignLHS])
+        // TODO check that lhs is declared in the current or higher scope
+
+      case Free(expr) => Free(rename(expr, localScope, varsInScope).asInstanceOf[Expr])
+
+      case Return(expr) => Return(rename(expr, localScope, varsInScope).asInstanceOf[Expr])
+
+      case Exit(expr) =>  Exit(rename(expr, localScope, varsInScope).asInstanceOf[Expr])
+
+      case Print(expr) => Print(rename(expr, localScope, varsInScope).asInstanceOf[Expr])
+
+      case Println(expr) => Println(rename(expr, localScope, varsInScope).asInstanceOf[Expr])
+
+      case IfElse(cond, then_stat, else_stat) =>
+        // TODO check if any variables in cond are defined in the current scope
+        // TODO enter a new scope for both bodys
+        val newScope = scala.collection.mutable.Map[String, String]()
+        IfElse(rename(cond, localScope, varsInScope).asInstanceOf[Expr],
+               rename(then_stat, newScope, varsInScope.clone()).asInstanceOf[Stat],
+               rename(else_stat, newScope,varsInScope.clone()).asInstanceOf[Stat])
+
+      case While(cond, body) =>
+        // TODO check if any variables in cond are defined in the current scope
+        // TODO enter a new scope for the body
+        val newScope = scala.collection.mutable.Map[String, String]()
+        While(rename(cond, localScope, varsInScope).asInstanceOf[Expr],
+              rename(body, newScope, varsInScope.clone()).asInstanceOf[Stat])
+
+      case Scope(stat) =>
+        // TODO enter a new scope
+        val newScope = scala.collection.mutable.Map[String, String]()
+        Scope(rename(stat, newScope, varsInScope.clone()).asInstanceOf[Stat])
+
+      case Combine(stats) =>
+        val renamedStats: ListBuffer[StatAtom] = ListBuffer()
+        stats.foreach(renamedStats += rename(_, localScope, varsInScope).asInstanceOf[StatAtom])
+        Combine(renamedStats.toList)
+
+      case NewPair(fst, snd) =>
+        NewPair(rename(fst, localScope, varsInScope).asInstanceOf[Expr],
+                rename(snd, localScope, varsInScope).asInstanceOf[Expr])
+
+      case Call(Ident(ident), ArgList(args)) =>
+        // TODO check that ident is declared in this scope
+        if (!varsInScope.contains(ident)) {
+          throw new IllegalArgumentException(s"function $ident not defined")
+        }
+        val args: List[Expr] = List()
+        args.foreach(rename(_, localScope, varsInScope).asInstanceOf[Expr] :: args)
+        Call(Ident(varsInScope(ident)), ArgList(args))
+
+      case node: AstNode => node
+    }
+  }
+  def rename(program: Program): Program = {
+    val variableRenaming: mutable.Map[String, String] = scala.collection.mutable.Map[String, String]()
+    val localScope: mutable.Map[String, String] = scala.collection.mutable.Map[String, String]()
+    rename(program, localScope, variableRenaming).asInstanceOf[Program]
+  }
+
 }
 
 object semanticAnalysis {
