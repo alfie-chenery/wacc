@@ -1,8 +1,8 @@
 package parsers
 
-import parsers.ast.{AstNode, Ident}
+import parsers.ast.Ident
 import parsley.Parsley._
-import parsley.combinator.{endBy, sepBy, sepBy1}
+import parsley.combinator.{sepBy, sepBy1}
 import parsley.{Parsley, Result}
 
 import java.io.File
@@ -63,7 +63,7 @@ object parser {
   import ast._
   import lexer._
   import implicits.tokenLift
-  import parsley.combinator.{many, option, some}
+  import parsley.combinator.{many, some}
   import parsley.errors.ErrorBuilder
   import parsley.expr._
   import parsley.io.ParseFromIO
@@ -160,7 +160,7 @@ object parser {
     `<program>`.parseFromFile(input).get
 
   def main(args: Array[String]): Unit = {
-    val program = "begin int i = 0; begin i = 2; int i = 1; i = 5 end; i = 6 end"
+    val program = "begin int i = 0; begin i = 2; int j = 3; int i = j * i end; i = 6 end"
     println(parse(program).get)
     println(renamingPass.rename(parse(program).get))
     /*
@@ -524,8 +524,8 @@ object renamingPass {
 
       case Decl(_type, Ident(ident), rhs) =>
         // TODO lookup variable to see if it's declared in current scope, if not, add it
-        Decl(_type, renameIdent(ident, localScope, varsInScope),
-          rename(rhs, localScope, varsInScope).asInstanceOf[AssignRHS])
+        val renamedRhs = rename(rhs, localScope, varsInScope).asInstanceOf[AssignRHS]
+        Decl(_type, renameIdent(ident, localScope, varsInScope), renamedRhs)
 
       case Assign(lhs, rhs) =>
         Assign(rename(lhs, localScope, varsInScope).asInstanceOf[AssignLHS],
@@ -537,6 +537,53 @@ object renamingPass {
           throw new IllegalArgumentException(s"variable $ident not declared")
         }
         Ident(varsInScope(ident))
+
+      case ParensExpr(expr) => ParensExpr(rename(expr, localScope, varsInScope).asInstanceOf[Expr])
+
+      case Or(lhs, rhs) =>
+        Or(rename(lhs, localScope, varsInScope).asInstanceOf[Expr2],
+           rename(rhs, localScope, varsInScope).asInstanceOf[Expr1])
+      case And(lhs, rhs) =>
+        And(rename(lhs, localScope, varsInScope).asInstanceOf[Expr3],
+            rename(rhs, localScope, varsInScope).asInstanceOf[Expr2])
+      case Eq(lhs, rhs) =>
+        Eq(rename(lhs, localScope, varsInScope).asInstanceOf[Expr4],
+           rename(rhs, localScope, varsInScope).asInstanceOf[Expr3])
+      case NotEq(lhs, rhs) =>
+        NotEq(rename(lhs, localScope, varsInScope).asInstanceOf[Expr4],
+              rename(rhs, localScope, varsInScope).asInstanceOf[Expr3])
+      case Greater(lhs, rhs) =>
+        Greater(rename(lhs, localScope, varsInScope).asInstanceOf[Expr5],
+                rename(rhs, localScope, varsInScope).asInstanceOf[Expr4])
+      case GreaterEq(lhs, rhs) =>
+        GreaterEq(rename(lhs, localScope, varsInScope).asInstanceOf[Expr5],
+                  rename(rhs, localScope, varsInScope).asInstanceOf[Expr4])
+      case Less(lhs, rhs) =>
+        Less(rename(lhs, localScope, varsInScope).asInstanceOf[Expr5],
+             rename(rhs, localScope, varsInScope).asInstanceOf[Expr4])
+      case LessEq(lhs, rhs) =>
+        LessEq(rename(lhs, localScope, varsInScope).asInstanceOf[Expr5],
+               rename(rhs, localScope, varsInScope).asInstanceOf[Expr4])
+      case Plus(lhs, rhs) =>
+        Plus(rename(lhs, localScope, varsInScope).asInstanceOf[Expr5],
+             rename(rhs, localScope, varsInScope).asInstanceOf[Expr6])
+      case Minus(lhs, rhs) =>
+        Plus(rename(lhs, localScope, varsInScope).asInstanceOf[Expr5],
+             rename(rhs, localScope, varsInScope).asInstanceOf[Expr6])
+      case Mult(lhs, rhs) =>
+        Mult(rename(lhs, localScope, varsInScope).asInstanceOf[Expr6],
+             rename(rhs, localScope, varsInScope).asInstanceOf[Expr7])
+      case Div(lhs, rhs) =>
+        Mult(rename(lhs, localScope, varsInScope).asInstanceOf[Expr6],
+             rename(rhs, localScope, varsInScope).asInstanceOf[Expr7])
+      case Mod(lhs, rhs) =>
+        Mult(rename(lhs, localScope, varsInScope).asInstanceOf[Expr6],
+             rename(rhs, localScope, varsInScope).asInstanceOf[Expr7])
+      case Not(expr) => Not(rename(expr, localScope, varsInScope).asInstanceOf[Expr7])
+      case Negate(expr) => Negate(rename(expr, localScope, varsInScope).asInstanceOf[Expr7])
+      case Len(expr) => Len(rename(expr, localScope, varsInScope).asInstanceOf[Expr7])
+      case Ord(expr) => Ord(rename(expr, localScope, varsInScope).asInstanceOf[Expr7])
+      case Chr(expr) => Chr(rename(expr, localScope, varsInScope).asInstanceOf[Expr7])
 
       case ArrayElem(ident, exprs) =>
         val renamedExprs: ListBuffer[Expr] = ListBuffer[Expr]()
@@ -594,9 +641,9 @@ object renamingPass {
         if (!varsInScope.contains(ident)) {
           throw new IllegalArgumentException(s"function $ident not defined")
         }
-        val args: List[Expr] = List()
-        args.foreach(rename(_, localScope, varsInScope).asInstanceOf[Expr] :: args)
-        Call(Ident(varsInScope(ident)), ArgList(args))
+        val renamedArgs: ListBuffer[Expr] = ListBuffer()
+        args.foreach(renamedArgs += rename(_, localScope, varsInScope).asInstanceOf[Expr])
+        Call(Ident(varsInScope(ident)), ArgList(renamedArgs.toList))
 
       case node: AstNode => node
     }
@@ -791,7 +838,5 @@ object semanticAnalysis {
           }
       }
     }
-
-
   }
 }
