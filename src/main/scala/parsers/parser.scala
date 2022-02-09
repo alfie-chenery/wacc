@@ -88,10 +88,10 @@ object parser {
 
   // TODO refactor this to put ident at the top and reduce backtracking
   private [parsers] lazy val `<expr-atoms>`: Parsley[Term] =
-    attempt(IntLiter(INT_LITER))     <|> attempt(BoolLiter(BOOL_LITER)) <|>
-      attempt(CharLiter(CHAR_LITER)) <|> attempt(StrLiter(STR_LITER))   <|>
-      attempt(PAIR_LITER #> PairLiter)      <|> attempt(`<array-elem>`)        <|>
-      `<ident>`                      <|> ParensExpr('(' ~> `<expr>` <~ ')')
+    attempt(IntLiter(INT_LITER))       <|> attempt(BoolLiter(BOOL_LITER)) <|>
+      attempt(CharLiter(CHAR_LITER))   <|> attempt(StrLiter(STR_LITER))   <|>
+      attempt(PAIR_LITER #> PairLiter) <|> attempt(`<array-elem>`)        <|>
+      `<ident>`                        <|> ParensExpr('(' ~> `<expr>` <~ ')')
 
   private [parsers] lazy val `<array-elem>`: Parsley[ArrayElem] = ArrayElem(`<ident>`, some('[' ~> `<expr>` <~ ']'))
 
@@ -160,21 +160,22 @@ object parser {
     `<program>`.parseFromFile(input).get
 
   def main(args: Array[String]): Unit = {
-    val program = "begin int i = 0; begin i = 2; int j = 3; int i = j * i end; i = 6 end"
-    println(parse(program).get)
+    val program = "begin int chrtest = 5; int j = chrtest end"
+    println(parse(program))
     println(renamingPass.rename(parse(program).get))
     /*
     val validPrograms = new File("../wacc_examples/valid")
     def findPrograms(file: File) {
-      var correct = 0
-      var totalFiles = 0
       val files: List[File] = file.listFiles().toList
       for (currFile: File <- files) {
         if (currFile.isFile) {
-          totalFiles += 1
-          val result = parse(currFile)
-          if (result.isSuccess) correct += 1
-          println(currFile.getName + ": " + result)
+          val program = parse(currFile)
+          if (program.isSuccess) {
+            println(currFile.getName + ": " + program.get)
+            println(currFile.getName + " (transform):" + renamingPass.rename(program.get))
+          } else {
+            println(currFile.getName + ": " + program)
+          }
         }
         else findPrograms(currFile)
       }
@@ -182,7 +183,6 @@ object parser {
     findPrograms(validPrograms)
      */
   }
-
 }
 
 object ast {
@@ -506,21 +506,26 @@ object renamingPass {
     program match {
       case Program(funcs, stat) =>
         val renamedFuncs: ListBuffer[Func] = ListBuffer[Func]()
+        for (func <- funcs) {
+          func match {
+            case Func(_, Ident(ident), _, _) => renameIdent(ident+"_func", localScope, varsInScope)
+          }
+        }
         funcs.foreach(renamedFuncs += rename(_, localScope, varsInScope).asInstanceOf[Func])
         Program(renamedFuncs.toList, rename(stat, localScope, varsInScope).asInstanceOf[Stat])
 
       case Func(_type, Ident(ident), ParamList(params), stat) =>
+        val newScope = scala.collection.mutable.Map[String, String]()
         val renamedParams: ListBuffer[Param] = ListBuffer()
         for (param <- params) {
           param match {
             case Param(_type, Ident(ident)) =>
-              renamedParams += Param(_type, renameIdent(ident, localScope, varsInScope))
+              renamedParams += Param(_type, renameIdent(ident, newScope, varsInScope))
             case _ =>
           }
         }
-        Func(_type, renameIdent(ident, localScope, varsInScope), ParamList(renamedParams.toList),
-          rename(stat, localScope, varsInScope).asInstanceOf[Stat])
-
+        Func(_type, Ident(varsInScope(ident+"_func")), ParamList(renamedParams.toList),
+          rename(stat, newScope, varsInScope).asInstanceOf[Stat])
 
       case Decl(_type, Ident(ident), rhs) =>
         // TODO lookup variable to see if it's declared in current scope, if not, add it
@@ -638,12 +643,12 @@ object renamingPass {
 
       case Call(Ident(ident), ArgList(args)) =>
         // TODO check that ident is declared in this scope
-        if (!varsInScope.contains(ident)) {
+        if (!varsInScope.contains(ident+"_func")) {
           throw new IllegalArgumentException(s"function $ident not defined")
         }
         val renamedArgs: ListBuffer[Expr] = ListBuffer()
         args.foreach(renamedArgs += rename(_, localScope, varsInScope).asInstanceOf[Expr])
-        Call(Ident(varsInScope(ident)), ArgList(renamedArgs.toList))
+        Call(Ident(varsInScope(ident+"_func")), ArgList(renamedArgs.toList))
 
       case node: AstNode => node
     }
