@@ -671,6 +671,7 @@ object semanticAnalysis {
         } else {
           st += (ident -> (rhs, _type))
         }
+        traverse(rhs)
       case Assign(lhs, Call(ident, al)) =>
         val n : AstNode = st(ident)._1
         n match{
@@ -683,6 +684,8 @@ object semanticAnalysis {
                 if (checkType(p.params(i)) != checkType(al.args(i))){
                   println("incorrect argument types")
                   break()
+                }else{
+                  traverse(p.params(i))
                 }
               }
             }
@@ -691,6 +694,7 @@ object semanticAnalysis {
             }
           case _ => println("type error")
         }
+        traverse(lhs)
       case Assign(lhs, rhs) =>
         val t : Type = checkType(rhs).asInstanceOf[Type]
         lhs match {
@@ -727,19 +731,79 @@ object semanticAnalysis {
               case _ => println("incorrect assignment form")
             }
         }
-      case Func(_type, ident, params, stat) => st += (ident -> (Func(_type, ident, params,stat), _type))
-      case IfElse(cond, _, _) =>
+        traverse(lhs)
+        traverse(rhs)
+      case Func(_type, ident, paramlist, stat) =>
+        st += (ident -> (Func(_type, ident, paramlist,stat), _type))
+        for (param <- paramlist.params){
+          traverse(param)
+        }
+        traverse(stat)
+      case IfElse(cond, stattrue, statfalse) =>
         if (checkExprType(cond) != WBool){
           println("type error")
         }
-        //TODO traverse further
-      case While(cond, _) =>
+        traverse(cond)
+        traverse(stattrue)
+        traverse(statfalse)
+      case While(cond, stat) =>
         if (checkExprType(cond) != WBool){
           println("type error")
         }
-        //TODO traverse further
-      //TODO new thing to call
-      case _ => traverse(node)
+        traverse(cond)
+        traverse(stat)
+      case Param(_type, ident) => st += (ident, (node, _type))
+      case Program(funcs, s) =>
+        for (func <- funcs){
+          traverse(func)
+        }
+        traverse(s)
+      case Read(lhs) => traverse(lhs)
+      case Free(expr) => traverse(expr)
+      case Return(expr) => traverse(expr)
+      case Exit(expr) => traverse(expr)
+      case Print(expr) => traverse(expr)
+      case Println(expr) => traverse(expr)
+      case Scope(stat) => traverse(stat)
+      case Combine(atoms) =>
+        for (atom <- atoms){
+          traverse(atom)
+        }
+      case NewPair(fst,snd) =>
+        traverse(fst)
+        traverse(snd)
+      case Call(_, args) =>
+        traverse(args)
+      case ArgList(args) =>
+        for (arg <- args){
+          traverse(arg)
+        }
+      case FstPair(expr) => traverse(expr)
+      case SndPair(expr) => traverse(expr)
+      case PairType(fst, snd) =>
+        traverse(fst)
+        traverse(snd)
+      case IntLiter(int) =>
+        if(int > 2147483647 || int < -2147483647){
+          println("out of bounds int")
+        }
+      case ArrayElem(_, exprs) =>
+        for (expr <- exprs){
+          traverse(expr)
+        }
+      case ParensExpr(expr) => traverse(expr)
+      case MathBinary(x, y) =>
+        traverse(x)
+        traverse(y)
+      case LogicBinary(x, y) =>
+        traverse(x)
+        traverse(y)
+      case Unary(x) => traverse(x)
+      case ArrayLiter(exprs) =>
+        for (expr <- exprs){
+          traverse(expr)
+        }
+      case _ =>
     }
 
     def checkType(node: AstNode): AstNode = {
