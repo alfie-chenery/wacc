@@ -229,7 +229,7 @@ object ast {
   case object WString extends BaseType with ParserBuilder[BaseType]{val parser: Parsley[WString.type] = pure(WString)}
   case class ArrayType(_type: Type) extends Type with PairElemType
   case class PairType(fst_type: PairElemType, snd_type: PairElemType) extends TypeAtom
-  sealed trait PairElemType
+  sealed trait PairElemType extends AstNode
   case object Pair extends PairElemType with ParserBuilder[PairElemType]{val parser: Parsley[Pair.type] = pure(Pair)}
 
   sealed trait Expr extends AssignRHS
@@ -661,7 +661,7 @@ object renamingPass {
 object semanticAnalysis {
   import parsers.ast._
 
-  val st: mutable.Map[Ident, AstNode] = scala.collection.mutable.Map[Ident, AstNode]()
+  val st: mutable.Map[Ident, (AstNode, Type)] = scala.collection.mutable.Map[Ident, (AstNode, Type)]()
 
   def traverse(node: AstNode): Unit = {
     node match {
@@ -669,29 +669,10 @@ object semanticAnalysis {
         if (checkType(rhs) != _type) {
           println("type error")
         } else {
-          st += (ident -> node)
+          st += (ident -> (rhs, _type))
         }
-      case Decl(_type, ident, NewPair(fst, snd)) =>
-        _type match{
-          case PairType(_,_) =>
-            //TODO maybe check inner types?
-          st += (ident -> NewPair(fst, snd))
-          case _ => println("type error")
-        }
-      case Assign(Ident(ident), NewPair(fst, snd)) =>
-        val n : AstNode = st(Ident(ident))
-        n match{
-          case NewPair(fst1, snd1) =>
-            if (checkExprType(fst1) != checkExprType(fst) || checkExprType(snd1) != checkExprType(snd)){
-              println("type error")
-            }else{
-              st += (Ident(ident) -> NewPair(fst, snd))
-            }
-          case _ => println("type error")
-        }
-      case Assign(_, NewPair(_, _)) => println("type error")
       case Assign(lhs, Call(ident, al)) =>
-        val n : AstNode = st(ident)
+        val n : AstNode = st(ident)._1
         n match{
           case Func(_type, _, p, _) =>
             val l: Int = al.args.length
@@ -711,68 +692,76 @@ object semanticAnalysis {
           case _ => println("type error")
         }
       case Assign(lhs, rhs) =>
+        val t : Type = checkType(rhs).asInstanceOf[Type]
         lhs match {
           case Ident(ident) =>
-            if (checkType(st(Ident(ident))) != checkType(rhs)) {
+            if (st(Ident(ident))._2 != t) {
               println("type error")
             } else {
-              st += (Ident(ident) -> rhs)
+              st += (Ident(ident) -> (node, t))
             }
           case ArrayElem(ident, _) =>
-            if (checkType(st(ident)) != checkType(rhs)){
+            if (st(ident)._2 != t){
               println("type error")
             }else{
-              st += (ident -> rhs)
+              st += (ident -> (node, t))
             }
           case FstPair(fst) =>
             fst match{
               case Ident(i) =>
-                if(checkType(st(Ident(i))) != checkType(rhs)){
+                if(st(Ident(i))._2 != t){
                   println("type error")
                 }else{
-                  st += (Ident(i) -> rhs)
+                  st += (Ident(i) -> (node, t))
                 }
               case _ => println("incorrect assignment form")
             }
           case SndPair(snd) =>
             snd match{
               case Ident(i) =>
-                if(checkType(st(Ident(i))) != checkType(rhs)){
+                if(st(Ident(i))._2 != t){
                   println("type error")
                 }else{
-                  st += (Ident(i) -> rhs)
+                  st += (Ident(i) -> (node, t))
                 }
               case _ => println("incorrect assignment form")
             }
         }
-      case Func(_type, ident, params, stat) => st += (ident -> Func(_type, ident, params,stat))
+      case Func(_type, ident, params, stat) => st += (ident -> (Func(_type, ident, params,stat), _type))
       case IfElse(cond, _, _) =>
         if (checkExprType(cond) != WBool){
           println("type error")
         }
+        //TODO traverse further
       case While(cond, _) =>
         if (checkExprType(cond) != WBool){
           println("type error")
         }
+        //TODO traverse further
+      //TODO new thing to call
       case _ => traverse(node)
     }
 
-    def checkType(node: AstNode): Type = {
+    def checkType(node: AstNode): AstNode = {
       node match {
         case ArrayLiter(exprs) =>
           var types: List[Type] = List()
           for (expr <- exprs) {
-            types = checkType(expr) +: types
+            types = checkType(expr).asInstanceOf[Type] +: types
           }
           val same: Boolean = types.forall(_ == types.head)
           if (same) {
             types.head
           } else {
+            println("type error")
             null
           }
+        case NewPair(e1, e2) =>
+          PairType(checkType(e1).asInstanceOf[PairElemType], checkType(e2).asInstanceOf[PairElemType])
         case FstPair(expr) => checkExprType(expr)
         case SndPair(expr) => checkExprType(expr)
-        case Call(ident, _) => checkType(st(ident))
+        case Call(ident, _) => checkType(st(ident)._1)
+        case Pair => Pair
         case _ => checkExprType(node)
       }
     }
@@ -786,7 +775,7 @@ object semanticAnalysis {
         case PairLiter => null
         case Ident(_) => null
         case ParensExpr(expr) => checkExprType(expr)
-        case ArrayElem(ident, _) => checkType(st(ident))
+        case ArrayElem(ident, _) => checkType(st(ident)._1).asInstanceOf[Type]
         case Unary(x) => unaryOperatorCheck(x)
         case MathBinary(x, y) =>
           if(checkExprType(x) == WInt && checkExprType(y) == WInt){
