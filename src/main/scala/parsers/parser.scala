@@ -37,14 +37,14 @@ object lexer {
   private [parsers] val INT_LITER: Parsley[Int] = token(optional("+") ~> digit.foldLeft1(0)((x, d) => x * 10 + d.asDigit))
   private [parsers] val BOOL_LITER: Parsley[Boolean] =
     (token("true") #> true) <|> (token("false") #> false)
-  private [parsers] val CHAR_LITER: Parsley[Char] = token('\'' ~> CHAR <~ '\'')
-  private [parsers] val CHAR: Parsley[Char] = ESC_CHAR <|> anyChar
-  private [parsers] val STR_LITER: Parsley[String] = token('\"') ~> token(manyUntil(CHAR, '\"').map(_.mkString))
-  private [parsers] val PAIR_LITER: Parsley[String] = token("null")
-  // TODO make this its own case class holding the char
   private [parsers] val ESC_CHAR: Parsley[Char] =
     token('\\' ~> (('0' #> '\u0000') <|> ('b' #> '\b') <|> ('t' #> '\t') <|> ('n' #> '\n') <|>
       ('f' #> '\f') <|> ('r' #> '\r') <|> '\"' <|> '\'' <|> '\\'))
+  private [parsers] val CHAR: Parsley[Char] = ESC_CHAR <|> anyChar
+  private [parsers] val CHAR_LITER: Parsley[Char] = token('\'' ~> CHAR <~ '\'')
+  private [parsers] val STR_LITER: Parsley[String] = token('\"') ~> token(manyUntil(CHAR, '\"').map(_.mkString))
+  private [parsers] val PAIR_LITER: Parsley[String] = token("null")
+  // TODO make this its own case class holding the char
 
   private def token[A](p: =>Parsley[A]): Parsley[A] = lex.lexeme(attempt(p))
   def fully[A](p: =>Parsley[A]): Parsley[A] = lex.whiteSpace ~> p <~ eof
@@ -82,8 +82,7 @@ object parser {
                               GreaterEq <# attempt(">="), Greater <# ">") +:
                SOps(InfixL)  (Minus <# "-", Plus <# "+") +:
                SOps(InfixL)  (Mod <# "%", Div <# "/", Mult <# "*") +:
-               SOps(Prefix)  (Not <# "!" , Negate <# "-",
-                              Len <# "len ", Ord <# "ord ", Chr <# attempt("chr ")) +:
+               SOps(Prefix)  (Chr <# attempt("chr "), Len <# "len ", Ord <# "ord ", Not <# "!" , Negate <# "-") +:
                Atoms(`<expr-atoms>`))
 
   // TODO refactor this to put ident at the top and reduce backtracking
@@ -96,7 +95,7 @@ object parser {
   private [parsers] lazy val `<array-elem>`: Parsley[ArrayElem] = ArrayElem(`<ident>`, some('[' ~> `<expr>` <~ ']'))
 
   private [parsers] lazy val `<pair-elem-type>`: Parsley[PairElemType] =
-    attempt(Pair <# "pair") <|> attempt(`<array-type-pair-elem>`) <|> `<base-type>`
+    attempt(Pair <# "pair") <|> attempt(`<array-type-pair-elem>`) a<|> `<base-type>`
 
   private [parsers] lazy val `<pair-type>`: Parsley[PairType] =
     PairType("pair" ~> '(' ~> `<pair-elem-type>` , ',' ~> `<pair-elem-type>` <~ ')')
@@ -146,13 +145,9 @@ object parser {
 
   //TODO return or exit needed before end
   private [parsers] lazy val `<func>` =
-    Func(`<type>`, `<ident>`, '(' ~> `<param-list>`  <~ ')', "is" ~> `<stat>` <~ "end")
+    Func(attempt(`<type>` <~> `<ident>` <~ '('), `<param-list>`  <~ ')', "is" ~> `<stat>` <~ "end")
 
-  private [parsers] lazy val `<program>` = fully(Program("begin" ~> many(attempt(`<func>`)), `<stat>` <~ "end"))
-
-
-
-
+  private [parsers] lazy val `<program>` = fully(Program("begin" ~> many(`<func>`), `<stat>` <~ "end"))
 
   def parse[Err: ErrorBuilder](input: String): Result[Err, Program] =
     `<program>`.parse(input)
@@ -170,7 +165,11 @@ object parser {
             println(currFile.getName + ": " + program.get)
             val renamedProgram = renamingPass.rename(program.get)
             println(currFile.getName + " (transform): " + renamedProgram)
-            //println(currFile.getName + " (type checked):" + renamedProgram)
+            try {
+              println(currFile.getName + " (type checked):" + semanticAnalysis.traverse(renamedProgram))
+            } catch {
+              case e: Exception => println(e.printStackTrace())
+            }
           } else {
             println(currFile.getName + ": " + program)
           }
@@ -188,7 +187,7 @@ object ast {
   sealed trait AstNode
 
   case class Program(funcs: List[Func], stat: Stat) extends AstNode
-  case class Func(_type: Type, ident: Ident, params: ParamList, stat: Stat) extends AstNode
+  case class Func(ident: (Type, Ident), params: ParamList, stat: Stat) extends AstNode
   case class ParamList(params: List[Param]) extends AstNode
   case class Param(_type: Type, ident: Ident) extends AstNode
 
@@ -288,7 +287,7 @@ object ast {
     def apply(funcs: Parsley[List[Func]], stat: Parsley[Stat]): Parsley[Program] = (funcs, stat).zipped(Program(_, _))
   }
   object Func{
-    def apply(_type: Parsley[Type], ident: Parsley[Ident], params: Parsley[ParamList], stat: Parsley[Stat]) : Parsley[Func] = (_type, ident, params, stat).zipped(Func(_,_,_,_))
+    def apply(ident: Parsley[(Type, Ident)], params: Parsley[ParamList], stat: Parsley[Stat]) : Parsley[Func] = (ident, params, stat).zipped(Func(_,_,_))
   }
   object ParamList {
     def apply(params: Parsley[List[Param]]): Parsley[ParamList] = params.map(ParamList(_))
@@ -505,13 +504,13 @@ object renamingPass {
         val renamedFuncs: ListBuffer[Func] = ListBuffer[Func]()
         for (func <- funcs) {
           func match {
-            case Func(_, Ident(ident), _, _) => renameIdent(ident+"_func", localScope, varsInScope)
+            case Func((_, Ident(ident)), _, _) => renameIdent(ident+"_func", localScope, varsInScope)
           }
         }
         funcs.foreach(renamedFuncs += rename(_, localScope, varsInScope).asInstanceOf[Func])
         Program(renamedFuncs.toList, rename(stat, localScope, varsInScope).asInstanceOf[Stat])
 
-      case Func(_type, Ident(ident), ParamList(params), stat) =>
+      case Func((_type, Ident(ident)), ParamList(params), stat) =>
         val newScope = scala.collection.mutable.Map[String, String]()
         val renamedParams: ListBuffer[Param] = ListBuffer()
         for (param <- params) {
@@ -521,7 +520,7 @@ object renamingPass {
             case _ =>
           }
         }
-        Func(_type, Ident(varsInScope(ident+"_func")), ParamList(renamedParams.toList),
+        Func((_type, Ident(varsInScope(ident+"_func"))), ParamList(renamedParams.toList),
           rename(stat, newScope, varsInScope).asInstanceOf[Stat])
 
       case Decl(_type, Ident(ident), rhs) =>
@@ -665,17 +664,49 @@ object semanticAnalysis {
 
   def traverse(node: AstNode): Unit = {
     node match {
+      case Program(funcs, s) =>
+        for (func <- funcs){
+          traverse(func)
+        }
+        traverse(s)
+
+      case Func((_type, ident), paramlist, stat) =>
+        st += (ident -> (Func((_type, ident), paramlist,stat), _type))
+        for (param <- paramlist.params){
+          traverse(param)
+        }
+        traverse(stat)
+
+      // <Stat>
+      // TODO type check expr
+      case Print(expr) => checkExprType(expr)
+      case Println(expr) => checkExprType(expr)
+      case Return(expr) => // TODO come back to this
+      case Exit(expr) => // TODO come back to this
+      case Free(expr) => // TODO come back to this
+      case Skip =>
+      case IfElse(cond, stat_true, stat_false) =>
+        if (checkExprType(cond) != WBool){
+          println("Condition must be a boolean expression")
+        }
+        traverse(stat_true)
+        traverse(stat_false)
+      case While(cond, stat) =>
+        if (checkExprType(cond) != WBool){
+          println("Condition must be a boolean expression")
+        }
+        traverse(stat)
+      case Scope(stat) => traverse(stat)
       case Decl(_type, ident, rhs) =>
         if (checkType(rhs) != _type) {
-          println("type error")
+          println(s"The right hand side does not match type ${_type}")
         } else {
           st += (ident -> (rhs, _type))
         }
-        traverse(rhs)
       case Assign(lhs, Call(ident, al)) =>
         val n : AstNode = st(ident)._1
         n match{
-          case Func(_type, _, p, _) =>
+          case Func((_type, _), p, _) =>
             val l: Int = al.args.length
             if (l != p.params.length) {
               println("wrong number of parameters")
@@ -731,40 +762,17 @@ object semanticAnalysis {
               case _ => println("incorrect assignment form")
             }
         }
-        traverse(lhs)
-        traverse(rhs)
-      case Func(_type, ident, paramlist, stat) =>
-        st += (ident -> (Func(_type, ident, paramlist,stat), _type))
-        for (param <- paramlist.params){
-          traverse(param)
-        }
-        traverse(stat)
-      case IfElse(cond, stattrue, statfalse) =>
-        if (checkExprType(cond) != WBool){
+        //traverse(lhs)
+        //traverse(rhs)
+
+
+      case Param(_type, ident) => st += (ident -> (node, _type))
+      case Read(lhs) =>
+        val _type = checkType(lhs)
+        if(_type != WChar || _type != WInt) {
           println("type error")
         }
-        traverse(cond)
-        traverse(stattrue)
-        traverse(statfalse)
-      case While(cond, stat) =>
-        if (checkExprType(cond) != WBool){
-          println("type error")
-        }
-        traverse(cond)
-        traverse(stat)
-      case Param(_type, ident) => st += (ident, (node, _type))
-      case Program(funcs, s) =>
-        for (func <- funcs){
-          traverse(func)
-        }
-        traverse(s)
-      case Read(lhs) => traverse(lhs)
-      case Free(expr) => traverse(expr)
-      case Return(expr) => traverse(expr)
-      case Exit(expr) => traverse(expr)
-      case Print(expr) => traverse(expr)
-      case Println(expr) => traverse(expr)
-      case Scope(stat) => traverse(stat)
+      // TODO fix these
       case Combine(atoms) =>
         for (atom <- atoms){
           traverse(atom)
@@ -836,8 +844,9 @@ object semanticAnalysis {
         case BoolLiter(_) => WBool
         case CharLiter(_) => WChar
         case StrLiter(_) => WString
+        // TODO check this
         case PairLiter => null
-        case Ident(_) => null
+        case Ident(ident) => st(Ident(ident))._2
         case ParensExpr(expr) => checkExprType(expr)
         case ArrayElem(ident, _) => checkType(st(ident)._1).asInstanceOf[Type]
         case Unary(x) => unaryOperatorCheck(x)
@@ -865,7 +874,7 @@ object semanticAnalysis {
             null
           }
         case Negate(expr) =>
-          if(checkExprType(expr) == WBool){
+          if(checkExprType(expr) == WInt){
             WBool
           }else{
             null
