@@ -3,9 +3,9 @@ package parsers
 import org.scalatest.flatspec.AnyFlatSpec
 
 class parserSpec extends AnyFlatSpec{
-  import parser._
+  import Parser._
   import lexer._
-  import ast._
+  import Ast._
 
   behavior of "<int-liter>"
   it should "parse positive numbers" in {
