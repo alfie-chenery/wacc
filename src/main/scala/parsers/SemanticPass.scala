@@ -87,7 +87,13 @@ object SemanticPass {
           }
           val same: Boolean = types.forall(_ == types.head)
           if (same) {
-            ArrayType(types.head)
+            val t : Option[Type] = types.headOption
+            if (t.isDefined){
+              ArrayType(t.get)
+            }else{
+              println("empty array")
+              null
+            }
           } else {
             println("All elements of an array must have the same type")
             null
