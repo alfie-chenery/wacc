@@ -125,33 +125,57 @@ object SemanticPass {
             println(s"Both sides of the expression || must be Integer")
           }
           WBool
-        case Mult(x, y) =>
-          if (!(checkExprType(x) == WInt && checkExprType(y) == WInt)) {
-            println(s"Both sides of the expression * must be Integer")
-          }
-          WInt
-        case Div(x, y) =>
-          if (!(checkExprType(x) == WInt && checkExprType(y) == WInt)) {
-            println(s"Both sides of the expression / must be Integer")
-          }
-          WInt
-        case Mod(x, y) =>
-          if (!(checkExprType(x) == WInt && checkExprType(y) == WInt)) {
-            println(s"Both sides of the expression % must be Integer")
-          }
-          WInt
-        case Plus(x, y) =>
-          if (!(checkExprType(x) == WInt && checkExprType(y) == WInt)) {
-            println(s"Both sides of the expression + must be Integer")
-          }
-          WInt
-        case intComparisonBinary(x, y) =>
-          val e1_type = checkExprType(x)
-          val e2_type = checkExprType(y)
-          if(!((e1_type == WInt &&  e2_type== WInt) || (e1_type == WBool &&  e2_type== WBool))){
-            println("Both sides of the expression must be Integers or Characters")
+        case Greater(x, y) =>
+          val x_type = checkExprType(x)
+          val y_type = checkExprType(y)
+          if (!(x_type == WInt && y_type == WInt) || (x_type == WChar && y_type == WChar)) {
+            println(s"Both sides of the expression > must be Integer")
           }
           WBool
+        case GreaterEq(x, y) =>
+          val x_type = checkExprType(x)
+          val y_type = checkExprType(y)
+          if (!(x_type == WInt && y_type == WInt) || (x_type == WChar && y_type == WChar)) {
+            println(s"Both sides of the expression >= must be Integer")
+          }
+          WBool
+        case Less(x, y) =>
+          val x_type = checkExprType(x)
+          val y_type = checkExprType(y)
+          if (!(x_type == WInt && y_type == WInt) || (x_type == WChar && y_type == WChar)) {
+            println(s"Both sides of the expression < must be Integer")
+          }
+          WBool
+        case LessEq(x, y) =>
+          val x_type = checkExprType(x)
+          val y_type = checkExprType(y)
+          if (!(x_type == WInt && y_type == WInt) || (x_type == WChar && y_type == WChar)) {
+            println(s"Both sides of the expression <= must be Integer")
+          }
+          WBool
+        case Eq(x, y) =>
+          val x_type = checkExprType(x)
+          val y_type = checkExprType(y)
+          if (!((x_type == WInt && y_type == WInt) ||
+                (x_type == WBool && y_type == WBool) ||
+                (x_type == WChar && y_type == WChar))) {
+            println(s"Both sides of the expression == must be Integer")
+          }
+          WBool
+        case NotEq(x, y) =>
+          val x_type = checkExprType(x)
+          val y_type = checkExprType(y)
+          if (!((x_type == WInt && y_type == WInt) ||
+                (x_type == WBool && y_type == WBool) ||
+                (x_type == WChar && y_type == WChar))) {
+            println(s"Both sides of the expression != must be Integer")
+          }
+          WBool
+        case intComparisonBinary(x, y) =>
+          if(!(checkExprType(x) == WInt && checkExprType(y) == WInt)){
+            println("Both sides of the expression must be Integers")
+          }
+          WInt
       }
     }
   }
@@ -172,12 +196,11 @@ object Unary{
 object intComparisonBinary{
   import parsers.Ast._
   def unapply(expr: Expr): Option[(Expr, Expr)] = expr match{
-    case Greater(x, y)   => Some(x, y)
-    case GreaterEq(x, y) => Some(x, y)
-    case Less(x, y)      => Some(x, y)
-    case LessEq(x, y)    => Some(x, y)
-    case Eq(x, y)        => Some(x, y)
-    case NotEq(x, y)     => Some(x, y)
+    case Mult(x, y)  => Some(x, y)
+    case Div(x, y)   => Some(x, y)
+    case Mod(x, y)   => Some(x, y)
+    case Plus(x, y)  => Some(x, y)
+    case Minus(x, y) => Some(x, y)
     case _               => None
   }
 }
