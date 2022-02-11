@@ -18,12 +18,12 @@ object ExpressionPrinter {
       case NewPair(fst, snd) => "newpair(" + prettyPrint(fst) + "," + prettyPrint(snd) + ")"
       case Call(Ident(i), ArgList(al)) =>
         val sb = new StringBuilder("call ")
-        sb.append(i)
+        sb.append(i.split('$')(0))
         sb += '('
         if (al.nonEmpty) {
           if (al.length > 1) {
-            for (i <- al.indices) {
-              sb.append(prettyPrint(al(i)))
+            for (j <- al.indices) {
+              sb.append(prettyPrint(al(j)))
               sb += ','
             }
           }else{
@@ -49,10 +49,11 @@ object ExpressionPrinter {
       case ArrayElem(Ident(i), exprs) =>
         val sb = new StringBuilder(i)
         sb.append(" = [")
-        for (i <- exprs.indices){
-          sb.append(prettyPrint(exprs(i)))
+        for (j <- exprs.indices){
+          sb.append(prettyPrint(exprs(j)))
           sb.append(", ")
         }
+        sb.setLength(sb.length - 2)
         sb += ']'
         sb.toString()
       case ParensExpr(expr) => "(" + prettyPrint(expr) + ")"
@@ -102,12 +103,12 @@ object ExpressionPrinter {
       case Func((t, Ident(i)), ParamList(pl), stat) =>
         val sb = new StringBuilder("")
         sb.append(prettyPrint(t))
-        sb.append(i)
+        sb.append(i.split('$')(0))
         sb += '('
         if (pl.nonEmpty) {
           if (pl.length > 1) {
-            for (i <- pl.indices) {
-              sb.append(prettyPrint(pl(i)))
+            for (j <- pl.indices) {
+              sb.append(prettyPrint(pl(j)))
               sb += ','
             }
           }else{

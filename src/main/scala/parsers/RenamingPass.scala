@@ -62,10 +62,10 @@ object RenamingPass {
       case Ident(ident) =>
         if (!varsInScope.contains(ident)) {
           errors += s"variable $ident not declared"
-          varsInScope += (ident -> (ident+"$0"))
-          localScope += (ident -> (ident+"$0"))
+          null
+        }else {
+          Ident(varsInScope(ident))
         }
-        Ident(varsInScope(ident))
 
       case ParensExpr(expr) => ParensExpr(rename(expr, localScope, varsInScope, errors).asInstanceOf[Expr])
 
