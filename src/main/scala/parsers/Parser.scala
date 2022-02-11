@@ -20,7 +20,7 @@ object lexer {
     commentLine = "#",
     nestedComments = false,
     keywords = Set("begin", "end", "is", "skip", "read", "return", "if", "then", "else",
-      "if", "then", "else", "fi", "while", "do", "end", "chr", "ord", "len"),
+      "if", "then", "else", "fi", "while", "do", "end", "len", "ord", "chr", "print", "println"),
     operators = binaryOperators ++ unaryOperators,
     identStart = Predicate(c => c.isLetter || c == '_'),
     identLetter = Predicate(c => c.isLetterOrDigit || c == '_'),
@@ -38,7 +38,7 @@ object lexer {
       ('f' #> '\f') <|> ('r' #> '\r') <|> '\"' <|> '\'' <|> '\\'))
   private [parsers] val CHAR: Parsley[Char] = ESC_CHAR <|> anyChar
   private [parsers] val CHAR_LITER: Parsley[Char] = token('\'' ~> CHAR <~ '\'')
-  private [parsers] val STR_LITER: Parsley[String] = token('\"') ~> token(manyUntil(CHAR, '\"').map(_.mkString))
+  private [parsers] val STR_LITER: Parsley[String] = token('\"' ~> manyUntil(CHAR, '\"').map(_.mkString))
   private [parsers] val PAIR_LITER: Parsley[String] = token("null")
   // TODO make this its own case class holding the char
 
@@ -50,6 +50,7 @@ object lexer {
     = void(lex.symbol(c))
     implicit def tokenLift(s: String): Parsley[Unit] = {
       if (lang.keywords(s)) lex.keyword(s)
+      else if (lang.operators(s)) lex.maxOp(s)
       else void(lex.symbol(s))
     }
   }
@@ -78,13 +79,13 @@ object Parser {
                               GreaterEq <# attempt(">="), Greater <# ">") +:
                SOps(InfixL)  (Minus <# "-", Plus <# "+") +:
                SOps(InfixL)  (Mod <# "%", Div <# "/", Mult <# "*") +:
-               SOps(Prefix)  (Chr <# attempt("chr "), Len <# "len ", Ord <# "ord ", Not <# "!" , Negate <# "-") +:
+               SOps(Prefix)  (Chr <# attempt("chr "), Len <# attempt("len "), Ord <# attempt("ord "), Not <# "!" , Negate <# "-") +:
                Atoms(`<expr-atoms>`))
 
   // TODO refactor this to put ident at the top and reduce backtracking
   private [parsers] lazy val `<expr-atoms>`: Parsley[Term] =
     attempt(IntLiter(INT_LITER))       <|> attempt(BoolLiter(BOOL_LITER)) <|>
-      attempt(CharLiter(CHAR_LITER))   <|> attempt(StrLiter(STR_LITER))   <|>
+      attempt(CharLiter(CHAR_LITER))   <|> StrLiter(STR_LITER)  <|>
       attempt(PAIR_LITER #> PairLiter) <|> attempt(`<array-elem>`)        <|>
       `<ident>`                        <|> ParensExpr('(' ~> `<expr>` <~ ')')
 
@@ -151,6 +152,7 @@ object Parser {
     `<program>`.parseFromFile(input).get
 
   def main(args: Array[String]): Unit = {
+    /*
     if (args.length == 0 || !args(0).endsWith(".wacc")) println("Please pass a .wacc file to be parsed")
     else {
       val program = parse(new File(args(0)))
@@ -163,7 +165,8 @@ object Parser {
       }
     }
 
-    /*
+     */
+
     val validPrograms = new File("../wacc_examples/valid/")
     val invalidPrograms = new File("../wacc_examples/invalid/")
     def findPrograms(file: File): Unit = {
@@ -188,6 +191,5 @@ object Parser {
       }
     }
     findPrograms(validPrograms)
-     */
   }
 }
