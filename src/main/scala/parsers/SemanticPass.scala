@@ -2,6 +2,8 @@ package parsers
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
+import parsers.ExpressionPrinter
+import parsers.ExpressionPrinter.prettyPrint
 
 object SemanticPass {
   import parsers.Ast._
@@ -31,14 +33,17 @@ object SemanticPass {
       case Skip =>
       case Decl(PairType(t1, t2), ident, PairLiter) =>  st += (ident -> (PairLiter, PairType(t1, t2)))
       case Decl(_type, ident, rhs) =>
-        if (_type != checkType(rhs, errors)) {
-          println(s"The right hand side does not match type ${_type}")
+        val t : Type = checkType(rhs, errors)
+        if (_type != t) {
+          errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: " + prettyPrint(_type) + ", actual: " + prettyPrint(t))
         } else {
           st += (ident -> (rhs, _type))
         }
       case Assign(lhs, rhs) =>
-        if (checkType(lhs, errors) != checkType(rhs, errors)) {
-          println(s"The type of the left hand side does not match the right hand side")
+        val t : Type = checkType(rhs, errors)
+        val t1 : Type = checkType(lhs, errors)
+        if (t1 != t) {
+          errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: " + prettyPrint(t1) + ", actual: " + prettyPrint(t))
         }
       case Read(lhs) => //TODO check this
       /*
@@ -50,21 +55,23 @@ object SemanticPass {
       case Free(expr) => // TODO come back to this
         val _type = checkExprType(expr, errors)
         if (!(_type.isInstanceOf[PairType] || _type.isInstanceOf[ArrayType])) {
-          println("Free must be give a Pair or array expression")
+          errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: pair Pair or array expression, actual: " + prettyPrint(_type))
         }
       case Print(expr) => checkExprType(expr, errors)
       case Println(expr) => checkExprType(expr, errors)
       case Return(expr) => // TODO come back to this
       case Exit(expr) => // TODO come back to this
       case IfElse(cond, stat_true, stat_false) =>
-        if (checkExprType(cond, errors) != WBool){
-          errors += "The condition of a if statement must be a boolean expression"
+        val t: Type = checkExprType(cond, errors)
+        if (t != WBool){
+          errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: bool, actual: " + prettyPrint(t))
         }
         traverse(stat_true, errors)
         traverse(stat_false, errors)
       case While(cond, stat) =>
-        if (checkExprType(cond, errors) != WBool){
-          errors += "The condition of a while statement must be a boolean expression"
+        val t: Type = checkExprType(cond, errors)
+        if (t != WBool){
+          errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: bool, actual: " + prettyPrint(t))
         }
         traverse(stat, errors)
       case Scope(stat) => traverse(stat, errors)
@@ -82,7 +89,7 @@ object SemanticPass {
           rhs_type match {
             case PairType(t1, _) => t1
             case _ =>
-              errors += "The expression passed to fst must be of type Pair and must not be null"
+              errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: Pair (not null)")
               rhs_type
           }
         case SndPair(pair) =>
@@ -90,7 +97,7 @@ object SemanticPass {
           rhs_type match {
             case PairType(_, t2) => t2
             case _ =>
-              errors += "The expression passed to snd must be of type Pair and must not be null"
+              errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: Pair (not null)")
               rhs_type
           }
 
@@ -110,7 +117,7 @@ object SemanticPass {
               null
             }
           } else {
-            errors += "All elements of an array must have the same type"
+            errors += "Semantic error detected: Incompatible type at " + prettyPrint(node) + ". All types in an array must match."
             null
           }
         case NewPair(PairLiter, PairLiter) => PairType(Pair, Pair)
@@ -124,16 +131,20 @@ object SemanticPass {
           n match{
             case Func(_, ParamList(pl), _) =>
               if (al.length != pl.length){
-                errors += s"incorrect number of args when calling functions $ident"
+                errors += "Semantic error detected: Too many arguments at " + prettyPrint(node)
               } else {
+                var t : Type = null
+                var t1 : Type = null
                 for (i <- al.indices) {
-                  if (checkExprType(al(i), errors) != pl(i)._type) {
-                    errors += "the argument types do not match those expected"
+                  t = checkExprType(al(i), errors)
+                  t1 = pl(i)._type
+                  if (t != t1) {
+                    errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: " + prettyPrint(t) + ", actual: " + prettyPrint(t1))
                   }
                 }
               }
             case _ =>
-              errors += "cannot call a non function"
+              errors += ("Semantic error detected at " + prettyPrint(node) + ". Cannot call anything not of type Function.")
           }
           returnType
       }
@@ -152,56 +163,66 @@ object SemanticPass {
         case ArrayElem(ident, _) => checkType(st(ident)._1, errors)
         case Unary(x) => checkExprType(x, errors)
         case And(x, y) =>
-          if (!(checkExprType(x, errors) == WBool && checkExprType(y, errors) == WBool)) {
-            errors += s"Both sides of the expression && must be Integer"
+          val t: Type = checkExprType(x, errors)
+          val t1: Type = checkExprType(y, errors)
+          if (!(t == WBool && t1 == WBool)) {
+            errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: bool, actual: " + prettyPrint(t1) + " and " + prettyPrint(t))
           }
           WBool
         case Or(x, y) =>
-          if (!(checkExprType(x, errors) == WBool && checkExprType(y, errors) == WBool)) {
-            errors += s"Both sides of the expression || must be Integer"
+          val t: Type = checkExprType(x, errors)
+          val t1: Type = checkExprType(y, errors)
+          if (!(t == WBool && t1 == WBool)) {
+            errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: bool and bool, actual: " + prettyPrint(t1) + " and " + prettyPrint(t))
           }
           WBool
         case Greater(x, y) =>
           val x_type = checkExprType(x, errors)
           val y_type = checkExprType(y, errors)
           if (!((x_type == WInt && y_type == WInt) || (x_type == WChar && y_type == WChar))) {
-            errors += s"Both sides of the expression > must be Integer"
+            errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: int and int OR char and char, actual: " + prettyPrint(x_type) + " and " + prettyPrint(y_type))
           }
           WBool
         case GreaterEq(x, y) =>
           val x_type = checkExprType(x, errors)
           val y_type = checkExprType(y, errors)
           if (!((x_type == WInt && y_type == WInt) || (x_type == WChar && y_type == WChar))) {
-            errors += s"Both sides of the expression >= must be Integer"
+            errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: int and int OR char and char, actual: " + prettyPrint(x_type) + " and " + prettyPrint(y_type))
           }
           WBool
         case Less(x, y) =>
           val x_type = checkExprType(x, errors)
           val y_type = checkExprType(y, errors)
           if (!((x_type == WInt && y_type == WInt) || (x_type == WChar && y_type == WChar))) {
-            errors += s"Both sides of the expression < must be Integer"
+            errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: int and int OR char and char, actual: " + prettyPrint(x_type) + " and " + prettyPrint(y_type))
           }
           WBool
         case LessEq(x, y) =>
           val x_type = checkExprType(x, errors)
           val y_type = checkExprType(y, errors)
           if (!((x_type == WInt && y_type == WInt) || (x_type == WChar && y_type == WChar))) {
-            errors += s"Both sides of the expression <= must be Integer"
+            errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: int and int OR char and char, actual: " + prettyPrint(x_type) + " and " + prettyPrint(y_type))
           }
           WBool
         case Eq(x, y) =>
-          if (checkExprType(x, errors) != checkExprType(y, errors)) {
-            errors += s"Both sides of the expression == must be the same"
+          val t: Type = checkExprType(x, errors)
+          val t1: Type = checkExprType(y, errors)
+          if (t != t1) {
+            errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: matching types, actual: " + prettyPrint(t) + " and " + prettyPrint(t1))
           }
           WBool
         case NotEq(x, y) =>
-          if (checkExprType(x, errors) != checkExprType(y, errors)) {
-            errors += s"Both sides of the expression != must be the same"
+          val t: Type = checkExprType(x, errors)
+          val t1: Type = checkExprType(y, errors)
+          if (t != t1) {
+            errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: matching types, actual: " + prettyPrint(t) + " and " + prettyPrint(t1))
           }
           WBool
         case intBinary(x, y) =>
-          if(!(checkExprType(x, errors) == WInt && checkExprType(y, errors) == WInt)){
-            errors += "Both sides of the expression must be Integers"
+          val t: Type = checkExprType(x, errors)
+          val t1: Type = checkExprType(y, errors)
+          if(!(t == WInt && t1 == WInt)){
+            errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: int and int, actual: " + prettyPrint(t) + " and " + prettyPrint(t1))
           }
           WInt
       }
