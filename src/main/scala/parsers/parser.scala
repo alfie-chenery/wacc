@@ -764,16 +764,21 @@ object semanticAnalysis {
         case ParensExpr(expr) => checkExprType(expr)
         case ArrayElem(ident, _) => checkType(st(ident)._1)
         case Unary(x) => checkExprType(x)
+        case And(e1, e2) =>
+          if(!(checkExprType(e1) == WBool && checkExprType(e2) == WBool)){
+            println("Both sides of the expression must be boolean")
+          }
+          WBool
+        case Or(e1, e2) =>
+          if(!(checkExprType(e1) == WBool && checkExprType(e2) == WBool)){
+            println("Both sides of the expression must be boolean")
+          }
+          WBool
         case MathBinary(x, y) =>
           if(!(checkExprType(x) == WInt && checkExprType(y) == WInt)){
             println("Both sides of the expression must be integers")
           }
           WInt
-        case LogicBinary(x, y) =>
-          if(!(checkExprType(x) == WBool && checkExprType(y) == WBool)){
-            println("Both sides of the expression must be boolean")
-          }
-          WBool
       }
     }
   }
