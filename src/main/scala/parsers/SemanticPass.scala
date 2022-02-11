@@ -121,8 +121,26 @@ object SemanticPass {
         case NewPair(e1, PairLiter) => PairType(checkExprType(e1).asInstanceOf[PairElemType], Pair)
         case NewPair(e1, e2) =>
           PairType(checkExprType(e1).asInstanceOf[PairElemType], checkExprType(e2).asInstanceOf[PairElemType])
-        // TODO check the param types match
-        case Call(ident, _) => st(ident)._2
+        case Call(ident, al) =>
+          val t : Type = st(ident)._2
+          val n : AstNode = st(ident)._1
+          n match{
+            case Func(_, pl, _) =>
+              if (al.args.length !=pl.params.length){
+                println("incorrect number of args")
+                null
+              }else{
+                for (i <- 0 to al.args.length){
+                  if(checkType(al.args(i)) != checkType(pl.params(i))){
+                    println("the argument types do not match those expected")
+                  }
+                }
+                t
+              }
+            case _ =>
+              println("cannot call a non function")
+              null
+          }
       }
     }
 
