@@ -451,12 +451,9 @@ object Unary{
   }
 }
 
-object boolBinary{
+object intComparisonBinary{
   import parsers.ast._
   def unapply(expr: Expr): Option[(Expr, Expr)] = expr match{
-    case And(x, y)       => Some(x, y)
-    case Or(x, y)        => Some(x, y)
-    case Minus(x, y)     => Some(x, y)
     case Greater(x, y)   => Some(x, y)
     case GreaterEq(x, y) => Some(x, y)
     case Less(x, y)      => Some(x, y)
@@ -655,12 +652,14 @@ object semanticAnalysis {
     node match {
       case Program(funcs, stat) =>
         for (func <- funcs){
-          traverse(func)
+          func match {
+            case Func((_type, ident), _, _) => st += (ident -> (func, _type))
+          }
         }
+        funcs.foreach(traverse(_))
         traverse(stat)
 
       case Func((_type, ident), ParamList(params), stat) =>
-        st += (ident -> (Func((_type, ident), ParamList(params),stat), _type))
         for (param <- params){
           traverse(param)
         }
@@ -712,7 +711,6 @@ object semanticAnalysis {
       case _ =>
     }
 
-    @tailrec
     def checkType(node: AstNode): Type = {
       node match {
         //AssignLHS
@@ -741,7 +739,8 @@ object semanticAnalysis {
         case NewPair(e1, PairLiter) => PairType(checkExprType(e1).asInstanceOf[PairElemType], Pair)
         case NewPair(e1, e2) =>
           PairType(checkExprType(e1).asInstanceOf[PairElemType], checkExprType(e2).asInstanceOf[PairElemType])
-        case Call(ident, _) => checkType(st(ident)._1)
+        // TODO check the param types match
+        case Call(ident, _) => st(ident)._2
       }
     }
 
@@ -757,6 +756,16 @@ object semanticAnalysis {
         case ParensExpr(expr) => checkExprType(expr)
         case ArrayElem(ident, _) => checkType(st(ident)._1)
         case Unary(x) => checkExprType(x)
+        case And(x, y) =>
+          if (!(checkExprType(x) == WBool && checkExprType(y) == WBool)) {
+            println(s"Both sides of the expression && must be Integer")
+          }
+          WBool
+        case Or(x, y) =>
+          if (!(checkExprType(x) == WBool && checkExprType(y) == WBool)) {
+            println(s"Both sides of the expression || must be Integer")
+          }
+          WBool
         case Mult(x, y) =>
           if (!(checkExprType(x) == WInt && checkExprType(y) == WInt)) {
             println(s"Both sides of the expression * must be Integer")
@@ -777,11 +786,13 @@ object semanticAnalysis {
             println(s"Both sides of the expression + must be Integer")
           }
           WInt
-        case boolBinary(x, y) =>
-          if(!(checkExprType(x) == WBool && checkExprType(y) == WBool)){
-            println("Both sides of the expression must be boolean")
+        case intComparisonBinary(x, y) =>
+          val e1_type = checkExprType(x)
+          val e2_type = checkExprType(y)
+          if(!((e1_type == WInt &&  e2_type== WInt) || (e1_type == WBool &&  e2_type== WBool))){
+            println("Both sides of the expression must be Integers or Characters")
           }
-          WInt
+          WBool
       }
     }
   }
