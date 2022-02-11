@@ -95,7 +95,7 @@ object parser {
   private [parsers] lazy val `<array-elem>`: Parsley[ArrayElem] = ArrayElem(`<ident>`, some('[' ~> `<expr>` <~ ']'))
 
   private [parsers] lazy val `<pair-elem-type>`: Parsley[PairElemType] =
-    attempt(Pair <# "pair") <|> attempt(`<array-type-pair-elem>`) a<|> `<base-type>`
+    attempt(Pair <# "pair") <|> attempt(`<array-type-pair-elem>`) <|> `<base-type>`
 
   private [parsers] lazy val `<pair-type>`: Parsley[PairType] =
     PairType("pair" ~> '(' ~> `<pair-elem-type>` , ',' ~> `<pair-elem-type>` <~ ')')
@@ -155,18 +155,18 @@ object parser {
     `<program>`.parseFromFile(input).get
 
   def main(args: Array[String]): Unit = {
-    val validPrograms = new File("../wacc_examples/valid")
+    val validPrograms = new File("../wacc_examples/valid/")
     def findPrograms(file: File): Unit = {
       val files: List[File] = file.listFiles().toList
       for (currFile: File <- files) {
         if (currFile.isFile) {
           val program = parse(currFile)
           if (program.isSuccess) {
-            println(currFile.getName + ": " + program.get)
-            val renamedProgram = renamingPass.rename(program.get)
-            println(currFile.getName + " (transform): " + renamedProgram)
             try {
-              println(currFile.getName + " (type checked):" + semanticAnalysis.traverse(renamedProgram))
+              println(currFile.getName + ": " + program.get)
+              val renamedProgram = renamingPass.rename(program.get)
+              println(currFile.getName + " (transform): " + renamedProgram)
+              println(currFile.getName + " (type checked):" + semanticAnalysis.traverse(renamedProgram) +"\n")
             } catch {
               case e: Exception => println(e.printStackTrace())
             }
@@ -447,7 +447,7 @@ object Unary{
     case Len(x)    => Some(x)
     case Ord(x)    => Some(x)
     case Chr(x)    => Some(x)
-    case _         => None
+    case _ => None
   }
 }
 
@@ -465,7 +465,6 @@ object MathBinary{
     case LessEq(x, y)    => Some(x, y)
     case Eq(x, y)        => Some(x, y)
     case NotEq(x, y)     => Some(x, y)
-    case _               => None
   }
 }
 
@@ -474,7 +473,6 @@ object LogicBinary{
   def unapply(expr: Expr): Option[(Expr, Expr)] = expr match{
     case And(x, y)      => Some(x, y)
     case Or(x, y)       => Some(x, y)
-    case _              => None
   }
 }
 
@@ -484,7 +482,7 @@ object renamingPass {
 
   def renameIdent(ident: String, localScope: mutable.Map[String,String], varsInScope: mutable.Map[String, String]): Ident = {
     if (localScope.contains(ident)) {
-      throw new IllegalArgumentException(s"identifier $ident already declared in the current scope")
+      println(s"identifier $ident already declared in the current scope")
     }
     var renamedIdent = ""
     if(varsInScope.contains(ident)) {
@@ -504,7 +502,7 @@ object renamingPass {
         val renamedFuncs: ListBuffer[Func] = ListBuffer[Func]()
         for (func <- funcs) {
           func match {
-            case Func((_, Ident(ident)), _, _) => renameIdent(ident+"_func", localScope, varsInScope)
+            case Func((_, Ident(ident)), _, _) => renameIdent(ident+"$func", localScope, varsInScope)
           }
         }
         funcs.foreach(renamedFuncs += rename(_, localScope, varsInScope).asInstanceOf[Func])
@@ -520,7 +518,7 @@ object renamingPass {
             case _ =>
           }
         }
-        Func((_type, Ident(varsInScope(ident+"_func"))), ParamList(renamedParams.toList),
+        Func((_type, Ident(varsInScope(ident+"$func"))), ParamList(renamedParams.toList),
           rename(stat, newScope, varsInScope).asInstanceOf[Stat])
 
       case Decl(_type, Ident(ident), rhs) =>
@@ -535,7 +533,7 @@ object renamingPass {
 
       case Ident(ident) =>
         if (!varsInScope.contains(ident)) {
-          throw new IllegalArgumentException(s"variable $ident not declared")
+          println(s"variable $ident not declared")
         }
         Ident(varsInScope(ident))
 
@@ -639,12 +637,12 @@ object renamingPass {
 
       case Call(Ident(ident), ArgList(args)) =>
         // TODO check that ident is declared in this scope
-        if (!varsInScope.contains(ident+"_func")) {
-          throw new IllegalArgumentException(s"function $ident not defined")
+        if (!varsInScope.contains(ident+"$func")) {
+          println(s"function $ident not defined")
         }
         val renamedArgs: ListBuffer[Expr] = ListBuffer()
         args.foreach(renamedArgs += rename(_, localScope, varsInScope).asInstanceOf[Expr])
-        Call(Ident(varsInScope(ident+"_func")), ArgList(renamedArgs.toList))
+        Call(Ident(varsInScope(ident+"$func")), ArgList(renamedArgs.toList))
 
       case node: AstNode => node
     }
@@ -664,27 +662,49 @@ object semanticAnalysis {
 
   def traverse(node: AstNode): Unit = {
     node match {
-      case Program(funcs, s) =>
+      case Program(funcs, stat) =>
         for (func <- funcs){
           traverse(func)
         }
-        traverse(s)
+        traverse(stat)
 
-      case Func((_type, ident), paramlist, stat) =>
-        st += (ident -> (Func((_type, ident), paramlist,stat), _type))
-        for (param <- paramlist.params){
+      case Func((_type, ident), ParamList(params), stat) =>
+        st += (ident -> (Func((_type, ident), ParamList(params),stat), _type))
+        for (param <- params){
           traverse(param)
         }
         traverse(stat)
+      case Param(_type, ident) => st += (ident -> (node, _type))
 
       // <Stat>
       // TODO type check expr
+      case Skip =>
+      case Decl(_type, ident, rhs) =>
+        if (_type != checkType(rhs)) {
+          println(s"The right hand side does not match type ${_type}")
+        } else {
+          st += (ident -> (rhs, _type))
+        }
+      case Assign(lhs, rhs) =>
+        if (checkType(lhs) != checkType(rhs)) {
+          println(s"The type of the left hand side does not match the right hand side")
+        }
+      case Read(lhs) => //TODO check this
+        /*
+        val _type = checkType(lhs)
+        if(_type != WChar || _type != WInt) {
+          println("type error")
+        }
+         */
+      case Free(expr) => // TODO come back to this
+        val _type = checkExprType(expr)
+        if (_type.isInstanceOf[PairType] || _type.isInstanceOf[ArrayType]) {
+          println("Free must be give a Pair or array expression")
+        }
       case Print(expr) => checkExprType(expr)
       case Println(expr) => checkExprType(expr)
       case Return(expr) => // TODO come back to this
       case Exit(expr) => // TODO come back to this
-      case Free(expr) => // TODO come back to this
-      case Skip =>
       case IfElse(cond, stat_true, stat_false) =>
         if (checkExprType(cond) != WBool){
           println("Condition must be a boolean expression")
@@ -697,144 +717,38 @@ object semanticAnalysis {
         }
         traverse(stat)
       case Scope(stat) => traverse(stat)
-      case Decl(_type, ident, rhs) =>
-        if (checkType(rhs) != _type) {
-          println(s"The right hand side does not match type ${_type}")
-        } else {
-          st += (ident -> (rhs, _type))
-        }
-      case Assign(lhs, Call(ident, al)) =>
-        val n : AstNode = st(ident)._1
-        n match{
-          case Func((_type, _), p, _) =>
-            val l: Int = al.args.length
-            if (l != p.params.length) {
-              println("wrong number of parameters")
-            }else{
-              for (i <- 0 to l){
-                if (checkType(p.params(i)) != checkType(al.args(i))){
-                  println("incorrect argument types")
-                  break()
-                }else{
-                  traverse(p.params(i))
-                }
-              }
-            }
-            if (checkType(lhs) != _type){
-              println("type error")
-            }
-          case _ => println("type error")
-        }
-        traverse(lhs)
-      case Assign(lhs, rhs) =>
-        val t : Type = checkType(rhs).asInstanceOf[Type]
-        lhs match {
-          case Ident(ident) =>
-            if (st(Ident(ident))._2 != t) {
-              println("type error")
-            } else {
-              st += (Ident(ident) -> (node, t))
-            }
-          case ArrayElem(ident, _) =>
-            if (st(ident)._2 != t){
-              println("type error")
-            }else{
-              st += (ident -> (node, t))
-            }
-          case FstPair(fst) =>
-            fst match{
-              case Ident(i) =>
-                if(st(Ident(i))._2 != t){
-                  println("type error")
-                }else{
-                  st += (Ident(i) -> (node, t))
-                }
-              case _ => println("incorrect assignment form")
-            }
-          case SndPair(snd) =>
-            snd match{
-              case Ident(i) =>
-                if(st(Ident(i))._2 != t){
-                  println("type error")
-                }else{
-                  st += (Ident(i) -> (node, t))
-                }
-              case _ => println("incorrect assignment form")
-            }
-        }
-        //traverse(lhs)
-        //traverse(rhs)
-
-
-      case Param(_type, ident) => st += (ident -> (node, _type))
-      case Read(lhs) =>
-        val _type = checkType(lhs)
-        if(_type != WChar || _type != WInt) {
-          println("type error")
-        }
-      // TODO fix these
-      case Combine(atoms) =>
-        for (atom <- atoms){
-          traverse(atom)
-        }
-      case NewPair(fst,snd) =>
-        traverse(fst)
-        traverse(snd)
-      case Call(_, args) =>
-        traverse(args)
-      case ArgList(args) =>
-        for (arg <- args){
-          traverse(arg)
-        }
-      case FstPair(expr) => traverse(expr)
-      case SndPair(expr) => traverse(expr)
-      case PairType(fst, snd) =>
-        traverse(fst)
-        traverse(snd)
-      case IntLiter(int) =>
-        if(int > 2147483647 || int < -2147483647){
-          println("out of bounds int")
-        }
-      case ArrayElem(_, exprs) =>
-        for (expr <- exprs){
-          traverse(expr)
-        }
-      case ParensExpr(expr) => traverse(expr)
-      case MathBinary(x, y) =>
-        traverse(x)
-        traverse(y)
-      case LogicBinary(x, y) =>
-        traverse(x)
-        traverse(y)
-      case Unary(x) => traverse(x)
-      case ArrayLiter(exprs) =>
-        for (expr <- exprs){
-          traverse(expr)
-        }
-      case _ =>
+      case Combine(stats) => stats.foreach(traverse(_))
     }
 
-    def checkType(node: AstNode): AstNode = {
+    def checkType(node: AstNode): Type = {
       node match {
+        //AssignLHS
+        case ident: Ident => st(ident)._2
+        case ArrayElem(ident, exprs) => st(ident)._2 //TODO
+        case FstPair(ident:Ident) => st(ident)._2
+        case SndPair(ident:Ident) => st(ident)._2
+
+        //AssignRHS
+        case expr:Expr => checkExprType(expr)
         case ArrayLiter(exprs) =>
           var types: List[Type] = List()
           for (expr <- exprs) {
-            types = checkType(expr).asInstanceOf[Type] +: types
+            types = checkExprType(expr) +: types
           }
           val same: Boolean = types.forall(_ == types.head)
           if (same) {
-            types.head
+            ArrayType(types.head)
           } else {
-            println("type error")
+            println("All elements of an array must have the same type")
             null
           }
+        case PairLiter => PairType(Pair, Pair)
+        case NewPair(PairLiter, PairLiter) => PairType(Pair, Pair)
+        case NewPair(PairLiter, e2) => PairType(Pair, checkExprType(e2).asInstanceOf[PairElemType])
+        case NewPair(e1, PairLiter) => PairType(checkExprType(e1).asInstanceOf[PairElemType], Pair)
         case NewPair(e1, e2) =>
-          PairType(checkType(e1).asInstanceOf[PairElemType], checkType(e2).asInstanceOf[PairElemType])
-        case FstPair(expr) => checkExprType(expr)
-        case SndPair(expr) => checkExprType(expr)
+          PairType(checkExprType(e1).asInstanceOf[PairElemType], checkExprType(e2).asInstanceOf[PairElemType])
         case Call(ident, _) => checkType(st(ident)._1)
-        case Pair => Pair
-        case _ => checkExprType(node)
       }
     }
 
@@ -846,57 +760,20 @@ object semanticAnalysis {
         case StrLiter(_) => WString
         // TODO check this
         case PairLiter => null
-        case Ident(ident) => st(Ident(ident))._2
+        case ident:Ident => st(ident)._2
         case ParensExpr(expr) => checkExprType(expr)
-        case ArrayElem(ident, _) => checkType(st(ident)._1).asInstanceOf[Type]
-        case Unary(x) => unaryOperatorCheck(x)
+        case ArrayElem(ident, _) => checkType(st(ident)._1)
+        case Unary(x) => checkExprType(x)
         case MathBinary(x, y) =>
-          if(checkExprType(x) == WInt && checkExprType(y) == WInt){
-            WInt
-          }else{
-            null
+          if(!(checkExprType(x) == WInt && checkExprType(y) == WInt)){
+            println("Both sides of the expression must be integers")
           }
+          WInt
         case LogicBinary(x, y) =>
-          if(checkExprType(x) == WBool && checkExprType(y) == WBool){
-            WBool
-          }else{
-            null
+          if(!(checkExprType(x) == WBool && checkExprType(y) == WBool)){
+            println("Both sides of the expression must be boolean")
           }
-      }
-    }
-
-    def unaryOperatorCheck(op: Expr): Type ={
-      op match{
-        case Not(expr)    =>
-          if(checkExprType(expr) == WBool){
-            WBool
-          }else{
-            null
-          }
-        case Negate(expr) =>
-          if(checkExprType(expr) == WInt){
-            WBool
-          }else{
-            null
-          }
-        case Len(expr)    =>
-          if(checkExprType(expr) == WBool){
-            WBool
-          }else{
-            null
-          }
-        case Ord(expr)    =>
-          if(checkExprType(expr) == WBool){
-            WBool
-          }else{
-            null
-          }
-        case Chr(expr)    =>
-          if(checkExprType(expr) == WBool){
-            WBool
-          }else{
-            null
-          }
+          WBool
       }
     }
   }
