@@ -106,7 +106,6 @@ object SemanticPass {
             if (t.isDefined){
               ArrayType(t.get)
             }else{
-              println("empty array")
               null
             }
           } else {
@@ -126,7 +125,7 @@ object SemanticPass {
               if (al.length != pl.length){
                 println(s"incorrect number of args when calling functions $ident")
               } else {
-                for (i <- 0 to al.length-1) {
+                for (i <- al.indices) {
                   if (checkExprType(al(i)) != pl(i)._type) {
                     println("the argument types do not match those expected")
                   }

@@ -20,7 +20,7 @@ object lexer {
     commentLine = "#",
     nestedComments = false,
     keywords = Set("begin", "end", "is", "skip", "read", "return", "if", "then", "else",
-      "if", "then", "else", "fi", "while", "do", "end"),
+      "if", "then", "else", "fi", "while", "do", "end", "chr", "ord", "len"),
     operators = binaryOperators ++ unaryOperators,
     identStart = Predicate(c => c.isLetter || c == '_'),
     identLetter = Predicate(c => c.isLetterOrDigit || c == '_'),
@@ -151,6 +151,19 @@ object Parser {
     `<program>`.parseFromFile(input).get
 
   def main(args: Array[String]): Unit = {
+    if (args.length == 0 || !args(0).endsWith(".wacc")) println("Please pass a .wacc file to be parsed")
+    else {
+      val program = parse(new File(args(0)))
+      if (program.isSuccess) {
+        SemanticPass.traverse(RenamingPass.rename(program.get))
+        sys.exit(0)
+      } else {
+        println(program)
+        sys.exit(100)
+      }
+    }
+
+    /*
     val validPrograms = new File("../wacc_examples/valid/")
     val invalidPrograms = new File("../wacc_examples/invalid/")
     def findPrograms(file: File): Unit = {
@@ -175,5 +188,6 @@ object Parser {
       }
     }
     findPrograms(validPrograms)
+     */
   }
 }
