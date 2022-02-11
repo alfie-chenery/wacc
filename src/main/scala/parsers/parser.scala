@@ -6,10 +6,10 @@ import parsley.combinator.{sepBy, sepBy1}
 import parsley.{Parsley, Result}
 
 import java.io.File
+import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.language.implicitConversions
-import scala.util.control.Breaks.break
 
 object lexer {
   import parsley.character.{anyChar, digit, isWhitespace}
@@ -162,10 +162,10 @@ object parser {
         if (currFile.isFile) {
           val program = parse(currFile)
           if (program.isSuccess) {
-            try {
               println(currFile.getName + ": " + program.get)
               val renamedProgram = renamingPass.rename(program.get)
               println(currFile.getName + " (transform): " + renamedProgram)
+            try {
               println(currFile.getName + " (type checked):" + semanticAnalysis.traverse(renamedProgram) +"\n")
             } catch {
               case e: Exception => println(e.printStackTrace())
@@ -182,7 +182,7 @@ object parser {
 }
 
 object ast {
-  import parsley.implicits.zipped.{Zipped2, Zipped3, Zipped4}
+  import parsley.implicits.zipped.{Zipped2, Zipped3 }
 
   sealed trait AstNode
 
@@ -447,17 +447,15 @@ object Unary{
     case Len(x)    => Some(x)
     case Ord(x)    => Some(x)
     case Chr(x)    => Some(x)
-    case _ => None
+    case _         => None
   }
 }
 
-object MathBinary{
+object boolBinary{
   import parsers.ast._
   def unapply(expr: Expr): Option[(Expr, Expr)] = expr match{
-    case Mult(x, y)      => Some(x, y)
-    case Div(x, y)       => Some(x, y)
-    case Mod(x, y)       => Some(x, y)
-    case Plus(x, y)      => Some(x, y)
+    case And(x, y)       => Some(x, y)
+    case Or(x, y)        => Some(x, y)
     case Minus(x, y)     => Some(x, y)
     case Greater(x, y)   => Some(x, y)
     case GreaterEq(x, y) => Some(x, y)
@@ -465,14 +463,7 @@ object MathBinary{
     case LessEq(x, y)    => Some(x, y)
     case Eq(x, y)        => Some(x, y)
     case NotEq(x, y)     => Some(x, y)
-  }
-}
-
-object LogicBinary{
-  import parsers.ast._
-  def unapply(expr: Expr): Option[(Expr, Expr)] = expr match{
-    case And(x, y)      => Some(x, y)
-    case Or(x, y)       => Some(x, y)
+    case _               => None
   }
 }
 
@@ -718,8 +709,10 @@ object semanticAnalysis {
         traverse(stat)
       case Scope(stat) => traverse(stat)
       case Combine(stats) => stats.foreach(traverse(_))
+      case _ =>
     }
 
+    @tailrec
     def checkType(node: AstNode): Type = {
       node match {
         //AssignLHS
@@ -764,19 +757,29 @@ object semanticAnalysis {
         case ParensExpr(expr) => checkExprType(expr)
         case ArrayElem(ident, _) => checkType(st(ident)._1)
         case Unary(x) => checkExprType(x)
-        case And(e1, e2) =>
-          if(!(checkExprType(e1) == WBool && checkExprType(e2) == WBool)){
-            println("Both sides of the expression must be boolean")
+        case Mult(x, y) =>
+          if (!(checkExprType(x) == WInt && checkExprType(y) == WInt)) {
+            println(s"Both sides of the expression * must be Integer")
           }
-          WBool
-        case Or(e1, e2) =>
-          if(!(checkExprType(e1) == WBool && checkExprType(e2) == WBool)){
-            println("Both sides of the expression must be boolean")
+          WInt
+        case Div(x, y) =>
+          if (!(checkExprType(x) == WInt && checkExprType(y) == WInt)) {
+            println(s"Both sides of the expression / must be Integer")
           }
-          WBool
-        case MathBinary(x, y) =>
-          if(!(checkExprType(x) == WInt && checkExprType(y) == WInt)){
-            println("Both sides of the expression must be integers")
+          WInt
+        case Mod(x, y) =>
+          if (!(checkExprType(x) == WInt && checkExprType(y) == WInt)) {
+            println(s"Both sides of the expression % must be Integer")
+          }
+          WInt
+        case Plus(x, y) =>
+          if (!(checkExprType(x) == WInt && checkExprType(y) == WInt)) {
+            println(s"Both sides of the expression + must be Integer")
+          }
+          WInt
+        case boolBinary(x, y) =>
+          if(!(checkExprType(x) == WBool && checkExprType(y) == WBool)){
+            println("Both sides of the expression must be boolean")
           }
           WInt
       }
