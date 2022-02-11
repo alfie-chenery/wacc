@@ -5,6 +5,7 @@ import parsley.combinator.{sepBy, sepBy1}
 import parsley.{Parsley, Result}
 
 import java.io.File
+import scala.collection.mutable.ListBuffer
 import scala.language.implicitConversions
 
 object lexer {
@@ -152,21 +153,24 @@ object Parser {
     `<program>`.parseFromFile(input).get
 
   def main(args: Array[String]): Unit = {
-    /*
+    var errors: ListBuffer[String] = ListBuffer()
     if (args.length == 0 || !args(0).endsWith(".wacc")) println("Please pass a .wacc file to be parsed")
     else {
       val program = parse(new File(args(0)))
       if (program.isSuccess) {
-        SemanticPass.traverse(RenamingPass.rename(program.get))
-        sys.exit(0)
+        SemanticPass.traverse(RenamingPass.rename(program.get, errors), errors)
+        if (errors.nonEmpty) {
+          sys.exit(200)
+        } else {
+          sys.exit(0)
+        }
       } else {
         println(program)
         sys.exit(100)
       }
     }
 
-     */
-
+    /*
     val validPrograms = new File("../wacc_examples/valid/")
     val invalidPrograms = new File("../wacc_examples/invalid/")
     def findPrograms(file: File): Unit = {
@@ -191,5 +195,6 @@ object Parser {
       }
     }
     findPrograms(validPrograms)
+     */
   }
 }
