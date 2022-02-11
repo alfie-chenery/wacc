@@ -36,8 +36,6 @@ object SemanticPass {
           st += (ident -> (rhs, _type))
         }
       case Assign(lhs, rhs) =>
-        val lhs_type = checkType(lhs)
-        val rhs_type = checkType(rhs)
         if (checkType(lhs) != checkType(rhs)) {
           println(s"The type of the left hand side does not match the right hand side")
         }
@@ -115,32 +113,29 @@ object SemanticPass {
             println("All elements of an array must have the same type")
             null
           }
-        case PairLiter => PairType(Pair, Pair)
         case NewPair(PairLiter, PairLiter) => PairType(Pair, Pair)
         case NewPair(PairLiter, e2) => PairType(Pair, checkExprType(e2).asInstanceOf[PairElemType])
         case NewPair(e1, PairLiter) => PairType(checkExprType(e1).asInstanceOf[PairElemType], Pair)
         case NewPair(e1, e2) =>
           PairType(checkExprType(e1).asInstanceOf[PairElemType], checkExprType(e2).asInstanceOf[PairElemType])
-        case Call(ident, al) =>
-          val t : Type = st(ident)._2
+        case Call(ident, ArgList(al)) =>
+          val returnType : Type = st(ident)._2
           val n : AstNode = st(ident)._1
           n match{
-            case Func(_, pl, _) =>
-              if (al.args.length !=pl.params.length){
-                println("incorrect number of args")
-                null
-              }else{
-                for (i <- 0 to al.args.length){
-                  if(checkType(al.args(i)) != checkType(pl.params(i))){
+            case Func(_, ParamList(pl), _) =>
+              if (al.length != pl.length){
+                println(s"incorrect number of args when calling functions $ident")
+              } else {
+                for (i <- 0 to al.length-1) {
+                  if (checkExprType(al(i)) != pl(i)._type) {
                     println("the argument types do not match those expected")
                   }
                 }
-                t
               }
             case _ =>
               println("cannot call a non function")
-              null
           }
+          returnType
       }
     }
 
@@ -200,8 +195,6 @@ object SemanticPass {
           }
           WBool
         case NotEq(x, y) =>
-          val x_type = checkExprType(x)
-          val y_type = checkExprType(y)
           if (checkExprType(x) != checkExprType(y)) {
             println(s"Both sides of the expression != must be the same")
           }

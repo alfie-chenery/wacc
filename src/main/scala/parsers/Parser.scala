@@ -13,8 +13,8 @@ object lexer {
   import parsley.implicits.character.{charLift, stringLift}
   import parsley.token.{LanguageDef, Lexer, Predicate}
 
-  val binaryOperators = Set("!", "-", "len", "ord", "chr")
-  val unaryOperators = Set("*", "/", "%", "+", ">", ">=", "<", "<", "<=", "==", "!=", "&&", "||")
+  val unaryOperators = Set("!", "-", "len", "ord", "chr")
+  val binaryOperators = Set("*", "/", "%", "+", ">", ">=", "<", "<", "<=", "==", "!=", "&&", "||")
 
   private val lang = LanguageDef.plain.copy(
     commentLine = "#",

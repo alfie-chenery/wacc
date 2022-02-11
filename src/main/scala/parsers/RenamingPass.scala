@@ -136,10 +136,11 @@ object RenamingPass {
       case IfElse(cond, then_stat, else_stat) =>
         // TODO check if any variables in cond are defined in the current scope
         // TODO enter a new scope for both bodys
-        val newScope = scala.collection.mutable.Map[String, String]()
+        val newScopeThen = scala.collection.mutable.Map[String, String]()
+        val newScopeElse = scala.collection.mutable.Map[String, String]()
         IfElse(rename(cond, localScope, varsInScope).asInstanceOf[Expr],
-          rename(then_stat, newScope, varsInScope.clone()).asInstanceOf[Stat],
-          rename(else_stat, newScope,varsInScope.clone()).asInstanceOf[Stat])
+          rename(then_stat, newScopeThen, varsInScope.clone()).asInstanceOf[Stat],
+          rename(else_stat, newScopeElse,varsInScope.clone()).asInstanceOf[Stat])
 
       case While(cond, body) =>
         // TODO check if any variables in cond are defined in the current scope
