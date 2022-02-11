@@ -50,7 +50,7 @@ object SemanticPass {
        */
       case Free(expr) => // TODO come back to this
         val _type = checkExprType(expr)
-        if (_type.isInstanceOf[PairType] || _type.isInstanceOf[ArrayType]) {
+        if (!(_type.isInstanceOf[PairType] || _type.isInstanceOf[ArrayType])) {
           println("Free must be give a Pair or array expression")
         }
       case Print(expr) => checkExprType(expr)
