@@ -50,7 +50,7 @@ object Ast {
   case object WString extends BaseType with ParserBuilder[BaseType]{val parser: Parsley[WString.type] = pure(WString)}
   case class ArrayType(_type: Type) extends Type with PairElemType
   case class PairType(fst_type: PairElemType, snd_type: PairElemType) extends TypeAtom
-  sealed trait PairElemType extends AstNode
+  sealed trait PairElemType extends AstNode with Type
   case object Pair extends PairElemType with ParserBuilder[PairElemType]{val parser: Parsley[Pair.type] = pure(Pair)}
 
   sealed trait Expr extends AssignRHS

@@ -75,8 +75,22 @@ object SemanticPass {
         //AssignLHS
         case ident: Ident => st(ident)._2
         case ArrayElem(ident, exprs) => st(ident)._2 //TODO make sure this works for multi-dimensional arrays
-        case FstPair(ident:Ident) => st(ident)._2
-        case SndPair(ident:Ident) => st(ident)._2
+        case FstPair(pair) =>
+          val rhs_type = checkType(pair)
+          rhs_type match {
+            case PairType(t1, _) => t1
+            case _ =>
+              println("The expression passed to fst must be of type Pair and must not be null")
+              rhs_type
+          }
+        case SndPair(pair) =>
+          val rhs_type = checkType(pair)
+          rhs_type match {
+            case PairType(_, t2) => t2
+            case _ =>
+              println("The expression passed to snd must be of type Pair and must not be null")
+              rhs_type
+          }
 
         //AssignRHS
         case expr:Expr => checkExprType(expr)
@@ -134,28 +148,28 @@ object SemanticPass {
         case Greater(x, y) =>
           val x_type = checkExprType(x)
           val y_type = checkExprType(y)
-          if (!(x_type == WInt && y_type == WInt) || (x_type == WChar && y_type == WChar)) {
+          if (!((x_type == WInt && y_type == WInt) || (x_type == WChar && y_type == WChar))) {
             println(s"Both sides of the expression > must be Integer")
           }
           WBool
         case GreaterEq(x, y) =>
           val x_type = checkExprType(x)
           val y_type = checkExprType(y)
-          if (!(x_type == WInt && y_type == WInt) || (x_type == WChar && y_type == WChar)) {
+          if (!((x_type == WInt && y_type == WInt) || (x_type == WChar && y_type == WChar))) {
             println(s"Both sides of the expression >= must be Integer")
           }
           WBool
         case Less(x, y) =>
           val x_type = checkExprType(x)
           val y_type = checkExprType(y)
-          if (!(x_type == WInt && y_type == WInt) || (x_type == WChar && y_type == WChar)) {
+          if (!((x_type == WInt && y_type == WInt) || (x_type == WChar && y_type == WChar))) {
             println(s"Both sides of the expression < must be Integer")
           }
           WBool
         case LessEq(x, y) =>
           val x_type = checkExprType(x)
           val y_type = checkExprType(y)
-          if (!(x_type == WInt && y_type == WInt) || (x_type == WChar && y_type == WChar)) {
+          if (!((x_type == WInt && y_type == WInt) || (x_type == WChar && y_type == WChar))) {
             println(s"Both sides of the expression <= must be Integer")
           }
           WBool
