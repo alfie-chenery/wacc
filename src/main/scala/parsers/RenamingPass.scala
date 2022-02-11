@@ -13,7 +13,8 @@ object RenamingPass {
     }
     var renamedIdent = ""
     if(varsInScope.contains(ident)) {
-      val nextIdentInt = varsInScope(ident).split('$')(1).toInt+1
+      val splitString = varsInScope(ident).split('$')
+      val nextIdentInt = splitString(splitString.length-1).toInt+1
       renamedIdent = ident+"$"+s"$nextIdentInt"
     } else {
       renamedIdent = ident + "$0"
@@ -61,8 +62,10 @@ object RenamingPass {
       case Ident(ident) =>
         if (!varsInScope.contains(ident)) {
           errors += s"variable $ident not declared"
+          null
+        } else {
+          Ident(varsInScope(ident))
         }
-        Ident(varsInScope(ident))
 
       case ParensExpr(expr) => ParensExpr(rename(expr, localScope, varsInScope, errors).asInstanceOf[Expr])
 

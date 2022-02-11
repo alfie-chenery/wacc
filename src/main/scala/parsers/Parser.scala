@@ -160,12 +160,13 @@ object Parser {
       if (program.isSuccess) {
         SemanticPass.traverse(RenamingPass.rename(program.get, errors), errors)
         if (errors.nonEmpty) {
+          errors.foreach(println(_))
           sys.exit(200)
         } else {
           sys.exit(0)
         }
       } else {
-        println(program)
+        errors.foreach(println(_))
         sys.exit(100)
       }
     }
@@ -181,9 +182,9 @@ object Parser {
           if (program.isSuccess) {
             try {
               println(currFile.getName + ": " + program.get)
-              val renamedProgram = RenamingPass.rename(program.get)
-              println(currFile.getName + " (transform): " + renamedProgram)
-              println(currFile.getName + " (type checked):" + SemanticPass.traverse(renamedProgram) +"\n")
+              val renamedProgram = RenamingPass.rename(program.get, errors)
+              println(currFile.getName + " (transform): " + renamedProgram + "\n" + errors)
+              println(currFile.getName + " (type checked):" + SemanticPass.traverse(renamedProgram, errors) +"\n" + errors)
             } catch {
               case e: Exception => println(e.printStackTrace())
             }
@@ -195,6 +196,6 @@ object Parser {
       }
     }
     findPrograms(validPrograms)
-     */
+    */
   }
 }

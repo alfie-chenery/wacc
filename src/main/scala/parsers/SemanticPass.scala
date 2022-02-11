@@ -32,7 +32,7 @@ object SemanticPass {
       case Decl(PairType(t1, t2), ident, PairLiter) =>  st += (ident -> (PairLiter, PairType(t1, t2)))
       case Decl(_type, ident, rhs) =>
         if (_type != checkType(rhs, errors)) {
-          println(s"The right hand side does not match type ${_type}")
+          errors += s"The right hand side does not match type ${_type}"
         } else {
           st += (ident -> (rhs, _type))
         }
@@ -50,7 +50,7 @@ object SemanticPass {
       case Free(expr) => // TODO come back to this
         val _type = checkExprType(expr, errors)
         if (!(_type.isInstanceOf[PairType] || _type.isInstanceOf[ArrayType])) {
-          println("Free must be give a Pair or array expression")
+          errors += "Free must be give a Pair or array expression"
         }
       case Print(expr) => checkExprType(expr, errors)
       case Println(expr) => checkExprType(expr, errors)
@@ -136,6 +136,7 @@ object SemanticPass {
               errors += "cannot call a non function"
           }
           returnType
+        case _ => null
       }
     }
 
@@ -147,7 +148,12 @@ object SemanticPass {
         case StrLiter(_) => WString
         // TODO check this
         case PairLiter => null
-        case ident:Ident => st(ident)._2
+        case ident:Ident =>
+          if (st.contains(ident)) {
+            st(ident)._2
+          } else {
+            null
+          }
         case ParensExpr(expr) => checkExprType(expr, errors)
         case ArrayElem(ident, _) => checkType(st(ident)._1, errors)
         case Unary(x) => checkExprType(x, errors)
@@ -204,6 +210,7 @@ object SemanticPass {
             errors += "Both sides of the expression must be Integers"
           }
           WInt
+        case _ => null
       }
     }
   }
