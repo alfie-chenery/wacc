@@ -153,8 +153,7 @@ object Parser {
     `<program>`.parseFromFile(input).get
 
   def main(args: Array[String]): Unit = {
-    var errors: ListBuffer[String] = ListBuffer()
-    /*
+    val errors: ListBuffer[String] = ListBuffer()
     if (args.length == 0 || !args(0).endsWith(".wacc")) println("Please pass a .wacc file to be parsed")
     else {
       val program = parse(new File(args(0)))
@@ -172,14 +171,15 @@ object Parser {
       }
     }
 
-     */
 
+    /*
     val validPrograms = new File("../wacc_examples/valid/")
     val invalidPrograms = new File("../wacc_examples/invalid/")
     def findPrograms(file: File): Unit = {
       val files: List[File] = file.listFiles().toList
       for (currFile: File <- files) {
         if (currFile.isFile) {
+          val errors: ListBuffer[String] = ListBuffer()
           val program = parse(currFile)
           if (program.isSuccess) {
             try {
@@ -199,6 +199,7 @@ object Parser {
         else findPrograms(currFile)
       }
     }
-    findPrograms(validPrograms)
+    findPrograms(invalidPrograms)
+     */
   }
 }
