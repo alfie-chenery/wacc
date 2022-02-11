@@ -147,6 +147,7 @@ object SemanticPass {
               errors += ("Semantic error detected at " + prettyPrint(node) + ". Cannot call anything not of type Function.")
           }
           returnType
+        case _ => null
       }
     }
 
@@ -158,7 +159,12 @@ object SemanticPass {
         case StrLiter(_) => WString
         // TODO check this
         case PairLiter => null
-        case ident:Ident => st(ident)._2
+        case ident:Ident =>
+          if(st.contains(ident)){
+            st(ident)._2
+          }else{
+            null
+          }
         case ParensExpr(expr) => checkExprType(expr, errors)
         case ArrayElem(ident, _) => checkType(st(ident)._1, errors)
         case Unary(x) => checkExprType(x, errors)
@@ -225,6 +231,7 @@ object SemanticPass {
             errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: int and int, actual: " + prettyPrint(t) + " and " + prettyPrint(t1))
           }
           WInt
+        case _ => null
       }
     }
   }

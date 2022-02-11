@@ -161,15 +161,17 @@ object Parser {
       if (program.isSuccess) {
         SemanticPass.traverse(RenamingPass.rename(program.get, errors), errors)
         if (errors.nonEmpty) {
+          errors.foreach(println(_))
           sys.exit(200)
         } else {
           sys.exit(0)
         }
       } else {
-        println(program)
+        errors.foreach(println(_))
         sys.exit(100)
       }
     }
+
      */
 
     val validPrograms = new File("../wacc_examples/valid/")
@@ -185,6 +187,8 @@ object Parser {
               val renamedProgram = RenamingPass.rename(program.get, errors)
               println(currFile.getName + " (transform): " + renamedProgram)
               println(currFile.getName + " (type checked):" + SemanticPass.traverse(renamedProgram, errors) +"\n")
+              errors.foreach(println(_))
+              println("\n")
             } catch {
               case e: Exception => println(e.printStackTrace())
             }
