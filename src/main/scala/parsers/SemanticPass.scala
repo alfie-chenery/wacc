@@ -28,6 +28,7 @@ object SemanticPass {
       // <Stat>
       // TODO type check expr
       case Skip =>
+      case Decl(PairType(t1, t2), ident, PairLiter) =>  st += (ident -> (PairLiter, PairType(t1, t2)))
       case Decl(_type, ident, rhs) =>
         if (_type != checkType(rhs)) {
           println(s"The right hand side does not match type ${_type}")
@@ -35,6 +36,8 @@ object SemanticPass {
           st += (ident -> (rhs, _type))
         }
       case Assign(lhs, rhs) =>
+        val lhs_type = checkType(lhs)
+        val rhs_type = checkType(rhs)
         if (checkType(lhs) != checkType(rhs)) {
           println(s"The type of the left hand side does not match the right hand side")
         }
