@@ -152,6 +152,7 @@ object Parser {
 
   def main(args: Array[String]): Unit = {
     val validPrograms = new File("../wacc_examples/valid/")
+    val invalidPrograms = new File("../wacc_examples/invalid/")
     def findPrograms(file: File): Unit = {
       val files: List[File] = file.listFiles().toList
       for (currFile: File <- files) {

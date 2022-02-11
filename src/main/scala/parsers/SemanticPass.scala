@@ -154,24 +154,18 @@ object SemanticPass {
           }
           WBool
         case Eq(x, y) =>
-          val x_type = checkExprType(x)
-          val y_type = checkExprType(y)
-          if (!((x_type == WInt && y_type == WInt) ||
-                (x_type == WBool && y_type == WBool) ||
-                (x_type == WChar && y_type == WChar))) {
-            println(s"Both sides of the expression == must be Integer")
+          if (checkExprType(x) != checkExprType(y)) {
+            println(s"Both sides of the expression == must be the same")
           }
           WBool
         case NotEq(x, y) =>
           val x_type = checkExprType(x)
           val y_type = checkExprType(y)
-          if (!((x_type == WInt && y_type == WInt) ||
-                (x_type == WBool && y_type == WBool) ||
-                (x_type == WChar && y_type == WChar))) {
-            println(s"Both sides of the expression != must be Integer")
+          if (checkExprType(x) != checkExprType(y)) {
+            println(s"Both sides of the expression != must be the same")
           }
           WBool
-        case intComparisonBinary(x, y) =>
+        case intBinary(x, y) =>
           if(!(checkExprType(x) == WInt && checkExprType(y) == WInt)){
             println("Both sides of the expression must be Integers")
           }
@@ -193,7 +187,7 @@ object Unary{
   }
 }
 
-object intComparisonBinary{
+object intBinary{
   import parsers.Ast._
   def unapply(expr: Expr): Option[(Expr, Expr)] = expr match{
     case Mult(x, y)  => Some(x, y)
