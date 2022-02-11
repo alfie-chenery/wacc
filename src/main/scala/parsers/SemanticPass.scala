@@ -60,7 +60,11 @@ object SemanticPass {
       case Print(expr) => checkExprType(expr, errors)
       case Println(expr) => checkExprType(expr, errors)
       case Return(expr) => // TODO come back to this
-      case Exit(expr) => // TODO come back to this
+      case Exit(expr) =>
+        val _type = checkExprType(expr, errors)
+        if (!(_type == WInt)) {
+          errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: Int, actual: " + prettyPrint(_type))
+        }
       case IfElse(cond, stat_true, stat_false) =>
         val t: Type = checkExprType(cond, errors)
         if (t != WBool){
