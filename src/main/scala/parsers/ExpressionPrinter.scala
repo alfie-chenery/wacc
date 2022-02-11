@@ -142,6 +142,7 @@ object ExpressionPrinter {
           sb.append(";")
         }
         sb.setLength(sb.length() - 1).toString
+      case _ => ""
     }
   }
 
