@@ -26,6 +26,13 @@ object SemanticPass {
           traverse(param, errors)
         }
         traverse(stat, errors)
+        //TODO check this implementation
+        //done: enforce that functions always return or exit
+        if (!checkReturns(stat, errors)){
+          //although found in the semantic pass, the spec defines this as a syntactic error
+          errors += ("Syntactic error detected: at " + prettyPrint(node) + ". Function does not contain return or exit statement in all branches")
+        }
+
       case Param(_type, ident) => st += (ident -> (node, _type))
 
       // <Stat>
@@ -81,6 +88,24 @@ object SemanticPass {
       case Scope(stat) => traverse(stat, errors)
       case Combine(stats) => stats.foreach(traverse(_, errors))
       case _ =>
+    }
+
+    def checkReturns(node: AstNode, errors: ListBuffer[String]): Boolean = {
+      //TODO give more detailed error messages where the return shouldve been
+      //todo  if this isnt necessary then errors can be removed as a parameter
+      node match {
+        case Return(expr) => true
+        case Exit(expr) => true //another valid way to exit functions
+        case IfElse(cond, stat_true, stat_false) =>
+          checkReturns(stat_true, errors) && checkReturns(stat_false, errors)
+        case While(cond, stat) => checkReturns(stat, errors)
+        case Scope(stat) => checkReturns(stat, errors)
+        case Combine(stats) => stats.map(checkReturns(_, errors)).contains(true)
+
+        //other stat types all return false
+        //other cases which arent stat should not be passed into this function so all return false
+        case _ => false
+      }
     }
 
     def checkType(node: AstNode, errors: ListBuffer[String]): Type = {
