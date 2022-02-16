@@ -91,8 +91,7 @@ object SemanticPass {
     }
 
     def checkReturns(node: AstNode, errors: ListBuffer[String]): Boolean = {
-      //TODO give more detailed error messages where the return shouldve been
-      //todo  if this isnt necessary then errors can be removed as a parameter
+      //TODO give more detailed error messages where the return shouldve been ie specific branch
       node match {
         case Return(expr) => true
         case Exit(expr) => true //another valid way to exit functions
@@ -100,9 +99,9 @@ object SemanticPass {
           checkReturns(stat_true, errors) && checkReturns(stat_false, errors)
         case While(cond, stat) => checkReturns(stat, errors)
         case Scope(stat) => checkReturns(stat, errors)
-        case Combine(stats) => stats.map(checkReturns(_, errors)).contains(true)
+        case Combine(stats) => checkReturns(stats.last, errors)
 
-        //other stat types all return false
+        //other stat types all return false as arent valid ways to end a function
         //other cases which arent stat should not be passed into this function so all return false
         case _ => false
       }
