@@ -20,7 +20,7 @@ object SemanticPass {
         funcs.foreach(traverse(_, errors))
         traverse(stat, errors)
         if (!checkReturns(stat, errors, main = true)){
-          errors += ("Syntactic error detected: at " + prettyPrint(node) + ". Main function does not contain exit statement in all branches")
+          errors += ("Semantic error detected: at " + prettyPrint(node) + ". Main function does not contain exit statement in all branches")
         }
 
       case Func((_, _), ParamList(params), stat) =>
