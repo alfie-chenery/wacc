@@ -2,7 +2,6 @@ package parsers
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
-import parsers.ExpressionPrinter
 import parsers.ExpressionPrinter.prettyPrint
 
 object SemanticPass {
@@ -20,6 +19,9 @@ object SemanticPass {
         }
         funcs.foreach(traverse(_, errors))
         traverse(stat, errors)
+        if (!checkReturns(stat, errors, main = true)){
+          errors += ("Syntactic error detected: at " + prettyPrint(node) + ". Main function does not contain exit statement in all branches")
+        }
 
       case Func((_, _), ParamList(params), stat) =>
         for (param <- params){
@@ -28,7 +30,7 @@ object SemanticPass {
         traverse(stat, errors)
         //TODO check this implementation
         //done: enforce that functions always return or exit
-        if (!checkReturns(stat, errors)){
+        if (!checkReturns(stat, errors, main = false)){
           //although found in the semantic pass, the spec defines this as a syntactic error
           errors += ("Syntactic error detected: at " + prettyPrint(node) + ". Function does not contain return or exit statement in all branches")
         }
@@ -90,19 +92,20 @@ object SemanticPass {
       case _ =>
     }
 
-    def checkReturns(node: AstNode, errors: ListBuffer[String]): Boolean = {
+    def checkReturns(node: AstNode, errors: ListBuffer[String], main: Boolean): Boolean = {
+      //main flags whether we are checking the main function, in which case return shouldnt be accepted
       //TODO give more detailed error messages where the return shouldve been ie specific branch
       node match {
-        case Return(expr) => true
-        case Exit(expr) => true //another valid way to exit functions
+        case Return(expr) => !main //if main function return is invalid, should be exit
+        case Exit(expr) => true //valid way to exit any function
         case IfElse(cond, stat_true, stat_false) =>
-          checkReturns(stat_true, errors) && checkReturns(stat_false, errors)
-        case While(cond, stat) => checkReturns(stat, errors)
-        case Scope(stat) => checkReturns(stat, errors)
-        case Combine(stats) => checkReturns(stats.last, errors)
+          checkReturns(stat_true, errors, main) && checkReturns(stat_false, errors, main)
+        case While(cond, stat) => checkReturns(stat, errors, main)
+        case Scope(stat) => checkReturns(stat, errors, main)
+        case Combine(stats) => checkReturns(stats.last, errors, main)
 
         //other stat types all return false as arent valid ways to end a function
-        //other cases which arent stat should not be passed into this function so all return false
+        //other nodes which arent stat should not be passed into this function so all return false
         case _ => false
       }
     }
