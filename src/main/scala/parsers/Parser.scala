@@ -1,7 +1,10 @@
 package parsers
 
 import parsley.Parsley._
+import parsley.character.alphaNum
 import parsley.combinator.{sepBy, sepBy1}
+import parsley.debug.DebugCombinators
+//import parsley.internal.machine.stacks.Stack.StackExt
 import parsley.{Parsley, Result}
 
 import java.io.File
@@ -21,7 +24,7 @@ object lexer {
     commentLine = "#",
     nestedComments = false,
     keywords = Set("begin", "end", "is", "skip", "read", "return", "if", "then", "else",
-      "if", "then", "else", "fi", "while", "do", "end", "len", "ord", "chr", "print", "println"),
+       "fi", "while", "do", "len", "ord", "chr", "print", "println", "true", "false", "null"),
     operators = binaryOperators ++ unaryOperators,
     identStart = Predicate(c => c.isLetter || c == '_'),
     identLetter = Predicate(c => c.isLetterOrDigit || c == '_'),
@@ -75,7 +78,7 @@ object Parser {
   private [parsers] lazy val `<expr>`: Parsley[Expr] =
     precedence(SOps(InfixR)  (Or <# "||") +:
                SOps(InfixR)  (And <# "&&") +:
-               SOps(NonAssoc)(NotEq <# attempt("!="), Eq <# attempt("==")) +:
+               SOps(NonAssoc)(NotEq <# attempt("!="), Eq <# attempt("==")) +: // todo: remove attempts
                SOps(NonAssoc)(LessEq <# attempt("<="), Less <# "<",
                               GreaterEq <# attempt(">="), Greater <# ">") +:
                SOps(InfixL)  (Minus <# "-", Plus <# "+") +:
@@ -85,10 +88,10 @@ object Parser {
 
   // TODO refactor this to put ident at the top and reduce backtracking
   private [parsers] lazy val `<expr-atoms>`: Parsley[Term] =
-    attempt(IntLiter(INT_LITER))       <|> attempt(BoolLiter(BOOL_LITER)) <|>
-      attempt(CharLiter(CHAR_LITER))   <|> StrLiter(STR_LITER)  <|>
-      attempt(PAIR_LITER #> PairLiter) <|> attempt(`<array-elem>`)        <|>
-      `<ident>`                        <|> ParensExpr('(' ~> `<expr>` <~ ')')
+     attempt(`<array-elem>`)          <|> `<ident>`                      <|>
+     attempt(PAIR_LITER #> PairLiter) <|> attempt(IntLiter(INT_LITER))   <|>
+     attempt(BoolLiter(BOOL_LITER))   <|> attempt(CharLiter(CHAR_LITER)) <|>
+     attempt(StrLiter(STR_LITER))     <|> ParensExpr('(' ~> `<expr>` <~ ')')
 
   private [parsers] lazy val `<array-elem>`: Parsley[ArrayElem] = ArrayElem(`<ident>`, some('[' ~> `<expr>` <~ ']'))
 
