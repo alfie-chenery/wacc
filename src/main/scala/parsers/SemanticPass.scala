@@ -19,9 +19,7 @@ object SemanticPass {
         }
         funcs.foreach(traverse(_, errors))
         traverse(stat, errors)
-        if (!checkReturns(stat, errors, main = true)){
-          errors += ("Semantic error detected: at " + prettyPrint(node) + ". Main function does not contain exit statement in all branches")
-        }
+        checkReturns(stat, errors, main = true)
 
       case Func((_, _), ParamList(params), stat) =>
         for (param <- params){
@@ -29,11 +27,9 @@ object SemanticPass {
         }
         traverse(stat, errors)
         //TODO check this implementation
-        //done: enforce that functions always return or exit
-        if (!checkReturns(stat, errors, main = false)){
-          //although found in the semantic pass, the spec defines this as a syntactic error
-          errors += ("Syntactic error detected: at " + prettyPrint(node) + ". Function does not contain return or exit statement in all branches")
-        }
+        //~done: enforce that functions always return or exit
+        //although found in the semantic pass, the spec defines this as a syntactic error
+        checkReturns(stat, errors, main = false)
 
       case Param(_type, ident) => st += (ident -> (node, _type))
 
@@ -66,7 +62,7 @@ object SemanticPass {
         }
       case Print(expr) => checkExprType(expr, errors)
       case Println(expr) => checkExprType(expr, errors)
-      case Return(expr) => // TODO come back to this
+      case Return(expr) => // TODO come back to this // TODO: should probably call checkReturns, but needs to know if in main or not...
       case Exit(expr) =>
         val _type = checkExprType(expr, errors)
         if (!(_type == WInt)) {
@@ -94,17 +90,24 @@ object SemanticPass {
       //main flags whether we are checking the main function, in which case return shouldnt be accepted
       //TODO give more detailed error messages where the return shouldve been ie specific branch
       node match {
-        case Return(expr) => !main //if main function return is invalid, should be exit
+        case Return(expr) =>
+          if(main) {
+            errors += ("Semantic error detected: at \"" + prettyPrint(node) + "\". Main function should not contain a return statement.")
+            false
+          } else {
+            true
+          } //if main function return is invalid, should be exit
         case Exit(expr) => true //valid way to exit any function
-        case IfElse(cond, stat_true, stat_false) =>
-          checkReturns(stat_true, errors, main) && checkReturns(stat_false, errors, main)
+        case IfElse(cond, stat_true, stat_false) => checkReturns(stat_true, errors, main) && checkReturns(stat_false, errors, main)
         case While(cond, stat) => checkReturns(stat, errors, main)
         case Scope(stat) => checkReturns(stat, errors, main)
         case Combine(stats) => checkReturns(stats.last, errors, main)
 
         //other stat types all return false as arent valid ways to end a function
         //other nodes which arent stat should not be passed into this function so all return false
-        case _ => false
+        case _ =>
+          errors += ("Semantic error detected: at \"" + prettyPrint(node) + "\". Function does not contain a return/exit in all conditional branches.")
+          false
       }
     }
 
