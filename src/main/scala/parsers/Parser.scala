@@ -166,7 +166,7 @@ object Parser {
           sys.exit(0)
         }
       } else {
-        errors.foreach(println(_))
+        println(program)
         sys.exit(100)
       }
     }
