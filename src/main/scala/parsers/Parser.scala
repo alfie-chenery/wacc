@@ -129,7 +129,7 @@ object Parser {
   private [parsers] lazy val `<stat-atoms>`: Parsley[StatAtom] =
     attempt(Assign(`<assign-lhs>`, '=' ~> `<assign-rhs>`))                            <|>
       attempt(Decl(`<type>`, `<ident>`, '=' ~> `<assign-rhs>`))                       <|>
-      attempt(Skip <# "skip")                                                         <|>
+      attempt(Skip *> "skip")                                                         <|>
       attempt(Read("read" ~> `<assign-lhs>`))      <|> Free("free" ~> `<expr>`)         <|>
       Return("return" ~> `<expr>`)        <|> Exit("exit" ~> `<expr>`)                  <|>
       attempt(Print("print" ~> `<expr>`)) <|>Println("println" ~> `<expr>`)   <|>

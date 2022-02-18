@@ -35,8 +35,8 @@ object SemanticPass {
 
       // <Stat>
       // TODO type check expr
-      case Skip =>
-      case Decl(PairType(t1, t2), ident, PairLiter) =>  st += (ident -> (PairLiter, PairType(t1, t2)))
+      case Skip() =>
+      case Decl(PairType(t1, t2), ident, PairLiter()) =>  st += (ident -> (PairLiter, PairType(t1, t2)))
       case Decl(_type, ident, rhs) =>
         val t : Type = checkType(rhs, errors)
         if (_type != t) {
@@ -52,8 +52,10 @@ object SemanticPass {
         }
       case Read(lhs) =>
         val _type = checkType(lhs, errors)
-        if(_type != WChar || _type != WInt) {
-          println("type error")
+        _type match{
+          case WChar() =>
+          case WInt() =>
+          case _ => errors += "type error"
         }
       case Free(expr) => // TODO come back to this
         val _type = checkExprType(expr, errors)
@@ -152,9 +154,9 @@ object SemanticPass {
             errors += "Semantic error detected: Incompatible type at " + prettyPrint(node) + ". All types in an array must match."
             null
           }
-        case NewPair(PairLiter, PairLiter) => PairType(Pair, Pair)
-        case NewPair(PairLiter, e2) => PairType(Pair, checkExprType(e2, errors).asInstanceOf[PairElemType])
-        case NewPair(e1, PairLiter) => PairType(checkExprType(e1, errors).asInstanceOf[PairElemType], Pair)
+        case NewPair(PairLiter(), PairLiter()) => PairType(Pair, Pair)
+        case NewPair(PairLiter(), e2) => PairType(Pair, checkExprType(e2, errors).asInstanceOf[PairElemType])
+        case NewPair(e1, PairLiter()) => PairType(checkExprType(e1, errors).asInstanceOf[PairElemType], Pair)
         case NewPair(e1, e2) =>
           PairType(checkExprType(e1, errors).asInstanceOf[PairElemType], checkExprType(e2, errors).asInstanceOf[PairElemType])
         case Call(ident, ArgList(al)) =>
@@ -185,12 +187,12 @@ object SemanticPass {
 
     def checkExprType(expr: AstNode, errors: ListBuffer[String]): Type = {
       expr match {
-        case IntLiter(_) => WInt
-        case BoolLiter(_) => WBool
-        case CharLiter(_) => WChar
-        case StrLiter(_) => WString
+        case IntLiter(_) => WInt()()
+        case BoolLiter(_) => WBool()
+        case CharLiter(_) => WChar()
+        case StrLiter(_) => WString()
         // TODO check this
-        case PairLiter => null
+        case PairLiter() => null
         case ident:Ident =>
           if(st.contains(ident)){
             st(ident)._2
@@ -206,7 +208,7 @@ object SemanticPass {
           if (!(t == WBool && t1 == WBool)) {
             errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: bool, actual: " + prettyPrint(t1) + " and " + prettyPrint(t))
           }
-          WBool
+          WBool()(_)
         case Or(x, y) =>
           val t: Type = checkExprType(x, errors)
           val t1: Type = checkExprType(y, errors)

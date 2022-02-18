@@ -4,7 +4,7 @@ import parsley.Parsley
 import parsley.Parsley.pos
 
 object Ast {
-  import parsley.implicits.zipped.{Zipped2, Zipped3 }
+  import parsley.implicits.zipped.{LazyZipped2, LazyZipped3}
 
   trait AstNode{
     val pos: (Int, Int)
@@ -129,7 +129,7 @@ object Ast {
 
   object Program {
     def apply(funcs: =>Parsley[List[Func]], stat: =>Parsley[Stat]): Parsley[Program]
-      = pos <**> (funcs, stat).zipped(Program(_, _))
+      = pos <**> (funcs, stat).lazyZipped(Program(_, _)_)
   }
   object Func{
     def apply(ident: Parsley[(Type, Ident)], params: Parsley[ParamList], stat: Parsley[Stat]) : Parsley[Func]
@@ -142,7 +142,7 @@ object Ast {
   }
   object Param{
     def apply(_type: Parsley[Type], ident: Parsley[Ident]) : Parsley[Param]
-      = pos <**> (_type, ident).zipped(Param(_,_))
+      = pos <**> (_type, ident).zipped(Param(_,_) _)
   }
 
   object Decl {

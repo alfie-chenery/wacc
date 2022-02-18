@@ -6,7 +6,7 @@ object ExpressionPrinter {
 
   def prettyPrint(node: AstNode) : String = {
     node match{
-      case Skip => "skip"
+      case Skip() => "skip"
       case Decl(t, i, rhs) => prettyPrint(t) + " " +  prettyPrint(i) + " = " + prettyPrint(rhs)
       case Assign(lhs, rhs) => prettyPrint(lhs) + " = " + prettyPrint(rhs)
       case Read(lhs) => "read " + prettyPrint(lhs)
@@ -34,17 +34,17 @@ object ExpressionPrinter {
         sb.toString()
       case FstPair(fst) => "fst " + prettyPrint(fst)
       case SndPair(snd) => "snd " + prettyPrint(snd)
-      case WInt => "int"
-      case WBool => "bool"
-      case WChar => "char"
-      case WString => "string"
+      case WInt() => "int"
+      case WBool() => "bool"
+      case WChar() => "char"
+      case WString() => "string"
       case ArrayType(t) => prettyPrint(t)
-      case Pair => "pair"
+      case Pair() => "pair"
       case IntLiter(i) => i.toString
       case BoolLiter(b) => b.toString
       case CharLiter(c) => c.toString
       case StrLiter(s) => s
-      case PairLiter => "null"
+      case PairLiter() => "null"
       case Ident(i) => i.split('$')(0)
       case ArrayElem(Ident(i), exprs) =>
         val sb = new StringBuilder(i)
