@@ -65,9 +65,32 @@ object CodeGen{
 
       case Assign(lhs, rhs) => ???
 
-      case Read(lhs) => ???
+      case Read(lhs) =>
 
-//        "ADD r4, sp, #0\n\tMOV r0, r4\n\tBL p_read_char"
+        val _type: Type = SemanticPass.checkExprType(lhs, node, new ListBuffer[String])
+
+        val t = _type match {
+        // todo: refactor? kinda don't like how the way it has side effects
+          case WChar =>
+//            data(s"$msg") =
+            data(s"msg") =
+              """.word 3
+                |.ascii	"%d\0" """.stripMargin
+            "p_read_int"
+
+          case WInt =>
+//            data(s"$msg") =
+            data(s"msg") =
+              """.word 4
+                |.ascii " %c\0" """.stripMargin
+            "p_read_bool"
+        }
+
+        functions += t
+
+        s""" ADD r4, sp, #0
+          | MOV r0, r4
+          | BL $t""".stripMargin
 
       case Free(expr) => ???
 
