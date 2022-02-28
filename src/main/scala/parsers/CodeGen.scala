@@ -223,7 +223,6 @@ object CodeGen{
     }
   }
 
-  //helper functions to make code cleaner
 
   val typeSize: immutable.Map[Type, Int] = Map[Type, Int](WInt -> 4, WBool -> 1, WChar -> 1)
 
@@ -239,34 +238,6 @@ object CodeGen{
         }
     }
     size
-  }
-
-  def pop(availableRegs: ListBuffer[Int]): String = {
-    /**
-     * pops the head of availableRegs and returns this register as a string, prepended with r
-     */
-    val reg = availableRegs.head
-    availableRegs.remove(0)
-    "r" + reg
-  }
-
-  def peek(availableRegs: ListBuffer[Int]): String = {
-    /**
-     * returns the head of availableRegs as a string prepended with r, without modifying availableRegs
-     */
-    val reg = availableRegs.head
-    "r" + reg
-  }
-
-  def drop(n: Int, availableRegs: ListBuffer[Int]): ListBuffer[Int] = {
-    /**
-     * returns the ListBuffer obtained by dropping the first n elements
-     */
-    var result = availableRegs.clone()
-    for (_ <- 1 to n) {
-      result = result.tail
-    }
-    result
   }
 
   def add(map: mutable.HashMap[String, String], key: String, value: String): Unit = {
