@@ -251,6 +251,7 @@ object CodeGen{
         "BLVS p_throw_overflow_error" +
         "MOV r0, r4" //todo
 
+      case _ => ""
       }
     }
 
@@ -386,6 +387,7 @@ object CodeGen{
         for (stat <- stats) {
           stat match {
             case Decl(_type, _, _) => size += typeSize(_type)
+            case _ =>
           }
         }
     }

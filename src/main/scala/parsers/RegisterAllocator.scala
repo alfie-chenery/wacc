@@ -1,6 +1,7 @@
 package parsers
 
 import scala.collection.mutable.ListBuffer
+import parsers.RegisterAllocatorGlobals._
 
 //companion object to store global values needed by all RegisterAllocators
 object RegisterAllocatorGlobals{
@@ -16,7 +17,6 @@ object RegisterAllocatorGlobals{
 }
 
 class RegisterAllocator(private var availableRegisters: ListBuffer[Int]) {
-  import parsers.RegisterAllocatorGlobals._
 
   //Default constructor
   private val initialAvailable:   ListBuffer[Int] = availableRegisters.clone()
