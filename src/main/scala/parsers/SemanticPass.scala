@@ -89,11 +89,11 @@ object SemanticPass {
 
   def checkReturns(node: AstNode, errors: ListBuffer[String], main: Boolean): Boolean = {
     //main flags whether we are checking the main function, in which case return shouldnt be accepted
-    //TODO give more detailed error messages where the return shouldve been ie specific branch
+    //TODO give more detailed error messages where the return should've been ie specific branch
     node match {
       case Return(expr) =>
         if(main) {
-          errors += ("Semantic error detected: at \"" + prettyPrint(node) + "\". Main function should not contain a return statement.")
+          errors += ("Syntax error detected: at \"" + prettyPrint(node) + "\". Main function should not contain a return statement.")
           false
         } else {
           true
@@ -107,7 +107,9 @@ object SemanticPass {
       //other stat types all return false as arent valid ways to end a function
       //other nodes which arent stat should not be passed into this function so all return false
       case _ =>
-        errors += ("Semantic error detected: at \"" + prettyPrint(node) + "\". Function does not contain a return/exit in all conditional branches.")
+        if (!main) {
+          errors += ("Syntax error detected: at \"" + prettyPrint(node) + "\". Function does not contain a return/exit in all conditional branches.")
+        }
         false
     }
   }

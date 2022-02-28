@@ -61,7 +61,7 @@ object CodeGen{
       case Param(_type, ident) => ???
 
       // <Stat>
-      case Skip => ???
+      case Skip => ""
 
       case Decl(PairType(t1, t2), ident, PairLiter) => ???
       case Decl(_type, ident, rhs) =>
