@@ -157,41 +157,48 @@ object CodeGen{
         traverse(expr2, ra)
         val reg1 = ra.next()
         val reg2 = ra.next()
-        "ORR " + reg1 +", " + reg1 + ", " + reg2 +
+        "ORR " + reg1 + ", " + reg1 + ", " + reg2 +
           "MOV " + retReg + ", " + reg2
 
       case And(BoolLiter(_), BoolLiter(_)) =>
-        "MOV r4, #1" +
-          "MOV r5, #0" +
-          "AND r4, r4, r5" +
-          "MOV r0, r4"
+        val reg1 = ra.next()
+        val reg2 = ra.next()
+        "MOV " + reg1 + ", #1" +
+          "MOV " + reg2 + ", #0" +
+          "AND " + reg1 + ", " + reg1 + ", " + reg2 +
+          "MOV " + retReg + ", " + reg1
 
       case And(expr1, expr2) =>
         traverse(expr1, ra)
         traverse(expr2, ra)
-        "AND r4, r4, r5" +
-          "MOV r0, r4"
-      //TODO: print function but only if not already there
+        val reg1 = ra.next()
+        val reg2 = ra.next()
+        "AND " + reg1 + ", " + reg1 + ", " + reg2 +
+          "MOV " + retReg + ", " + reg1
 
       case Greater(expr1, expr2) =>
         traverse(expr1, ra)
         traverse(expr2, ra)
 
       case Less(IntLiter(x), IntLiter(y)) =>
-        "LDR r4 =" + x.toString +
-                "LDR r5 =" + y.toString +
-                "CMP r4, r5" +
-                "MOVLT r4, #1" +
-                "MOVGE r4, #0" +
-                "MOV r0, r4"
+        val reg1 = ra.next()
+        val reg2 = ra.next()
+        "LDR " + reg1 + " =" + x.toString +
+                "LDR " + reg2 + " =" + y.toString +
+                "CMP " + reg1 + ", " + reg2 +
+                "MOVLT " + reg1 + ", #1" +
+                "MOVGE " + reg1 + ", #0" +
+                "MOV " + retReg + ", " + reg1
 
       case LessEq(IntLiter(x), IntLiter(y)) =>
-        "LDR r4 =" + x.toString +
-                "LDR r5 =" + y.toString +
-                "CMP r4 r5" +
-                "MOVLE r4 #1" +
-                "MOVGT r4 #0" +
-                "MOV r0, r4"
+        val reg1 = ra.next()
+        val reg2 = ra.next()
+        "LDR " + reg1 + " =" + x.toString +
+                "LDR " + reg2 + " =" + y.toString +
+                "CMP " + reg1 + ", " + reg2 +
+                "MOVLE " + reg1 + ", #1" +
+                "MOVGT " + reg1 + ", #0" +
+                "MOV " + retReg + ", " + reg1
 
 
       case Plus(IntLiter(x), IntLiter(y)) =>
