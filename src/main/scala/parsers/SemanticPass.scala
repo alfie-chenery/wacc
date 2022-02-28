@@ -52,7 +52,7 @@ object SemanticPass {
         }
       case Read(lhs) =>
         val _type = checkType(lhs, errors)
-        if (_type != WChar || _type != WInt) {
+        if (!(_type == WChar || _type == WInt)) {
           println("type error")
         }
       case Free(expr) => // TODO come back to this
