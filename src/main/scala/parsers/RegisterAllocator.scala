@@ -13,9 +13,11 @@ class RegisterAllocator(availableRegisters: ListBuffer[Int]) {
   val pc = "r15"
 
   //if no list buffer in constructor, assume we have access to all registers
+  /*
   def this() = {
     this(allRegisters.to(ListBuffer))
   }
+   */
 
 
   def next(): String = {

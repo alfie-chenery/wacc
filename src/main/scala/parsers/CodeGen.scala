@@ -1,5 +1,6 @@
 package parsers
 
+import java.io.{BufferedWriter, File, FileWriter}
 import scala.collection.mutable
 import scala.collection.immutable
 import scala.collection.mutable.ListBuffer
@@ -21,23 +22,36 @@ object CodeGen{
   def traverse(node: AstNode, ra: RegisterAllocator): String = {
     node match {
       case Program(funcs, stat) =>
+        var program = "main:\n\t" +
+          "PUSH {lr}\n\t"
 
-        main += "main:\n\tPUSH {lr}"
-        funcs.foreach(traverse(_, availableRegs))
-        traverse(stat, availableRegs)
-        main +=
-          "LDR r0, =0\n\t" +
-          "POP {pc}\n\t" +
-          ".ltorg"
+        val assignmentSize = assignmentsInScope(stat)
+        if (assignmentSize > 0) program += "SUB sp, sp, #" + assignmentSize + "\n\t"
+
+        for (func <- funcs) {
+          program += traverse(func, ra)
+        }
+
+        program += traverse(stat, ra)
+        if (assignmentSize > 0) program += "ADD sp, sp, #" + assignmentSize + "\n\t"
+
+        program += "LDR " + ra.retReg + ", =0\n\t" +
+        "POP {pc}\n\t" +
+        ".ltorg"
+        program
 
       case Func((_type, Ident(name)), ParamList(params), stat) =>
-        update(functions, name, ":\n\t")
-//        for (param <- params) {
-//          traverse(param, availableRegs)
-//        }
-        traverse(stat, availableRegs)
+        var program = name + ":\n\t" +
+          "PUSH {lr}\n\t"
+          val assignmentSize = assignmentsInScope(stat)
+          if (assignmentSize > 0) program += "SUB sp, sp, #" + assignmentSize + "\n\t"
+          program += traverse(stat, ra)
+          if (assignmentSize > 0) program += "ADD sp, sp, #" + assignmentSize + "\n\t"
+          program += "POP {lr}\n\t" +
+            ".ltorg"
+        program
 
-      case Param(_type, ident) =>
+      case Param(_type, ident) => ???
 
       // <Stat>
       case Skip => ???
@@ -129,7 +143,7 @@ object CodeGen{
         statements
 
       case Or(BoolLiter(_), BoolLiter(_)) =>
-        main += "MOV r4, #1" +
+        "MOV r4, #1" +
           "MOV r5, #0" +
           "ORR r4, r4, r5" +
           "MOV r0, r4"
@@ -142,7 +156,7 @@ object CodeGen{
       //TODO: print function but only if not already there
 
       case And(BoolLiter(_), BoolLiter(_)) =>
-        main += "MOV r4, #1" +
+        "MOV r4, #1" +
           "MOV r5, #0" +
           "AND r4, r4, r5" +
           "MOV r0, r4"
@@ -155,11 +169,11 @@ object CodeGen{
       //TODO: print function but only if not already there
 
       case Greater(expr1, expr2) =>
-        traverse(expr1, availableRegs)
-        traverse(expr2, availableRegs)
+        traverse(expr1, ra)
+        traverse(expr2, ra)
 
       case Less(IntLiter(x), IntLiter(y)) =>
-        main += "LDR r4 =" + x.toString +
+        "LDR r4 =" + x.toString +
                 "LDR r5 =" + y.toString +
                 "CMP r4, r5" +
                 "MOVLT r4, #1" +
@@ -167,37 +181,41 @@ object CodeGen{
                 "MOV r0, r4"
 
       case LessEq(IntLiter(x), IntLiter(y)) =>
-        main += "LDR r4 =" + x.toString +
+        "LDR r4 =" + x.toString +
                 "LDR r5 =" + y.toString +
                 "CMP r4 r5" +
                 "MOVLE r4 #1" +
                 "MOVGT r4 #0" +
                 "MOV r0, r4"
+
+
+      case Plus(IntLiter(x), IntLiter(y)) =>
+        "ADDS r4, r4, r5" +
+        "BLVS p_throw_overflow_error" +
+        "MOV r0, r4" //todo
+
+
+
       }
     }
 
   //TODO add actual IO to file, presumably file passed as parameter
-  def writeToFile(): Unit ={
+  def writeToFile(filename: String): Unit ={
     val sb = new StringBuilder()
-    sb += ".data\n\t"
+    sb.append(".data\n\t")
     for((k,v) <- data){
-      sb += k + ":\n\t" + v
+      sb.append(k + ":\n\t" + v)
     }
-    //write to file here
-    sb.setLength(0) //clear string builder
 
-    sb += ".text\n\t"
+    sb.append(".text\n\t")
     for((k,v) <- text){
-      sb += k + ":\n\t" + v
+      sb.append(k + ":\n\t" + v)
     }
-    //write to file here
-    sb.setLength(0) //clear string builder
 
-    sb += ".global main\n\t"
+    sb.append(".global main\n\t")
     for((k,v) <- functions){
-      sb += k + ":\n\t" + v
+      sb.append(k + ":\n\t" + v)
     }
-    //write to file here
   }
 
   //helper functions to make code cleaner
@@ -251,7 +269,7 @@ object CodeGen{
      * Adds new key value pair to map only if the key is not already present
      */
     if(!map.contains(key)){
-      map += (key,value)
+      map += (key -> value)
     }
   }
 
