@@ -2,13 +2,10 @@ package parsers
 
 import org.scalatest.flatspec.AnyFlatSpec
 
-import java.io.File
-import scala.collection.mutable.ListBuffer
-
 class parserSpec extends AnyFlatSpec{
   import Parser._
-  import lexer._
-  import Ast._
+  import java.io.File
+  import scala.collection.mutable.ListBuffer
 
   def runFrontEnd(dir: File, expectedReturn: Int): Unit = {
     val files: List[File] = dir.listFiles().toList
@@ -25,7 +22,7 @@ class parserSpec extends AnyFlatSpec{
             if (errors.nonEmpty) returnVal = 100
             else returnVal = 0
           } catch {
-            case e => e.printStackTrace()
+            case e: Exception => e.printStackTrace()
           }
         } else {
           println(program)
