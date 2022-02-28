@@ -16,6 +16,13 @@ object CodeGen{
   val functions: mutable.Set[String] =  mutable.Set()
   // todo: refactor so that maps/buffers automatically indent/format strings
 
+  var messageIndex = 0
+
+  def getMessageIndex: Int = {
+    messageIndex += 1
+    messageIndex
+  }
+
   //TODO make use of availableRegs to replace
   def traverse(node: AstNode, ra: RegisterAllocator): String = {
     node match {
@@ -70,17 +77,15 @@ object CodeGen{
         val _type: Type = SemanticPass.checkExprType(lhs, node, new ListBuffer[String])
 
         val t = _type match {
-        // todo: refactor? kinda don't like how the way it has side effects
+        // todo: needs to account for register availability
           case WChar =>
-//            data(s"$msg") =
-            data(s"msg") =
+            data(s"msg_$getMessageIndex") =
               """.word 3
                 |.ascii	"%d\0" """.stripMargin
             "p_read_int"
 
           case WInt =>
-//            data(s"$msg") =
-            data(s"msg") =
+            data(s"msg_$getMessageIndex") =
               """.word 4
                 |.ascii " %c\0" """.stripMargin
             "p_read_bool"
