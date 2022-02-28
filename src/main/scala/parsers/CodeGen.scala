@@ -62,7 +62,7 @@ object CodeGen{
         // TODO this is not gonna work (see many variables example)
         val reg = ra.next()
         "SUB sp, sp, #4" +
-        "LDR " + reg +", =" + traverse(rhs, ra) + ////////////////////////////////////////
+        "LDR " + reg +", =" + traverse(rhs, ra) + //not sure this is right. Traverse might make new lines of code, we just want to evaluate the rhs
         "STR " + reg + ", [sp]" +
         "ADD sp, sp, #4"
 
@@ -110,7 +110,7 @@ object CodeGen{
       case Exit(expr) =>
         val reg = ra.next()
         "LDR " + reg + " =" + traverse(expr, ra) +
-        "MOV r0, r4" +
+        "MOV " + retReg + ", " + reg +
         "BL exit"
 
       case IfElse(cond, stat_true, stat_false) =>
@@ -131,30 +131,34 @@ object CodeGen{
         "B L0" +
           "L1:" + traverse(stat, ra) +
         "L0" + traverse(cond, ra)
-        //TODO GOT TO HERE WITH RA
+        //conditional branch back to L1
 
       case Scope(stat) => traverse(stat, ra)
 
       case Combine(stats) =>
-        // TODO this could be refactored
         val statements = ""
+        val newScope = new RegisterAllocator(ra.getAvailable)
         for (stat <- stats) {
-          statements + traverse(stat, ra)
+          statements + traverse(stat, newScope)
+          newScope.restore() //TODO check this implementation
         }
         statements
 
       case Or(BoolLiter(_), BoolLiter(_)) =>
-        "MOV r4, #1" +
-          "MOV r5, #0" +
-          "ORR r4, r4, r5" +
-          "MOV r0, r4"
+        val reg1 = ra.next()
+        val reg2 = ra.next()
+        "MOV " + reg1 + ", #1" +
+          "MOV " + reg2 + ", #0" +
+          "ORR " + reg1 + ", " + reg1 + ", " + reg2 +
+          "MOV " + retReg + ", " + reg1
 
       case Or(expr1, expr2) =>
         traverse(expr1, ra)
         traverse(expr2, ra)
-        "ORR r4, r4, r5" +
-          "MOV r0, r4"
-      //TODO: print function but only if not already there
+        val reg1 = ra.next()
+        val reg2 = ra.next()
+        "ORR " + reg1 +", " + reg1 + ", " + reg2 +
+          "MOV " + retReg + ", " + reg2
 
       case And(BoolLiter(_), BoolLiter(_)) =>
         "MOV r4, #1" +
