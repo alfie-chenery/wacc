@@ -29,9 +29,7 @@ class RegisterAllocator(availableRegs: ListBuffer[Int]) {
 
 
   def next(): String = {
-    val reg = "r" + availableRegisters.head.toString
-    availableRegisters.remove(0)
-    reg
+    "r" + availableRegisters.remove(0).toString
   }
 
   def restore(): Unit = {
