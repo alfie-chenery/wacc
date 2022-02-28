@@ -6,4 +6,5 @@ target
 *.class
 
 #ignore other junk files
+.bsp/sbt.json
 *~
