@@ -17,9 +17,14 @@ object CodeGen{
   val text = new mutable.HashMap[String, String]
   val main = new mutable.ListBuffer[String]
   val functions = new mutable.HashMap[String, String]
-  // todo: refactor so that maps/buffers automatically indent/format strings
 
-  //TODO make use of availableRegs to replace
+  //counter to track label of branch functions L0, l1 etc
+  //implement same as msg_0 counter or as class with .next()
+  var branchCounter = 0
+
+  // todo: refactor so that maps/buffers automatically indent/format strings
+  // todo: reformat to use instruction ADT instead of strings
+
   def traverse(node: AstNode, ra: RegisterAllocator): String = {
     node match {
       case Program(funcs, stat) =>
@@ -55,7 +60,7 @@ object CodeGen{
       case Param(_type, ident) => ???
 
       // <Stat>
-      case Skip => ???
+      case Skip => ""
 
       case Decl(PairType(t1, t2), ident, PairLiter) => ???
       case Decl(_type, ident, rhs) =>
