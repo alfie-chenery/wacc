@@ -176,40 +176,101 @@ object CodeGen{
         "AND " + reg1 + ", " + reg1 + ", " + reg2 +
           "MOV " + retReg + ", " + reg1
 
-      case Greater(expr1, expr2) =>
-        traverse(expr1, ra)
-        traverse(expr2, ra)
+      case Greater(IntLiter(x), IntLiter(y)) =>
+        val reg1 = ra.next()
+        val reg2 = ra.next()
+        "LDR " + reg1 + " =" + x.toString +
+          "LDR " + reg2 + " =" + y.toString +
+          phonyCaseCompare("Greater", reg1, reg2)
+
+      case GreaterEq(IntLiter(x), IntLiter(y)) =>
+        val reg1 = ra.next()
+        val reg2 = ra.next()
+        "LDR " + reg1 + " =" + x.toString +
+          "LDR " + reg2 + " =" + y.toString +
+          phonyCaseCompare("GreaterEq", reg1, reg2)
 
       case Less(IntLiter(x), IntLiter(y)) =>
         val reg1 = ra.next()
         val reg2 = ra.next()
         "LDR " + reg1 + " =" + x.toString +
-                "LDR " + reg2 + " =" + y.toString +
-                "CMP " + reg1 + ", " + reg2 +
-                "MOVLT " + reg1 + ", #1" +
-                "MOVGE " + reg1 + ", #0" +
-                "MOV " + retReg + ", " + reg1
+          "LDR " + reg2 + " =" + y.toString +
+          phonyCaseCompare("Less", reg1, reg2)
 
       case LessEq(IntLiter(x), IntLiter(y)) =>
         val reg1 = ra.next()
         val reg2 = ra.next()
         "LDR " + reg1 + " =" + x.toString +
-                "LDR " + reg2 + " =" + y.toString +
-                "CMP " + reg1 + ", " + reg2 +
-                "MOVLE " + reg1 + ", #1" +
-                "MOVGT " + reg1 + ", #0" +
-                "MOV " + retReg + ", " + reg1
+          "LDR " + reg2 + " =" + y.toString +
+          phonyCaseCompare("LessEq", reg1, reg2)
 
+      case Eq(IntLiter(x), IntLiter(y)) =>
+        val reg1 = ra.next()
+        val reg2 = ra.next()
+        "LDR " + reg1 + " =" + x.toString +
+          "LDR " + reg2 + " =" + y.toString +
+          phonyCaseCompare("Eq", reg1, reg2)
+
+      case NotEq(IntLiter(x), IntLiter(y)) =>
+        val reg1 = ra.next()
+        val reg2 = ra.next()
+        "LDR " + reg1 + " =" + x.toString +
+          "LDR " + reg2 + " =" + y.toString +
+          phonyCaseCompare("NotEq", reg1, reg2)
+
+
+//      case Greater(expr1, expr2) =>
+//        traverse(expr1, ra)
+//        traverse(expr2, ra)
+      //TODO - potentially make an eval function to evaluate expr1 to a intLiter
+      // or make traverse of intLitter(x) return x.toString and nothing else
+      // so that the expr and intLiter cases can be combined
+      // ie case Greater(expr1, expr2) handles if expr1 and expr2 are already intLiter
 
       case Plus(IntLiter(x), IntLiter(y)) =>
         "ADDS r4, r4, r5" +
         "BLVS p_throw_overflow_error" +
         "MOV r0, r4" //todo
 
-
-
       }
     }
+
+  def phonyCaseCompare(subcase: String, reg1: String, reg2: String): String = {
+    /**
+     * Function to factor out repeated code for comparison expressions
+     * Can be seen as a case containing all comparison cases as sub cases,
+     * But this isn't reflected in the current AST implementation hence phony
+     * The main case in traverse should ensure reg1 and reg2 store the correct
+     * values before calling this function
+     */
+    var postfix1 = ""
+    var postfix2 = ""
+    subcase match{
+      case "Greater" =>
+        postfix1 = "GT"
+        postfix2 = "LE"
+      case "GreaterEq" =>
+        postfix1 = "GE"
+        postfix2 = "LT"
+      case "Less" =>
+        postfix1 = "LT"
+        postfix2 = "GE"
+      case "LessEq" =>
+        postfix1 = "LE"
+        postfix2 = "GT"
+      case "Eq" =>
+        postfix1 = "EQ"
+        postfix2 = "NE"
+      case "NotEq" =>
+        postfix1 = "NE"
+        postfix2 = "EQ"
+    }
+
+    "CMP " + reg1 + ", " + reg2 +
+    "MOV" + postfix1 + " " + reg1 + ", #1" +
+    "MOV" + postfix2 + " " + reg1 + ", #0" +
+    "MOV " + retReg + ", " + reg1
+  }
 
   //TODO add actual IO to file, presumably file passed as parameter
   def writeToFile(filename: String): Unit ={
