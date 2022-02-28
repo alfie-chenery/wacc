@@ -13,9 +13,7 @@ object CodeGen{
 
   // each of these maps represent a section of the output code that can be appended to
   val data = new mutable.HashMap[String, String]
-  val text = new mutable.HashMap[String, String]
-  val main = new mutable.ListBuffer[String]
-  val functions = new mutable.HashMap[String, String]
+  val functions: mutable.Set[String] =  mutable.Set()
   // todo: refactor so that maps/buffers automatically indent/format strings
 
   //TODO make use of availableRegs to replace
@@ -69,48 +67,39 @@ object CodeGen{
 
       case Read(lhs) => ???
 
+//        "ADD r4, sp, #0\n\tMOV r0, r4\n\tBL p_read_char"
+
       case Free(expr) => ???
 
       case Print(expr) =>
         val _type: Type = SemanticPass.checkExprType(expr, node, new ListBuffer[String])
         _type match{
           case WString =>
-            "LDR r1, [r0]" +
-            "ADD r2, r0, #4" +
-            "LDR r0, =msg_3" +
-            "ADD r0, r0, #4" +
-            "BL printf" +
-            "MOV r0, #0" +
-            "BL fflush"
+            functions += "p_print_string"
+            // TODO call the string function
+            ""
           case WBool =>
-            add(functions, "p_print_bool:",
-                "PUSH {lr}" +
-                "CMP r0, #0" +
-                "LDRNE r0, =msg_0" +
-                "LDREQ r0, =msg_1" +
-                "ADD r0, r0, #4" +
-                "BL printf" +
-                "MOV r0, #0" +
-                "BL fflush" +
-                "POP {pc}")
-
-            "MOV r4, #0" + // todo: r4 might not be available
-            "MOV r0, r4" +
-            "BL p_print_bool"
+            functions += "p_print_bool"
+            """ MOV r4, #0
+              | MOV r0, r4
+              | BL p_print_bool""".stripMargin
+            // todo: r4 might not be available
             //TODO: all other print types
-          //TODO: find all functions that are branched to and add
-          //TODO: add global messages that can be added
+            //TODO: find all functions that are branched to and add
+            //TODO: add global messages that can be added
         }
 
-      case Println(expr) => ??? // todo: mostly same as print
+      case Println(expr) =>
+        functions += "p_print_ln"
+        traverse(Print(expr), ra) + "BL p_print_ln" // formatting
 
       case Return(expr) => ??? //todo
 
       case Exit(expr) =>
         val reg = ra.next()
-        "LDR " + reg + " =" + traverse(expr, ra) +
-        "MOV r0, r4" +
-        "BL exit"
+        s"""LDR $reg = ${traverse(expr, ra)}
+           |MOV r0, r4
+           |BL exit""".stripMargin
 
       case IfElse(cond, stat_true, stat_false) =>
         // TODO add stack pointer changes for new scopes
@@ -142,6 +131,7 @@ object CodeGen{
         }
         statements
 
+      // TODO this is almost certainly missing something
       case Or(BoolLiter(_), BoolLiter(_)) =>
         "MOV r4, #1" +
           "MOV r5, #0" +
@@ -155,6 +145,7 @@ object CodeGen{
           "MOV r0, r4"
       //TODO: print function but only if not already there
 
+      // TODO this is almost certainly missing something
       case And(BoolLiter(_), BoolLiter(_)) =>
         "MOV r4, #1" +
           "MOV r5, #0" +
@@ -169,6 +160,7 @@ object CodeGen{
       //TODO: print function but only if not already there
 
       case Greater(expr1, expr2) =>
+        // TODO this is almost certainly missing something
         traverse(expr1, ra)
         traverse(expr2, ra)
 
@@ -208,20 +200,85 @@ object CodeGen{
     }
 
     sb.append(".text\n\t")
-    for((k,v) <- text){
-      sb.append(k + ":\n\t" + v)
-    }
 
     sb.append(".global main\n\t")
-    for((k,v) <- functions){
-      sb.append(k + ":\n\t" + v)
-    }
+//    for((k,v) <- functions){
+//      sb.append(k + ":\n\t" + v)
+//    }
   }
 
-  //helper functions to make code cleaner
+  // TODO in future this could be transformed to use the datatype
+  // TODO make messages variables
+  val standardFunctions: immutable.Map[String, String] = Map(
+    "p_read_int" ->
+      s""" PUSH {lr}
+        | MOV r1 r0
+        | LDR r0 =msg_0
+        | ADD r0, r0, #4
+        | BL scanf
+        | POP {pc}""".stripMargin,
 
+    "p_read_char"->
+      s""" PUSH {lr}
+        | MOV r1, r0
+        | LDR r0 =msg_0
+        | ADD r0, r0, #4
+        | BL scanf
+        | POP {pc}""".stripMargin,
+
+    "p_print_string" ->
+      s""" PUSH {lr}
+        | LDR r1, [r0]
+        | ADD r2, r0, 4
+        | LDR r0, =msg_0
+        | ADD r0, r0, #4
+        | BL printf
+        | MOV r0 #0
+        | BL fflush
+        | POP {pc}""".stripMargin,
+
+    "p_print_ln" ->
+      s""" PUSH {LR}
+        | LDR r0, =msg_0
+        | ADD r0, r0, #4
+        | BL puts
+        | MOV r0, #0
+        | BL fflush
+        | POP {pc}
+        |""".stripMargin,
+
+  "p_print_ln" ->
+    s""" PUSH {LR}
+       | LDR r0, =msg_0
+       | ADD r0, r0, #4
+       | BL puts
+       | MOV r0, #0
+       | BL fflush
+       | POP {pc}
+       |""".stripMargin,
+
+  "p_read_int" ->
+    s"""  PUSH {lr}
+        | MOV r1, r0
+        | LDR r0, =msg_0
+        | ADD r0, r0, #4
+        | BL scanf
+        | POP {pc}""".stripMargin,
+
+  "p_read_char" ->
+    s"""  PUSH {lr}
+        | MOV r1, r0
+        | LDR r0, =msg_0
+        | ADD r0, r0, #4
+        | BL scanf
+        | POP {pc}
+    """.stripMargin
+
+  )
+
+
+  // TODO add more to this map
   val typeSize: immutable.Map[Type, Int] = Map[Type, Int](WInt -> 4, WBool -> 1, WChar -> 1)
-
   def assignmentsInScope(stats: Stat): Int = {
     var size = 0;
     stats match {
@@ -280,5 +337,7 @@ object CodeGen{
      */
     map(key) = map.getOrElse(key, "") + data
   }
+
+
 
 }
