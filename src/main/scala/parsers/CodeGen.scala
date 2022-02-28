@@ -4,6 +4,7 @@ import java.io.{BufferedWriter, File, FileWriter}
 import scala.collection.mutable
 import scala.collection.immutable
 import scala.collection.mutable.ListBuffer
+import parsers.RegisterAllocatorGlobals._
 
 object CodeGen{
   /**
@@ -33,7 +34,7 @@ object CodeGen{
         program += traverse(stat, ra)
         if (assignmentSize > 0) program += "ADD sp, sp, #" + assignmentSize + "\n\t"
 
-        program += "LDR " + ra.retReg + ", =0\n\t" +
+        program += "LDR " + retReg + ", =0\n\t" +
         "POP {pc}\n\t" +
         ".ltorg"
         program
@@ -273,7 +274,6 @@ object CodeGen{
         | BL scanf
         | POP {pc}
     """.stripMargin
-
   )
 
 
@@ -337,7 +337,5 @@ object CodeGen{
      */
     map(key) = map.getOrElse(key, "") + data
   }
-
-
 
 }
