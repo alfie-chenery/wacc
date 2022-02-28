@@ -15,11 +15,10 @@ object RegisterAllocatorGlobals{
   val allRegisters = List(4, 5, 6, 7, 8, 9, 10, 11, 12)
 }
 
-class RegisterAllocator(availableRegs: ListBuffer[Int]) {
+class RegisterAllocator(private var availableRegisters: ListBuffer[Int]) {
   import parsers.RegisterAllocatorGlobals._
 
   //Default constructor
-  private var availableRegisters: ListBuffer[Int] = availableRegs
   private val initialAvailable:   ListBuffer[Int] = availableRegisters.clone()
 
   //Auxiliary constructor: if no list buffer in constructor, assume we have access to all registers
