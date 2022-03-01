@@ -57,7 +57,7 @@ object Assembly {
     override def toString: String = "ADD " + o1.toString + ", " + o2.toString + ", " + o3.toString
   }
   case class MOV(rd: Register, o2: Operand, suffix: Suffix) extends Mnemonic {
-    override def toString: String = "MOV" + suffix.toString + " " + rd.toString + " ," + o2.toString
+    override def toString: String = "MOV" + suffix.toString + " " + rd.toString + ", " + o2.toString
   }
   case class BL(label: String) extends Mnemonic {
     override def toString: String = "BL " + label

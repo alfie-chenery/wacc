@@ -73,22 +73,17 @@ object CodeGen{
         code += LDR(r, traverseExpr(rhs, ra, code), Base)
         code += STR(r, SP, nullOp)
       case Decl(WBool, ident, rhs) =>
-        var r = ra.next()
-        //code += MOV(r, imm(translate expr), Base)
-        r = ra.next()
+        val r = ra.next()
+        code += MOV(r, traverseExpr(rhs, ra, code), Base)
         code += STRB(r, SP, nullOp)
       case Decl(WChar, ident, rhs) =>
-        var r = ra.next()
-        //code += MOV(r, immc(translate expr), Base)
-        r = ra.next()
+        val r = ra.next()
+        code += MOV(r, traverseExpr(rhs, ra, code), Base)
         code += STRB(r, SP, nullOp)
       case Decl(WString, ident, rhs) =>
         //todo: string length
-        val msg = s"msg_$getDataMsgIndex"
-//        data(msg) = """.word //todo
-//                    |.ascii	"%d\0" """.stripMargin
-        var r = ra.next()
-        code += LDR(r, label(msg), Base)
+        val r = ra.next()
+        code += LDR(r, traverseExpr(rhs, ra, code), Base)
         code += STR(r, SP, nullOp)
       //case Decl
 
@@ -107,9 +102,10 @@ object CodeGen{
           val read_msg = s"msg_$getDataMsgIndex"
           t match {
             case "p_read_char" =>
-//              data(read_msg) = //todo
-//                            """.word 3
-//                              |.ascii	"%d\0" """.stripMargin
+              data(read_msg) = List(
+                DWord(3),
+                DAscii("%d\\0")
+              )
               labels("p_read_char") =
                 List(PUSH(LinkReg),
                   MOV(reg(1), RetReg, Base),
@@ -118,9 +114,10 @@ object CodeGen{
                   BL("scanf"),
                   POP(PC))
             case "p_read_int" =>
-//              data(read_msg) =
-//                """.word 4 //todo
-//                  |.ascii " %c\0" """.stripMargin
+              data(read_msg) = List(
+                DWord(4),
+                DAscii(" %c\\0")
+              )
               labels("p_read_int") =
                 List(PUSH(LinkReg),
                   MOV(reg(1), RetReg, Base),
@@ -232,9 +229,10 @@ object CodeGen{
       case Println(expr) =>
         val int_msg = s"msg_$getDataMsgIndex"
         if (!labels.contains("p_print_ln")) {
-//          data("println_msg") =
-//            """.word 1
-//              |.ascii "\0" """.stripMargin
+          data("println_msg") = List(
+            DWord(1),
+            DAscii("\\0")
+          )
           labels("p_print_ln") =
             List(PUSH(LinkReg),
               LDR(RetReg, label(int_msg), Base),
@@ -385,7 +383,16 @@ object CodeGen{
   def traverseExpr(node: AstNode, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Operand = {
     node match {
       case IntLiter(x) => imm(x)
-      case StrLiter(s) => ???
+      case BoolLiter(b) => imm(if (b) 1 else 0)
+      case CharLiter(c) => immc(c)
+      case StrLiter(s) =>
+        val int_msg = s"msg_$getDataMsgIndex"
+        data(int_msg) = List(DWord(s.length), DAscii(s))
+        label(int_msg)
+      case PairLiter => ???
+      case Ident(x) => ???
+      case ArrayElem(Ident(x), elems) => ???
+      // TODO binary and unary ops
     }
   }
 
@@ -425,8 +432,6 @@ object CodeGen{
     val code: ListBuffer[Mnemonic] = ListBuffer()
     traverse(node, ra, code)
 
-
-
     if (data.nonEmpty) {
       sb.append(".data\n\n")
       for ((k, body) <- data) {
@@ -442,7 +447,7 @@ object CodeGen{
     for (line <- code) {
       sb.append((if (!line.isInstanceOf[funcName]) "\t" else "") + line.toString + "\n")
     }
-
+    // todo: the formatting might fail once IfElse is implemented...
     for((k,v) <- labels){
       sb.append("\n" + k + ":\n\t")
       for (line <- v) {
