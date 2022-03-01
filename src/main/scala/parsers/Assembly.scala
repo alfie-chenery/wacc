@@ -3,31 +3,45 @@ package parsers
 // TODO remove use of nullOp
 object Assembly {
 
-  case class funcName(name: String){
-    override def toString: String = name + ":"
-  }
 
   sealed trait Mnemonic
+  case class funcName(name: String) extends Mnemonic {
+    override def toString: String = name + ":"
+  }
+  case object LTORG extends Mnemonic {
+    override def toString: String = ".ltorg"
+  }
+
+  /**
+   * Data definition directive that initialises 1+ 4-byte ints
+   * @param size
+   */
+  case class DWord(size: Int) extends Mnemonic {
+    override def toString: String = ".word " + size.toString
+  }
+
+  /**
+   * String definition directive for an ascii string (won't automatically append a sentinel /0 character)
+   * @param string
+   */
+  case class DAscii(string: String) extends Mnemonic {
+    override def toString: String = s""".ascii "$string" """
+  }
+
   //TODO: to string has conditional comma
   case class LDR(r: Register, o2: Operand, suffix: Suffix) extends Mnemonic {
-    override def toString: String = "LDR" + suffix.toString + r.toString + ", " + o2.toString
+    override def toString: String = "LDR " + suffix.toString + r.toString + ", " + o2.toString
   }
   case class PUSH(r: Register) extends Mnemonic {
-    override def toString: String = "PUSH{" + r.toString + "}"
+    override def toString: String = "PUSH {" + r.toString + "}"
   }
   case class POP(r: Register) extends Mnemonic {
-    override def toString: String = "POP{" + r.toString + "}"
+    override def toString: String = "POP {" + r.toString + "}"
   }
   case class SUB(o1: Operand, o2: Operand, o3: Operand) extends Mnemonic {
-    override def toString: String = {
-      var ret: String = "SUB " + o1.toString + ", " + o2.toString
-      o3 match{
-        case nullOp =>
-        case _ => ret + ", " + o3.toString
-      }
-      ret
-    }
+    override def toString: String = "SUB " + o1.toString + ", " + o2.toString + ", " + o3.toString
   }
+
   case class STR(rd: Register, rn: Register, offset: Operand) extends Mnemonic {
     override def toString: String = {
       var ret: String = "SUB " + rd.toString + ", [" + rn.toString
@@ -100,8 +114,11 @@ object Assembly {
   case class imm(i: Int) extends Operand {
     override def toString: String = "#" + i.toString
   }
+  case class immc(c: Char) extends Operand {
+    override def toString: String = "#'" + c.toString + "'"
+  }
   case class label(l: String) extends Operand {
-    override def toString: String = "=" + label
+    override def toString: String = "=" + l
   }
   case object nullOp extends Operand {
     override def toString: String = ""
@@ -112,13 +129,13 @@ object Assembly {
     override def toString: String = "r0"
   }
   case object SP extends Register{
-    override def toString: String = "r13"
+    override def toString: String = "sp"
   }
   case object LinkReg extends Register{
-    override def toString: String = "r14"
+    override def toString: String = "lr"
   }
   case object PC extends Register{
-    override def toString: String = "r15"
+    override def toString: String = "pc"
   }
   case class reg(num: Int) extends Register{
     override def toString: String = "r" + num.toString
@@ -146,10 +163,11 @@ object Assembly {
   case object SB extends Suffix {
     override def toString: String = "SB"
   }
-  case object Base extends Suffix {
+  case object Base extends Suffix { // todo: is there any way of overloading function definitions instead?
     override def toString: String = ""
   }
 
+  /*
   object imm {
     def apply(i: Int): imm = new imm(i)
   }
@@ -243,5 +261,6 @@ object Assembly {
     def apply(rd: Register, o2: Operand, o3: Operand): RSBS = new RSBS(rd, o2, o3)
   }
 
+   */
 
 }

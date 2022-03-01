@@ -13,9 +13,8 @@ object CodeGen{
 
   // each of these maps represent a section of the output code that can be appended to
   // linkedHashMaps, since data and labels should follow a specific order
-  val data = new mutable.LinkedHashMap[String, String]
-  val labels = new mutable.LinkedHashMap[String, String]
-  val errors = new mutable.LinkedHashMap[String, String]
+  val data = new mutable.LinkedHashMap[String, List[Mnemonic]]
+  val labels = new mutable.LinkedHashMap[String, List[Mnemonic]]
   // todo: refactor so that maps/buffers automatically indent/format strings ?
   // todo: reformat to use instruction ADT instead of strings
 
@@ -24,6 +23,15 @@ object CodeGen{
    */
   def getDataMsgIndex: Int = {
     data.size
+  }
+
+  /**
+   * value used for conditional branch labels L0, L1 etc
+   */
+  var branchIndex: Int = -1
+  def nextBranchIndex: String = {
+    branchIndex += 1
+    "L" + branchIndex.toString
   }
 
   //TODO make use of availableRegs to replace
@@ -36,7 +44,7 @@ object CodeGen{
         val assignmentSize = assignmentsInScope(stat)
         if (assignmentSize > 0) code += SUB(SP, SP, imm(assignmentSize))
         for (func <- funcs) {
-          code += traverse(func, ra, code)
+          traverse(func, ra, code)
         }
 
         traverse(stat, ra, code)
@@ -44,37 +52,50 @@ object CodeGen{
 
         code += LDR(RetReg, imm(0), Base)
         code += POP(PC)
-        //".ltorg"
+        code += LTORG
 
       case Func((_type, Ident(name)), ParamList(params), stat) =>
         code += funcName(name)
         code += PUSH(LinkReg)
         val assignmentSize = assignmentsInScope(stat)
         if (assignmentSize > 0) code += SUB(SP, SP, imm(assignmentSize))
-        code += traverse(stat, ra, code)
+        traverse(stat, ra, code)
         if (assignmentSize > 0) code += ADD(SP, SP, imm(assignmentSize))
         code += POP(LinkReg)
-        //".ltorg"
+        code += LTORG
 
       case Param(_type, ident) => ???
 
       // <Stat>
-      case Skip => ""
-
       case Decl(PairType(t1, t2), ident, PairLiter) => ???
-      case Decl(_type, ident, rhs) =>
-        // TODO this is not gonna work (see many variables example)
+      case Decl(WInt, ident, rhs) =>
         val r = ra.next()
-        code += SUB(SP, SP, imm(4))
-        //unsure about this - just copied from what was here before
         code += LDR(r, traverseExpr(rhs, ra, code), Base)
         code += STR(r, SP, nullOp)
-        code += ADD(SP, SP, imm(4))
-        null
+      case Decl(WBool, ident, rhs) =>
+        var r = ra.next()
+        //code += MOV(r, imm(translate expr), Base)
+        r = ra.next()
+        code += STRB(r, SP, nullOp)
+      case Decl(WChar, ident, rhs) =>
+        var r = ra.next()
+        //code += MOV(r, immc(translate expr), Base)
+        r = ra.next()
+        code += STRB(r, SP, nullOp)
+      case Decl(WString, ident, rhs) =>
+        //todo: string length
+        val msg = s"msg_$getDataMsgIndex"
+//        data(msg) = """.word //todo
+//                    |.ascii	"%d\0" """.stripMargin
+        var r = ra.next()
+        code += LDR(r, label(msg), Base)
+        code += STR(r, SP, nullOp)
+      //case Decl
 
       case Assign(lhs, rhs) => ???
 
-      //TODO: what??????
+      case Free(expr) => ???
+
       case Read(lhs: AstNode) =>
         // todo: needs to account for register availability (?)
         val _type: Type = SemanticPass.checkExprType(lhs, node, new ListBuffer[String])
@@ -86,106 +107,111 @@ object CodeGen{
           val read_msg = s"msg_$getDataMsgIndex"
           t match {
             case "p_read_char" =>
-              data(read_msg) =
-                            """.word 3
-                              |.ascii	"%d\0" """.stripMargin
+//              data(read_msg) = //todo
+//                            """.word 3
+//                              |.ascii	"%d\0" """.stripMargin
               labels("p_read_char") =
-                s"""PUSH {lr}
-                   |MOV r1, r0
-                   |LDR r0, =$read_msg
-                   |ADD r0, r0, #4
-                   |BL scanf
-                   |POP {pc}
-                   |""".stripMargin
+                List(PUSH(LinkReg),
+                  MOV(reg(1), RetReg, Base),
+                  LDR(RetReg, label(read_msg), Base),
+                  ADD(RetReg, RetReg, imm(4)),
+                  BL("scanf"),
+                  POP(PC))
             case "p_read_int" =>
-              data(read_msg) =
-                """.word 4
-                  |.ascii " %c\0" """.stripMargin
+//              data(read_msg) =
+//                """.word 4 //todo
+//                  |.ascii " %c\0" """.stripMargin
               labels("p_read_int") =
-                s"""PUSH {lr}
-                   |MOV r1, r0
-                   |LDR r0, =$read_msg
-                   |ADD r0, r0, #4
-                   |BL scanf
-                   |POP {pc}""".stripMargin
+                List(PUSH(LinkReg),
+                  MOV(reg(1), RetReg, Base),
+                  LDR(RetReg, label(read_msg), Base),
+                  ADD(RetReg, RetReg, imm(4)),
+                  BL("scanf"),
+                  POP(PC))
           }
         }
-        s""" ADD r4, sp, #0
-          | MOV r0, r4
-          | BL $t""".stripMargin
+        code += ADD(reg(4), SP, imm(0))
+        code += MOV(RetReg, reg(4), Base)
+        code += BL(t)
 
-      case Free(expr) => ???
-
-      //TODO: what?????
       case Print(expr: AstNode) =>
         expr match {
           case StrLiter(str_val: String) =>
             val t = "p_print_string"
             val str_val_msg = s"msg_$getDataMsgIndex"
-            data(str_val_msg) =
-              s""".word ${str_val.length}
-
-                 |.ascii "$str_val" """.stripMargin
+            data(str_val_msg) = List(
+              DWord(str_val.length),
+              DAscii(str_val)
+            )
             if (!labels.contains(t)) {
               val str_format_msg = s"msg_$getDataMsgIndex"
-              data(str_format_msg) =
-                """.word 5
-                  |.ascii "%.*s\0" """.stripMargin
-              data(t) =
-                s"""PUSH {lr}
-                   |LDR r1, [r0]
-                   |ADD r2, r0, #4
-                   |LDR r0, =$str_format_msg
-                   |ADD r0, r0, #4
-                   |BL printf
-                   |MOV r0, #0
-                   |BL fflush
-                   |POP {pc}""".stripMargin
+              data(str_format_msg) = List(
+                DWord(5),
+                DAscii("%.*s\\0")
+              )
+              labels(t) =
+                List(PUSH(LinkReg),
+                  // todo: fill in this line
+                  ADD(reg(2), RetReg, imm(4)),
+                  LDR(RetReg, label(str_format_msg), Base),
+                  ADD(RetReg, RetReg, imm(4)),
+                  BL("printf"),
+                  MOV(RetReg, imm(0), Base),
+                  BL("fflush"),
+                  POP(PC)
+                )
             }
-            s"""LDR r4, $str_val_msg
-                  |MOV r0, r4
-                  |BL p_print_string""".stripMargin
+            code += (LDR(reg(4), label(str_val_msg), Base),
+                     MOV(RetReg, reg(4), Base),
+                     BL("p_print_string"))
+
+
           case BoolLiter(bool_val: Boolean) =>
             if (!labels.contains("p_print_bool")) {
               val bool_true_msg = s"msg_$getDataMsgIndex"
               val bool_false_msg = s"msg_$getDataMsgIndex"
-              data(bool_true_msg) =
-                """.word 5
-                  |.ascii "true\0" """.stripMargin
-              data(bool_false_msg) =
-                """.word 6
-                  |.ascii "false\0" """.stripMargin
+              data(bool_true_msg) = List(
+                DWord(5),
+                DAscii("true\\0")
+              )
+              data(bool_false_msg) = List(
+                DWord(6),
+                DAscii("false\\0")
+              )
               labels("p_print_bool") =
-                s"""PUSH {lr}
-                   |CMP r0, #0
-                   |LDRNE r0, =$bool_true_msg
-                   |LDREQ r0, =$bool_false_msg
-                   |ADD r0, r0, #4
-                   |BL printf
-                   |MOV r0, #0
-                   |BL fflush
-                   |POP {pc}""".stripMargin
+                List(PUSH(LinkReg),
+                  CMP(RetReg, imm(0)),
+                  LDR(RetReg, label(bool_true_msg), NE),
+                  LDR(RetReg, label(bool_false_msg), EQ),
+                  ADD(RetReg, RetReg, imm(4)),
+                  BL("printf"),
+                  MOV(RetReg, imm(0), Base),
+                  BL("ffllush"),
+                  POP(PC))
             }
-            s""" MOV r4, #${if (bool_val) 1 else 0}
-               | MOV r0, r4
-               | BL p_print_bool""".stripMargin
+            code += MOV(reg(4), imm(if (bool_val) 1 else 0), Base)
+            code += MOV(RetReg, reg(4), Base)
+            code += BL("p_print_bool")
 
           case IntLiter(int_val: Int) =>
             if (!labels.contains("p_print_int")) {
               val int_msg = s"msg_$getDataMsgIndex"
+              data(int_msg) =
+                List(DWord(3), DAscii("%d\\0"))
+
               labels("p_print_int") =
-                s""" |PUSH {lr}
-                   |MOV r1, r0
-                   |LDR r0, =$int_msg
-                   |ADD r0, r0, #4
-                   |BL printf
-                   |MOV r0, #0
-                   |BL fflush
-                   |POP {pc}""".stripMargin
+                List(PUSH(LinkReg),
+                  MOV(reg(1), RetReg, Base),
+                  LDR(RetReg, label(int_msg), Base),
+                  ADD(RetReg, RetReg, imm(4)),
+                  BL("printf"),
+                  MOV(RetReg, imm(0), Base),
+                  BL("fflush"),
+                  POP(PC))
             }
-            s""" MOV r4, #$int_val
-               | MOV r0, r4
-               | BL p_print_bool""".stripMargin
+            code += MOV(reg(4), imm(int_val), Base)
+            code += MOV(RetReg, reg(4), Base)
+            code += BL("p_print_int")
 
           case CharLiter(char_val: Char) =>
             s"""MOV r4, #'$char_val'
@@ -204,22 +230,23 @@ object CodeGen{
         //TODO: r4 might not be available?
 
       case Println(expr) =>
-        val _p = traverse(Print(expr), ra, code)
-        val println_msg = getDataMsgIndex
+        val int_msg = s"msg_$getDataMsgIndex"
         if (!labels.contains("p_print_ln")) {
-          data("println_msg") =
-            """.word 1
-              |.ascii "\0" """.stripMargin
+//          data("println_msg") =
+//            """.word 1
+//              |.ascii "\0" """.stripMargin
           labels("p_print_ln") =
-            s"""PUSH {lr}
-               |LDR r0, =$println_msg
-               |ADD r0, r0, #4
-               |BL puts
-               |MOV r0, #0
-               |BL fflush
-               |POP {pc}""".stripMargin
+            List(PUSH(LinkReg),
+              LDR(RetReg, label(int_msg), Base),
+              ADD(RetReg, RetReg, imm(4)),
+              BL("puts"),
+              MOV(RetReg, imm(0), Base),
+              BL("fflush"),
+              POP(PC)
+            )
         }
-        _p + s"""BL p_print_ln"""
+        traverse(Print(expr), ra, code)
+        code += BL("p_print_ln")
 
       case Return(expr) => ??? //todo
 
@@ -235,26 +262,28 @@ object CodeGen{
         traverse(cond, ra, code)
         code += CMP(reg, imm(0))
         val newScope = new RegisterAllocator(ra.getAvailable)
-        code += traverse(stat_true, newScope, code)
+        traverse(stat_true, newScope, code)
         newScope.restore()
-        code += funcName("L0")
-        code += traverse(stat_false, newScope, code)
-        code += funcName("L1")
+        code += funcName(nextBranchIndex)
+        traverse(stat_false, newScope, code)
+        code += funcName(nextBranchIndex)
 
 
       case While(cond, stat) =>
         // TODO add stack changes for scoping
-        code +=B("L0")
-        code += funcName("L1")
-        code += traverse(stat, ra, code)
-        code += funcName("L0")
-        code += traverse(cond, ra, code)
-        //conditional branch back to L1
+        val condLabel = nextBranchIndex
+        val bodyLabel = nextBranchIndex
+        code += B(condLabel)
+        code += funcName(bodyLabel)
+        traverse(stat, ra, code)
+        code += funcName(condLabel)
+        traverse(cond, ra, code)
+        code += BEQ(bodyLabel)
+
 
       case Scope(stat) => traverse(stat, ra, code)
 
       case Combine(stats) =>
-        // TODO this could be refactored
         for (stat <- stats) {
           traverse(stat, ra, code)
         }
@@ -355,7 +384,8 @@ object CodeGen{
 
   def traverseExpr(node: AstNode, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Operand = {
     node match {
-     case IntLiter(x) => imm(x)
+      case IntLiter(x) => imm(x)
+      case StrLiter(s) => ???
     }
   }
 
@@ -383,38 +413,51 @@ object CodeGen{
         suffix2 = EQ
     }
 
-    val result = new ListBuffer[Mnemonic]
-    result += CMP(reg1, reg2)
-    result += MOV(reg1, imm(1), suffix1)
-    result += MOV(reg1, imm(0), suffix2)
-    result += MOV(RetReg, reg1, Base)
+    code += CMP(reg1, reg2)
+    code += MOV(reg1, imm(1), suffix1)
+    code += MOV(reg1, imm(0), suffix2)
+    code += MOV(RetReg, reg1, Base)
   }
 
   //TODO add actual IO to file, presumably file passed as parameter
   def compile(node: AstNode, ra: RegisterAllocator): String = {
     val sb = new StringBuilder()
-    if (data.nonEmpty) {
-      sb.append(".data\n\n")
-      for ((k, v) <- data) {
-        sb.append(k + ":\n\t" + v)
-      }
-    }
-
-    sb.append(".text\n\n")
-    sb.append(".global main\n\n")
-
     val code: ListBuffer[Mnemonic] = ListBuffer()
     traverse(node, ra, code)
-    code.foreach(sb.append(_))
+
+
+
+    if (data.nonEmpty) {
+      sb.append(".data\n\n")
+      for ((k, body) <- data) {
+        sb.append("\n" + k + ":\n\t")
+        for (line <- body) {
+          sb.append(line + "\n\t")
+        }
+      }
+    }
+    sb.append("\n.text\n\n")
+    sb.append(".global main\n\n")
+
+    for (line <- code) {
+      sb.append((if (!line.isInstanceOf[funcName]) "\t" else "") + line.toString + "\n")
+    }
 
     for((k,v) <- labels){
-      sb.append(k + ":\n\t" + v)
+      sb.append("\n" + k + ":\n\t")
+      for (line <- v) {
+        sb.append(line + "\n\t")
+      }
     }
     sb.toString()
   }
 
   // TODO add more to this map
-  val typeSize: immutable.Map[Type, Int] = Map[Type, Int](WInt -> 4, WBool -> 1, WChar -> 1)
+  val typeSize: immutable.Map[Type, Int] = Map[Type, Int](
+    WInt -> 4,
+    WBool -> 1,
+    WChar -> 1,
+    WString -> 4)
   def assignmentsInScope(stats: Stat): Int = {
     var size = 0
     stats match {
@@ -430,7 +473,7 @@ object CodeGen{
     size
   }
 
-  def add(map: mutable.HashMap[String, String], key: String, value: String): Unit = {
+  def add(map: mutable.LinkedHashMap[String, String], key: String, value: String): Unit = {
     /**
      * Adds new key value pair to map only if the key is not already present
      */
