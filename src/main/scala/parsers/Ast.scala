@@ -4,7 +4,7 @@ import parsley.Parsley
 import parsley.Parsley.pure
 
 object Ast {
-  import parsley.implicits.zipped.{Zipped2, Zipped3 }
+  import parsley.implicits.zipped.{Zipped2, Zipped3}
 
   sealed trait AstNode
 
