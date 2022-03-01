@@ -10,6 +10,5 @@
 
 begin
   return 42 ;
-  println "should not get here"; 
-  exit 4
+  println "should not get here" 
 end

@@ -2,10 +2,10 @@ package parsers
 
 import parsers.Parser.parse
 
-import java.io.File
+import java.io.{File, FileWriter}
 import scala.collection.mutable.ListBuffer
 
-class Main {
+object Main {
   def main(args: Array[String]): Unit = {
 
     if (args.length == 0 || !args(0).endsWith(".wacc")) {
@@ -30,11 +30,14 @@ class Main {
       errors.foreach(println(_))
       sys.exit(200)
     }
-    val ALL_AVAILABLE_REGISTERS = ListBuffer[Int](0, 1, 2, 3, 4)
-    // CodeGen.traverse(renamedProgram, RegisterAllocator(ALL_AVAILABLE_REGISTERS))
 
     // Run compiler backend
     // only gets here if hasn't exited
+    val filename = args(0).split('/').last
+    val outputFilename = filename.split('.')(0) + ".s"
+    val fw = new FileWriter(outputFilename)
+    fw.write(CodeGen.traverse(renamedProgram, new RegisterAllocator()))
+    fw.close()
 
     sys.exit(0)
 
