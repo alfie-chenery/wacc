@@ -46,7 +46,7 @@ object Assembly {
 
   case class STR(rd: Register, rn: Register) extends Mnemonic {
     override def toString: String = {
-      "SUB " + rd.toString + ", " + rn.toString
+      "STR " + rd.toString + ", " + rn.toString
     }
   }
   case class ADD(o1: Operand, o2: Operand, o3: Operand) extends Mnemonic {
