@@ -170,11 +170,11 @@ object CodeGen{
           case WBool =>
             if (!labels.contains("p_print_bool")) {
               val bool_true_msg = s"msg_$getDataMsgIndex"
-              val bool_false_msg = s"msg_$getDataMsgIndex"
               data(bool_true_msg) = List(
                 DWord(5),
                 DAscii("true\\0")
               )
+              val bool_false_msg = s"msg_$getDataMsgIndex"
               data(bool_false_msg) = List(
                 DWord(6),
                 DAscii("false\\0")
@@ -235,7 +235,7 @@ object CodeGen{
       case Println(expr) =>
         val int_msg = s"msg_$getDataMsgIndex"
         if (!labels.contains("p_print_ln")) {
-          data("println_msg") = List(
+          data(int_msg) = List(
             DWord(1),
             DAscii("\\0")
           )
