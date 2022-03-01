@@ -12,15 +12,17 @@ object CodeGen{
    import parsers.Ast._
 
   // each of these maps represent a section of the output code that can be appended to
-  val data = new mutable.HashMap[String, String]
-  val functions: mutable.Set[String] =  mutable.Set()
-  // todo: refactor so that maps/buffers automatically indent/format strings
+  // linkedHashMaps, since data and labels should follow a specific order
+  val data = new mutable.LinkedHashMap[String, String]
+  val labels = new mutable.LinkedHashMap[String, String]
+  val errors = new mutable.LinkedHashMap[String, String]
+  // todo: refactor so that maps/buffers automatically indent/format strings ?
 
-  var messageIndex = 0
-
-  def getMessageIndex: Int = {
-    messageIndex += 1
-    messageIndex
+  /**
+   * Returns the next available 'msg' index in data
+   */
+  def getDataMsgIndex: Int = {
+    data.size
   }
 
   //TODO make use of availableRegs to replace
@@ -59,7 +61,7 @@ object CodeGen{
       case Param(_type, ident) => ???
 
       // <Stat>
-      case Skip => ???
+      case Skip => ""
 
       case Decl(PairType(t1, t2), ident, PairLiter) => ???
       case Decl(_type, ident, rhs) =>
@@ -72,53 +74,135 @@ object CodeGen{
 
       case Assign(lhs, rhs) => ???
 
-      case Read(lhs) =>
-
+      case Read(lhs: AstNode) =>
+        // todo: needs to account for register availability (?)
         val _type: Type = SemanticPass.checkExprType(lhs, node, new ListBuffer[String])
-
         val t = _type match {
-        // todo: needs to account for register availability
-          case WChar =>
-            data(s"msg_$getMessageIndex") =
-              """.word 3
-                |.ascii	"%d\0" """.stripMargin
-            "p_read_int"
-
-          case WInt =>
-            data(s"msg_$getMessageIndex") =
-              """.word 4
-                |.ascii " %c\0" """.stripMargin
-            "p_read_bool"
+          case WChar => "p_read_char"
+          case WInt => "p_read_int"
         }
-
-        functions += t
-
+        if (!labels.contains(t)) {
+          val read_msg = s"msg_$getDataMsgIndex"
+          t match {
+            case "p_read_char" =>
+              data(read_msg) =
+                            """.word 3
+                              |.ascii	"%d\0" """.stripMargin
+              labels("p_read_char") =
+                s"""PUSH {lr}
+                   |MOV r1, r0
+                   |LDR r0, =$read_msg
+                   |ADD r0, r0, #4
+                   |BL scanf
+                   |POP {pc}
+                   |""".stripMargin
+            case "p_read_int" =>
+              data(read_msg) =
+                """.word 4
+                  |.ascii " %c\0" """.stripMargin
+              labels("p_read_int") =
+                s"""PUSH {lr}
+                   |MOV r1, r0
+                   |LDR r0, =$read_msg
+                   |ADD r0, r0, #4
+                   |BL scanf
+                   |POP {pc}""".stripMargin
+          }
+        }
         s""" ADD r4, sp, #0
           | MOV r0, r4
           | BL $t""".stripMargin
 
       case Free(expr) => ???
 
-      case Print(expr) =>
-        val _type: Type = SemanticPass.checkExprType(expr, node, new ListBuffer[String])
-        _type match{
-          case WString =>
-            functions += "p_print_string"
-            // TODO call the string function
-            ""
-          case WBool =>
-            functions += "p_print_bool"
-            """ MOV r4, #0
-              | MOV r0, r4
-              | BL p_print_bool""".stripMargin
-            // todo: r4 might not be available
-            //TODO: all other print types
-            //TODO: find all functions that are branched to and add
-            //TODO: add global messages that can be added
+      case Print(expr: AstNode) =>
+        expr match {
+          case StrLiter(str_val: String) =>
+            val t = "p_print_string"
+            val str_val_msg = s"msg_$getDataMsgIndex"
+            data(str_val_msg) =
+              s""".word ${str_val.length}
+
+                 |.ascii "$str_val" """.stripMargin
+            if (!labels.contains(t)) {
+              val str_format_msg = s"msg_$getDataMsgIndex"
+              data(str_format_msg) =
+                """.word 5
+                  |.ascii "%.*s\0" """.stripMargin
+              data(t) =
+                s"""PUSH {lr}
+                   |LDR r1, [r0]
+                   |ADD r2, r0, #4
+                   |LDR r0, =$str_format_msg
+                   |ADD r0, r0, #4
+                   |BL printf
+                   |MOV r0, #0
+                   |BL fflush
+                   |POP {pc}""".stripMargin
+            }
+            s"""LDR r4, $str_val_msg
+                  |MOV r0, r4
+                  |BL p_print_string""".stripMargin
+          case BoolLiter(bool_val: Boolean) =>
+            if (!labels.contains("p_print_bool")) {
+              val bool_true_msg = s"msg_$getDataMsgIndex"
+              val bool_false_msg = s"msg_$getDataMsgIndex"
+              data(bool_true_msg) =
+                """.word 5
+                  |.ascii "true\0" """.stripMargin
+              data(bool_false_msg) =
+                """.word 6
+                  |.ascii "false\0" """.stripMargin
+              labels("p_print_bool") =
+                s"""PUSH {lr}
+                   |CMP r0, #0
+                   |LDRNE r0, =${bool_true_msg}
+                   |LDREQ r0, =${bool_false_msg}
+                   |ADD r0, r0, #4
+                   |BL printf
+                   |MOV r0, #0
+                   |BL fflush
+                   |POP {pc}""".stripMargin
+            }
+            s""" MOV r4, #${if (bool_val) 1 else 0}
+               | MOV r0, r4
+               | BL p_print_bool""".stripMargin
+
+          case IntLiter(int_val: Int) =>
+            if (!labels.contains("p_print_int")) {
+              val int_msg = s"msg_$getDataMsgIndex"
+              labels("p_print_int") =
+                s""" |PUSH {lr}
+                   |MOV r1, r0
+                   |LDR r0, =$int_msg
+                   |ADD r0, r0, #4
+                   |BL printf
+                   |MOV r0, #0
+                   |BL fflush
+                   |POP {pc}""".stripMargin
+            }
+            s""" MOV r4, #$int_val
+               | MOV r0, r4
+               | BL p_print_bool""".stripMargin
+
+          case CharLiter(char_val: Char) =>
+            s"""MOV r4, #'$char_val'
+               |MOV r0, r4
+               |BL putchar""".stripMargin
+
+          //TODO: implement all other print types
+          case PairLiter => ???
+          case Ident(ident: String) => ??? // ?
+          case ArrayElem(ident: Ident, expr: List[Expr]) => ???
+          case ParensExpr(expr: Expr) => ??? // is this actually a possibility or are these removed in the previous passes?
+
         }
+        //TODO: find all functions that are branched to and add (???)
+        //TODO: add global messages that can be added (???)
+        //TODO: r4 might not be available?
 
       case Println(expr) =>
-        functions += "p_print_ln"
+        labels += "p_print_ln"
         traverse(Print(expr), ra) + "BL p_print_ln" // formatting
 
       case Return(expr) => ??? //todo
