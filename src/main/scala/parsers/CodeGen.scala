@@ -16,6 +16,7 @@ object CodeGen{
   val data = new mutable.LinkedHashMap[String, List[Mnemonic]]
   val labels = new mutable.LinkedHashMap[String, List[Mnemonic]]
   val variableLocation = new mutable.LinkedHashMap[String, Register]
+  var currentShift = 0
   // todo: refactor so that maps/buffers automatically indent/format strings ?
   // todo: reformat to use instruction ADT instead of strings
 
@@ -43,7 +44,11 @@ object CodeGen{
         code += PUSH(LinkReg)
 
         val assignmentSize = assignmentsInScope(stat)
-        if (assignmentSize > 0) code += SUB(SP, SP, imm(assignmentSize))
+        if (assignmentSize > 0) {
+          // 1024 is the maximum immediate value because of shifting
+          for (i <- 0 until assignmentSize / 1024) code += SUB(SP, SP, imm(1024))
+          code += SUB(SP, SP, imm(assignmentSize % 1024))
+        }
         for (func <- funcs) {
           traverse(func, ra, code)
         }
@@ -72,28 +77,41 @@ object CodeGen{
       case Decl(WInt, Ident(ident), rhs) =>
         val r = ra.next()
         code += LDR(r, traverseExpr(rhs, ra, code), Base)
-        val location = if (variableLocation.isEmpty) regVal(SP) else regShift(SP, variableLocation.size)
+        // TODO fix the shift size
+        val location = if (variableLocation.isEmpty) regVal(SP) else {
+          currentShift += 4
+          regShift(SP, currentShift)
+        }
         variableLocation += (ident -> location)
         code += STR(r, location)
       case Decl(WBool, Ident(ident), rhs) =>
         val r = ra.next()
         code += MOV(r, traverseExpr(rhs, ra, code), Base)
         // TODO this isn't quite going to work for variables of different types that take up different amounts of space
-        val location = if (variableLocation.isEmpty) regVal(SP) else regShift(SP, variableLocation.size)
+        val location = if (variableLocation.isEmpty) regVal(SP) else {
+          currentShift += 1
+          regShift(SP, currentShift)
+        }
         variableLocation += (ident -> location)
         code += STRB(r, location)
       case Decl(WChar, Ident(ident), rhs) =>
         val r = ra.next()
         // TODO reg shifts
         code += MOV(r, traverseExpr(rhs, ra, code), Base)
-        val location = if (variableLocation.isEmpty) regVal(SP) else regShift(SP, variableLocation.size)
+        val location = if (variableLocation.isEmpty) regVal(SP) else {
+          currentShift += 1
+          regShift(SP, currentShift)
+        }
         variableLocation += (ident -> location)
         code += STRB(r, location)
       case Decl(WString, Ident(ident), rhs) =>
         //todo: string length
         val r = ra.next()
         code += LDR(r, traverseExpr(rhs, ra, code), Base)
-        val location = if (variableLocation.isEmpty) regVal(SP) else regShift(SP, variableLocation.size)
+        val location = if (variableLocation.isEmpty) regVal(SP) else {
+          currentShift += 4
+          regShift(SP, currentShift)
+        }
         variableLocation += (ident -> location)
         code += STR(r, location)
       //case Decl
