@@ -1,8 +1,7 @@
 package parsers
 
+// TODO remove use of nullOp
 object Assembly {
-
-  import parsley.implicits.zipped.{Zipped2, Zipped3}
 
   sealed trait mnemonic
   //TODO: to string has conditional comma

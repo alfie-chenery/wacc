@@ -40,16 +40,17 @@ object CodeGen{
         for (func <- funcs) {
           program += traverse(func, ra)
         }
-
         program += traverse(stat, ra)
+
         if (assignmentSize > 0) program += "ADD sp, sp, #" + assignmentSize + "\n\t"
 
         program += "LDR " + retReg + ", =0\n\t" +
-        "POP {pc}\n\t" +
-        ".ltorg"
+          "POP {pc}\n\t" +
+          ".ltorg"
         program
 
       case Func((_type, Ident(name)), ParamList(params), stat) =>
+        // TODO deal with params
         var program = name + ":\n\t" +
           "PUSH {lr}\n\t"
           val assignmentSize = assignmentsInScope(stat)
@@ -69,10 +70,11 @@ object CodeGen{
       case Decl(_type, ident, rhs) =>
         // TODO this is not gonna work (see many variables example)
         val reg = ra.next()
-        "SUB sp, sp, #4" +
-        "LDR " + reg +", =" + traverse(rhs, ra) + //not sure this is right. Traverse might make new lines of code, we just want to evaluate the rhs
-        "STR " + reg + ", [sp]" +
-        "ADD sp, sp, #4"
+        s""" SUB sp, sp, #4
+           | LDR $reg, =${traverse(rhs,ra)}
+           | STR $reg, [sp]
+           | ADD sp,
+           |""".stripMargin
 
       case Assign(lhs, rhs) => ???
 
@@ -207,7 +209,7 @@ object CodeGen{
         val _p = traverse(Print(expr), ra)
         val println_msg = getDataMsgIndex
         if (!labels.contains("p_print_ln")) {
-          data(println_msg) =
+          data("println_msg") =
             """.word 1
               |.ascii "\0" """.stripMargin
           labels("p_print_ln") =
@@ -225,9 +227,9 @@ object CodeGen{
 
       case Exit(expr) =>
         val reg = ra.next()
-        s"""LDR $reg = ${traverse(expr, ra)}
-           |MOV r0, r4
-           |BL exit""".stripMargin
+        s""" LDR $reg = ${traverse(expr, ra)}
+           | MOV r0, $reg
+           | BL exit""".stripMargin
 
       case IfElse(cond, stat_true, stat_false) =>
         // TODO add stack pointer changes for new scopes
