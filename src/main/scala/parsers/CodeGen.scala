@@ -15,6 +15,7 @@ object CodeGen{
   // linkedHashMaps, since data and labels should follow a specific order
   val data = new mutable.LinkedHashMap[String, List[Mnemonic]]
   val labels = new mutable.LinkedHashMap[String, List[Mnemonic]]
+  val variableLocation = new mutable.LinkedHashMap[String, Operand]
   // todo: refactor so that maps/buffers automatically indent/format strings ?
   // todo: reformat to use instruction ADT instead of strings
 
@@ -133,14 +134,11 @@ object CodeGen{
 
       case Print(expr: AstNode) =>
         //TODO: escape escape characters somehow in data strings? when they get written to the file it treats them literally
-        expr match {
-          case StrLiter(str_val: String) =>
+        val ret = traverseExpr(expr, ra, code)
+        // TODO change this so it doesn't match explicit types
+        SemanticPass.checkExprType(expr, expr, new ListBuffer[String]) match {
+          case WString =>
             val t = "p_print_string"
-            val str_val_msg = s"msg_$getDataMsgIndex"
-            data(str_val_msg) = List(
-              DWord(str_val.length),
-              DAscii(str_val)
-            )
             if (!labels.contains(t)) {
               val str_format_msg = s"msg_$getDataMsgIndex"
               data(str_format_msg) = List(
@@ -159,12 +157,12 @@ object CodeGen{
                   POP(PC)
                 )
             }
-            code += (LDR(reg(4), label(str_val_msg), Base),
-                     MOV(RetReg, reg(4), Base),
-                     BL("p_print_string"))
+            code += LDR(reg(4), ret, Base)
+            code += MOV(RetReg, reg(4), Base)
+            code += BL("p_print_string")
 
 
-          case BoolLiter(bool_val: Boolean) =>
+          case WBool =>
             if (!labels.contains("p_print_bool")) {
               val bool_true_msg = s"msg_$getDataMsgIndex"
               val bool_false_msg = s"msg_$getDataMsgIndex"
@@ -187,11 +185,11 @@ object CodeGen{
                   BL("ffllush"),
                   POP(PC))
             }
-            code += MOV(reg(4), imm(if (bool_val) 1 else 0), Base)
+            code += MOV(reg(4), ret, Base)
             code += MOV(RetReg, reg(4), Base)
             code += BL("p_print_bool")
 
-          case IntLiter(int_val: Int) =>
+          case WInt =>
             if (!labels.contains("p_print_int")) {
               val int_msg = s"msg_$getDataMsgIndex"
               data(int_msg) =
@@ -207,20 +205,22 @@ object CodeGen{
                   BL("fflush"),
                   POP(PC))
             }
-            code += MOV(reg(4), imm(int_val), Base)
+            code += MOV(reg(4), ret, Base)
             code += MOV(RetReg, reg(4), Base)
             code += BL("p_print_int")
 
-          case CharLiter(char_val: Char) =>
-            s"""MOV r4, #'$char_val'
-               |MOV r0, r4
-               |BL putchar""".stripMargin
+          case WChar =>
+            code += MOV(reg(4), ret, Base)
+            code += MOV(RetReg, reg(4), Base)
+            code += BL("putchar")
 
           //TODO: implement all other print types
+          /*
           case PairLiter => ???
           case Ident(ident: String) => ??? // ?
           case ArrayElem(ident: Ident, expr: List[Expr]) => ???
           case ParensExpr(expr: Expr) => ??? // is this actually a possibility or are these removed in the previous passes?
+           */
 
         }
         //TODO: find all functions that are branched to and add (???)
@@ -393,6 +393,15 @@ object CodeGen{
       case PairLiter => ???
       case Ident(x) => ???
       case ArrayElem(Ident(x), elems) => ???
+
+      case And(expr1, expr2) =>
+        // TODO change register allocation here
+        val reg1 = ra.next()
+        val reg2 = ra.next()
+        code += MOV(reg1, traverseExpr(expr1, ra, code), Base)
+        code += MOV(reg2, traverseExpr(expr2, ra, code), Base)
+        code += AND(reg1, reg1, reg2)
+        reg1
       // TODO binary and unary ops
     }
   }
