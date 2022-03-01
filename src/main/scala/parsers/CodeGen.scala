@@ -391,89 +391,19 @@ object CodeGen{
   }
 
   //TODO add actual IO to file, presumably file passed as parameter
-  def writeToFile(filename: String): Unit ={
+  def compile(): String ={
     val sb = new StringBuilder()
     sb.append(".data\n\t")
     for((k,v) <- data){
       sb.append(k + ":\n\t" + v)
     }
-
     sb.append(".text\n\t")
-
     sb.append(".global main\n\t")
-//    for((k,v) <- functions){
-//      sb.append(k + ":\n\t" + v)
-//    }
+    for((k,v) <- labels){
+      sb.append(k + ":\n\t" + v)
+    }
+    sb.toString()
   }
-
-  // TODO in future this could be transformed to use the datatype
-  // TODO make messages variables
-  val standardFunctions: immutable.Map[String, String] = Map(
-    "p_read_int" ->
-      s""" PUSH {lr}
-        | MOV r1 r0
-        | LDR r0 =msg_0
-        | ADD r0, r0, #4
-        | BL scanf
-        | POP {pc}""".stripMargin,
-
-    "p_read_char"->
-      s""" PUSH {lr}
-        | MOV r1, r0
-        | LDR r0 =msg_0
-        | ADD r0, r0, #4
-        | BL scanf
-        | POP {pc}""".stripMargin,
-
-    "p_print_string" ->
-      s""" PUSH {lr}
-        | LDR r1, [r0]
-        | ADD r2, r0, 4
-        | LDR r0, =msg_0
-        | ADD r0, r0, #4
-        | BL printf
-        | MOV r0 #0
-        | BL fflush
-        | POP {pc}""".stripMargin,
-
-    "p_print_ln" ->
-      s""" PUSH {LR}
-        | LDR r0, =msg_0
-        | ADD r0, r0, #4
-        | BL puts
-        | MOV r0, #0
-        | BL fflush
-        | POP {pc}
-        |""".stripMargin,
-
-  "p_print_ln" ->
-    s""" PUSH {LR}
-       | LDR r0, =msg_0
-       | ADD r0, r0, #4
-       | BL puts
-       | MOV r0, #0
-       | BL fflush
-       | POP {pc}
-       |""".stripMargin,
-
-  "p_read_int" ->
-    s"""  PUSH {lr}
-        | MOV r1, r0
-        | LDR r0, =msg_0
-        | ADD r0, r0, #4
-        | BL scanf
-        | POP {pc}""".stripMargin,
-
-  "p_read_char" ->
-    s"""  PUSH {lr}
-        | MOV r1, r0
-        | LDR r0, =msg_0
-        | ADD r0, r0, #4
-        | BL scanf
-        | POP {pc}
-    """.stripMargin
-  )
-
 
   // TODO add more to this map
   val typeSize: immutable.Map[Type, Int] = Map[Type, Int](WInt -> 4, WBool -> 1, WChar -> 1)

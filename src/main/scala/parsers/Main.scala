@@ -36,10 +36,11 @@ object Main {
     val filename = args(0).split('/').last
     val outputFilename = filename.split('.')(0) + ".s"
     val fw = new FileWriter(outputFilename)
-    fw.write(CodeGen.traverse(renamedProgram, new RegisterAllocator()))
+    val cg = CodeGen
+    cg.traverse(renamedProgram, new RegisterAllocator())
+    fw.write(cg.compile())
     fw.close()
 
     sys.exit(0)
-
   }
 }
