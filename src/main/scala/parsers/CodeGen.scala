@@ -1,10 +1,11 @@
 package parsers
 
 import java.io.{BufferedWriter, File, FileWriter}
+
 import scala.collection.mutable
 import scala.collection.immutable
 import scala.collection.mutable.ListBuffer
-import parsers.RegisterAllocatorGlobals._
+import parsers.Assembly.retReg
 
 object CodeGen{
   /**
