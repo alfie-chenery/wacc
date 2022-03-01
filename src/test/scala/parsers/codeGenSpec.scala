@@ -15,17 +15,17 @@ class codeGenSpec extends AnyFlatSpec {
   prompt> qemu-arm -L /usr/arm-linux-gnueabi/ FILENAME1
    */
 
-  "make".!!
-
-  val baseTestDir = "src/test/scala/parsers"
-  val testDir = "valid/IO/print"
-  val filename = "print"
-
-  s"./compile $baseTestDir/$testDir/$filename.wacc".!!
-
-  s"arm-linux-gnueabi-gcc -o $filename -mcpu=arm1176jzf-s -mtune=arm1176jzf-s $filename.s".!!
-
-  s"qemu-arm -L /usr/arm-linux-gnueabi/ $filename".!!
+//  "make".!!
+//
+//  val baseTestDir = "src/test/scala/parsers"
+//  val testDir = "valid/IO/print"
+//  val filename = "print"
+//
+//  s"./compile $baseTestDir/$testDir/$filename.wacc".!!
+//
+//  s"arm-linux-gnueabi-gcc -o $filename -mcpu=arm1176jzf-s -mtune=arm1176jzf-s $filename.s".!!
+//
+//  s"qemu-arm -L /usr/arm-linux-gnueabi/ $filename".!!
 
 //  behavior of ""
 
