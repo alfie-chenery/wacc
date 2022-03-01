@@ -15,7 +15,7 @@ object CodeGen{
   // linkedHashMaps, since data and labels should follow a specific order
   val data = new mutable.LinkedHashMap[String, List[Mnemonic]]
   val labels = new mutable.LinkedHashMap[String, List[Mnemonic]]
-  val variableLocation = new mutable.LinkedHashMap[String, Operand]
+  val variableLocation = new mutable.LinkedHashMap[String, Register]
   // todo: refactor so that maps/buffers automatically indent/format strings ?
   // todo: reformat to use instruction ADT instead of strings
 
@@ -72,22 +72,27 @@ object CodeGen{
       case Decl(WInt, ident, rhs) =>
         val r = ra.next()
         code += LDR(r, traverseExpr(rhs, ra, code), Base)
-        code += STR(r, SP, nullOp)
-      case Decl(WBool, ident, rhs) =>
+        code += STR(r, SP)
+      case Decl(WBool, Ident(ident), rhs) =>
         val r = ra.next()
         code += MOV(r, traverseExpr(rhs, ra, code), Base)
-        code += STRB(r, SP, nullOp)
+        // TODO this isn't quite going to work for variables of different types that take up different amounts of space
+        val location = if (variableLocation.isEmpty) regVal(SP) else regShift(SP, variableLocation.size)
+        variableLocation += (ident -> location)
+        code += STRB(r, location)
       case Decl(WChar, ident, rhs) =>
         val r = ra.next()
         code += MOV(r, traverseExpr(rhs, ra, code), Base)
-        code += STRB(r, SP, nullOp)
+        code += STRB(r, SP)
       case Decl(WString, ident, rhs) =>
         //todo: string length
         val r = ra.next()
         code += LDR(r, traverseExpr(rhs, ra, code), Base)
-        code += STR(r, SP, nullOp)
+        code += STR(r, SP)
       //case Decl
 
+      case Assign(Ident(ident), rhs) =>
+        code += MOV(variableLocation(ident), traverseExpr(rhs, ra, code), Base)
       case Assign(lhs, rhs) => ???
 
       case Free(expr) => ???
@@ -247,7 +252,9 @@ object CodeGen{
         traverse(Print(expr), ra, code)
         code += BL("p_print_ln")
 
-      case Return(expr) => ??? //todo
+      case Return(expr) =>
+        code += MOV(RetReg, traverseExpr(expr, ra, code), Base)
+
 
       case Exit(expr) =>
         val reg = ra.next()
@@ -286,39 +293,6 @@ object CodeGen{
         for (stat <- stats) {
           traverse(stat, ra, code)
         }
-
-      case Or(BoolLiter(_), BoolLiter(_)) =>
-        // TODO this is currently not correct
-        val reg1 = ra.next()
-        val reg2 = ra.next()
-        code += MOV(reg1, imm(1), Base)
-        code += MOV(reg2, imm(0), Base)
-        code += ORR(reg1, reg1, reg2)
-        code += MOV(RetReg, reg1, Base)
-
-      case Or(expr1, expr2) =>
-        traverseExpr(expr1, ra, code)
-        traverseExpr(expr2, ra, code)
-        val reg1 = ra.next()
-        val reg2 = ra.next()
-        code += ORR(reg1, reg1, reg2)
-        code += MOV(RetReg, reg2, Base)
-
-      case And(BoolLiter(_), BoolLiter(_)) =>
-        val reg1 = ra.next()
-        val reg2 = ra.next()
-        code += MOV(reg1, imm(1), Base)
-        code += MOV(reg2, imm(0), Base)
-        code += AND(reg1, reg1, reg2)
-        code += MOV(RetReg, reg1, Base)
-
-      case And(expr1, expr2) =>
-        traverseExpr(expr1, ra, code)
-        traverseExpr(expr2, ra, code)
-        val reg1 = ra.next()
-        val reg2 = ra.next()
-        code += AND(reg1, reg1, reg2)
-        code += MOV(RetReg, reg1, Base)
 
       case Greater(IntLiter(x), IntLiter(y)) =>
         val reg1 = ra.next()
@@ -391,17 +365,30 @@ object CodeGen{
         data(int_msg) = List(DWord(s.length), DAscii(s))
         label(int_msg)
       case PairLiter => ???
-      case Ident(x) => ???
+      case Ident(x) => variableLocation(x)
       case ArrayElem(Ident(x), elems) => ???
+      case Call(Ident(name), args) =>
+        // TODO deal with arguments
+        code += BL(name)
+        RetReg
 
+        // TODO reduce register use
       case And(expr1, expr2) =>
-        // TODO change register allocation here
         val reg1 = ra.next()
+        code += LDR(reg1, traverseExpr(expr1, ra, code), SB)
         val reg2 = ra.next()
-        code += MOV(reg1, traverseExpr(expr1, ra, code), Base)
-        code += MOV(reg2, traverseExpr(expr2, ra, code), Base)
+        code += LDR(reg2, traverseExpr(expr2, ra, code), SB)
         code += AND(reg1, reg1, reg2)
         reg1
+
+      case Or(expr1, expr2) =>
+        val reg1 = ra.next()
+        code += LDR(reg1, traverseExpr(expr1, ra, code), SB)
+        val reg2 = ra.next()
+        code += LDR(reg2, traverseExpr(expr2, ra, code), SB)
+        code += ORR(reg1, reg1, reg2)
+        reg1
+
       // TODO binary and unary ops
     }
   }
@@ -423,7 +410,7 @@ object CodeGen{
       case LT =>
         suffix2 = GE
       case LE =>
-        suffix2 = GT
+    suffix2 = GT
       case EQ =>
         suffix2 = NE
       case NE =>

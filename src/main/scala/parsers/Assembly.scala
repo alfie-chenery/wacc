@@ -30,7 +30,7 @@ object Assembly {
 
   //TODO: to string has conditional comma
   case class LDR(r: Register, o2: Operand, suffix: Suffix) extends Mnemonic {
-    override def toString: String = "LDR " + suffix.toString + r.toString + ", " + o2.toString
+    override def toString: String = "LDR" + suffix.toString + " " + r.toString + ", " + o2.toString
   }
   case class PUSH(r: Register) extends Mnemonic {
     override def toString: String = "PUSH {" + r.toString + "}"
@@ -42,15 +42,9 @@ object Assembly {
     override def toString: String = "SUB " + o1.toString + ", " + o2.toString + ", " + o3.toString
   }
 
-  case class STR(rd: Register, rn: Register, offset: Operand) extends Mnemonic {
+  case class STR(rd: Register, rn: Register) extends Mnemonic {
     override def toString: String = {
-      var ret: String = "SUB " + rd.toString + ", [" + rn.toString
-      offset match{
-        case nullOp =>
-        case _ => ret + ", " + offset.toString
-      }
-      ret += "]"
-      ret
+      "SUB " + rd.toString + ", " + rn.toString
     }
   }
   case class ADD(o1: Operand, o2: Operand, o3: Operand) extends Mnemonic {
@@ -68,15 +62,9 @@ object Assembly {
   case class BEQ(label: String) extends Mnemonic {
     override def toString: String = "BEQ " + label
   }
-  case class STRB(rd: Register, rn: Register, offset: Operand) extends Mnemonic {
+  case class STRB(rd: Register, rn: Register) extends Mnemonic {
     override def toString: String = {
-      var ret: String = "SUB " + rd.toString + ", [" + rn.toString
-      offset match {
-        case nullOp =>
-        case _ => ret + ", " + offset.toString
-      }
-      ret += "]"
-      ret
+      "STRB " + rd.toString + ", " + rn.toString
     }
   }
   case class AND(rd: Register, rn: Register, rm: Register) extends Mnemonic {
@@ -119,6 +107,12 @@ object Assembly {
   }
   case class label(l: String) extends Operand {
     override def toString: String = "=" + l
+  }
+  case class regShift(reg: Register, shift: Int) extends Register {
+    override def toString: String = "[" + reg.toString + ", #" + shift + "]"
+  }
+  case class regVal(reg: Register) extends Register {
+    override def toString: String = "[" + reg.toString + "]"
   }
   case object nullOp extends Operand {
     override def toString: String = ""
@@ -166,101 +160,5 @@ object Assembly {
   case object Base extends Suffix { // todo: is there any way of overloading function definitions instead?
     override def toString: String = ""
   }
-
-  /*
-  object imm {
-    def apply(i: Int): imm = new imm(i)
-  }
-
-  object label {
-    def apply(l: String): label = new label(l)
-  }
-
-  object reg {
-    def apply(num: Int): reg = new reg(num)
-  }
-
-  object LDR {
-    def apply(r: Register, o2: Operand, suffix: Suffix): LDR = new LDR(r, o2, suffix)
-  }
-
-  object PUSH {
-    def apply(r: Register): PUSH = new PUSH(r)
-  }
-
-  object POP{
-    def apply(r: Register): POP = new POP(r)
-  }
-
-  object SUB{
-    def apply(o1: Operand, o2: Operand, o3: Operand): SUB = new SUB(o1, o2, o3)
-  }
-
-  object STR{
-    def apply(rd: Register, rn: Register, offset: Operand): STR = new STR(rd, rn, offset)
-  }
-
-  object ADD{
-    def apply(o1: Operand, o2: Operand, o3: Operand): ADD = new ADD(o1, o2, o3)
-  }
-
-  object MOV{
-    def apply(rd: Register, o2: Operand, suffix: Suffix): MOV = new MOV(rd, o2, suffix)
-  }
-
-  object BL{
-    def apply(label: String): BL = new BL(label)
-  }
-
-  object CMP{
-    def apply(r: Register, o2: Operand): CMP = new CMP(r, o2)
-  }
-
-  object BEQ{
-    def apply(label: String): BEQ = new BEQ(label)
-  }
-
-  object STRB{
-    def apply(rd: Register, rn: Register, offset: Operand): STRB = new STRB(rd, rn, offset)
-  }
-
-
-  object AND{
-    def apply(rd: Register, rn: Register, rm: Register): AND = new AND(rd, rn, rm)
-  }
-
-  object ORR{
-    def apply(rd: Register, rn: Register, rm: Register): ORR = new ORR(rd, rn, rm)
-  }
-
-  object BLVS{
-    def apply(label: String): BLVS = new BLVS(label)
-  }
-
-  object ADDS{
-    def apply(rd: Register, rn: Register, rm: Register): ADDS = new ADDS(rd, rn, rm)
-  }
-
-  object SUBS{
-    def apply(rd: Register, rn: Register, rm: Register): SUBS = new SUBS(rd, rn, rm)
-  }
-
-  object MULTS{
-    def apply(rd: Register, rn: Register, rm: Register): MULTS = new MULTS(rd, rn, rm)
-  }
-
-  object BLEQ{
-    def apply(label: String): BLEQ = new BLEQ(label)
-  }
-
-  object EOR{
-    def apply(rd: Register, o2: Operand, o3: Operand): EOR = new EOR(rd, o2, o3)
-  }
-
-  object RSBS{
-    def apply(rd: Register, o2: Operand, o3: Operand): RSBS = new RSBS(rd, o2, o3)
-  }
-
-   */
 
 }
