@@ -6,7 +6,7 @@ object Assembly {
     override def toString: String = name + ":"
   }
 
-  sealed trait mnemonic
+  sealed trait Mnemonic
   //TODO: to string has conditional comma
   case class LDR(r: Register, o2: Operand, suffix: Suffix) extends Mnemonic {
     override def toString: String = "LDR" + suffix.toString + r.toString + ", " + o2.toString
@@ -57,7 +57,7 @@ object Assembly {
     override def toString: String = {
       var ret: String = "SUB " + rd.toString + ", [" + rn.toString
       offset match {
-        case nullOp() =>
+        case nullOp =>
         case _ => ret + ", " + offset.toString
       }
       ret += "]"
@@ -110,16 +110,16 @@ object Assembly {
   case object RetReg extends Register{
     override def toString: String = "r0"
   }
-  case class sp() extends register{
+  case object SP extends Register{
     override def toString: String = "r13"
   }
-  case class linkReg() extends register{
+  case object LinkReg extends Register{
     override def toString: String = "r14"
   }
-  case class pc() extends register{
+  case object PC extends Register{
     override def toString: String = "r15"
   }
-  case class reg(num: Int) extends register{
+  case class reg(num: Int) extends Register{
     override def toString: String = "r" + num.toString
   }
 
@@ -161,32 +161,16 @@ object Assembly {
     def apply(num: Int): reg = new reg(num)
   }
 
-  object retReg {
-    def apply(): retReg = new retReg
-  }
-
-  object sp {
-    def apply(): sp = new sp
-  }
-
-  object linkReg {
-    def apply(): linkReg = new linkReg
-  }
-
-  object pc {
-    def apply(): pc = new pc
-  }
-
   object LDR {
     def apply(r: Register, o2: Operand, suffix: Suffix): LDR = new LDR(r, o2, suffix)
   }
 
   object PUSH {
-    def apply(r: register): PUSH = new PUSH(r)
+    def apply(r: Register): PUSH = new PUSH(r)
   }
 
   object POP{
-    def apply(r: register): POP = new POP(r)
+    def apply(r: Register): POP = new POP(r)
   }
 
   object SUB{
@@ -223,11 +207,11 @@ object Assembly {
 
 
   object AND{
-    def apply(rd: register, rn: register, rm: register): AND = new AND(rd, rn, rm)
+    def apply(rd: Register, rn: Register, rm: Register): AND = new AND(rd, rn, rm)
   }
 
   object ORR{
-    def apply(rd: register, rn: register, rm: register): ORR = new ORR(rd, rn, rm)
+    def apply(rd: Register, rn: Register, rm: Register): ORR = new ORR(rd, rn, rm)
   }
 
   object BLVS{
@@ -235,15 +219,15 @@ object Assembly {
   }
 
   object ADDS{
-    def apply(rd: register, rn: register, rm: register): ADDS = new ADDS(rd, rn, rm)
+    def apply(rd: Register, rn: Register, rm: Register): ADDS = new ADDS(rd, rn, rm)
   }
 
   object SUBS{
-    def apply(rd: register, rn: register, rm: register): SUBS = new SUBS(rd, rn, rm)
+    def apply(rd: Register, rn: Register, rm: Register): SUBS = new SUBS(rd, rn, rm)
   }
 
   object MULTS{
-    def apply(rd: register, rn: register, rm: register): MULTS = new MULTS(rd, rn, rm)
+    def apply(rd: Register, rn: Register, rm: Register): MULTS = new MULTS(rd, rn, rm)
   }
 
   object BLEQ{

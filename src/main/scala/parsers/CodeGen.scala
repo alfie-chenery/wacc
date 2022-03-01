@@ -1,10 +1,8 @@
 package parsers
 
-import java.io.{BufferedWriter, File, FileWriter}
 import scala.collection.mutable
 import scala.collection.immutable
 import scala.collection.mutable.ListBuffer
-import parsers.RegisterAllocatorGlobals._
 
 object CodeGen{
   /**
@@ -160,8 +158,8 @@ object CodeGen{
               labels("p_print_bool") =
                 s"""PUSH {lr}
                    |CMP r0, #0
-                   |LDRNE r0, =${bool_true_msg}
-                   |LDREQ r0, =${bool_false_msg}
+                   |LDRNE r0, =$bool_true_msg
+                   |LDREQ r0, =$bool_false_msg
                    |ADD r0, r0, #4
                    |BL printf
                    |MOV r0, #0
@@ -206,7 +204,7 @@ object CodeGen{
         //TODO: r4 might not be available?
 
       case Println(expr) =>
-        val _p = traverse(Print(expr), ra)
+        val _p = traverse(Print(expr), ra, code)
         val println_msg = getDataMsgIndex
         if (!labels.contains("p_print_ln")) {
           data(println_msg) =
@@ -227,9 +225,9 @@ object CodeGen{
 
       case Exit(expr) =>
         val reg = ra.next()
-        s"""LDR $reg = ${traverse(expr, ra)}
-           |MOV r0, r4
-           |BL exit""".stripMargin
+        code += LDR(reg, traverseExpr(expr, ra, code), Base)
+        code += MOV(RetReg, reg, Base)
+        code += BL("exit")
 
       case IfElse(cond, stat_true, stat_false) =>
         // TODO add stack pointer changes for new scopes
@@ -253,16 +251,16 @@ object CodeGen{
         code += traverse(cond, ra, code)
         //conditional branch back to L1
 
-      case Scope(stat) => traverse(stat, ra)
+      case Scope(stat) => traverse(stat, ra, code)
 
       case Combine(stats) =>
         // TODO this could be refactored
         for (stat <- stats) {
-          statements + traverse(stat, newScope)
-          newScope.restore() //TODO check this implementation
+          traverse(stat, ra, code)
         }
 
       case Or(BoolLiter(_), BoolLiter(_)) =>
+        // TODO this is currently not correct
         val reg1 = ra.next()
         val reg2 = ra.next()
         code += MOV(reg1, imm(1), Base)
@@ -271,8 +269,8 @@ object CodeGen{
         code += MOV(RetReg, reg1, Base)
 
       case Or(expr1, expr2) =>
-        traverse(expr1, ra)
-        traverse(expr2, ra)
+        traverseExpr(expr1, ra, code)
+        traverseExpr(expr2, ra, code)
         val reg1 = ra.next()
         val reg2 = ra.next()
         code += ORR(reg1, reg1, reg2)
@@ -287,8 +285,8 @@ object CodeGen{
         code += MOV(RetReg, reg1, Base)
 
       case And(expr1, expr2) =>
-        traverse(expr1, ra)
-        traverse(expr2, ra)
+        traverseExpr(expr1, ra, code)
+        traverseExpr(expr2, ra, code)
         val reg1 = ra.next()
         val reg2 = ra.next()
         code += AND(reg1, reg1, reg2)
@@ -355,7 +353,13 @@ object CodeGen{
       }
     }
 
-  def phonyCaseCompare(subcase: String, reg1: String, reg2: String): String = {
+  def traverseExpr(node: AstNode, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Operand = {
+    node match {
+     case IntLiter(x) => imm(x)
+    }
+  }
+
+  def phonyCaseCompare(code: ListBuffer[Mnemonic], suffix1: Suffix, reg1: Register, reg2: Register): Unit = {
     /**
      * Function to factor out repeated code for comparison expressions
      * Can be seen as a case containing all comparison cases as sub cases,
@@ -363,44 +367,46 @@ object CodeGen{
      * The main case in traverse should ensure reg1 and reg2 store the correct
      * values before calling this function
      */
-    var postfix1 = ""
-    var postfix2 = ""
-    subcase match{
-      case "Greater" =>
-        postfix1 = "GT"
-        postfix2 = "LE"
-      case "GreaterEq" =>
-        postfix1 = "GE"
-        postfix2 = "LT"
-      case "Less" =>
-        postfix1 = "LT"
-        postfix2 = "GE"
-      case "LessEq" =>
-        postfix1 = "LE"
-        postfix2 = "GT"
-      case "Eq" =>
-        postfix1 = "EQ"
-        postfix2 = "NE"
-      case "NotEq" =>
-        postfix1 = "NE"
-        postfix2 = "EQ"
+    var suffix2: Suffix = null
+    suffix1 match{
+      case GT =>
+        suffix2 = LE
+      case GE =>
+        suffix2 = LT
+      case LT =>
+        suffix2 = GE
+      case LE =>
+        suffix2 = GT
+      case EQ =>
+        suffix2 = NE
+      case NE =>
+        suffix2 = EQ
     }
 
-    "CMP " + reg1 + ", " + reg2 +
-    "MOV" + postfix1 + " " + reg1 + ", #1" +
-    "MOV" + postfix2 + " " + reg1 + ", #0" +
-    "MOV " + retReg + ", " + reg1
+    val result = new ListBuffer[Mnemonic]
+    result += CMP(reg1, reg2)
+    result += MOV(reg1, imm(1), suffix1)
+    result += MOV(reg1, imm(0), suffix2)
+    result += MOV(RetReg, reg1, Base)
   }
 
   //TODO add actual IO to file, presumably file passed as parameter
-  def compile(): String ={
+  def compile(node: AstNode, ra: RegisterAllocator): String = {
     val sb = new StringBuilder()
-    sb.append(".data\n\t")
-    for((k,v) <- data){
-      sb.append(k + ":\n\t" + v)
+    if (data.nonEmpty) {
+      sb.append(".data\n\n")
+      for ((k, v) <- data) {
+        sb.append(k + ":\n\t" + v)
+      }
     }
-    sb.append(".text\n\t")
-    sb.append(".global main\n\t")
+
+    sb.append(".text\n\n")
+    sb.append(".global main\n\n")
+
+    val code: ListBuffer[Mnemonic] = ListBuffer()
+    traverse(node, ra, code)
+    code.foreach(sb.append(_))
+
     for((k,v) <- labels){
       sb.append(k + ":\n\t" + v)
     }
@@ -410,7 +416,7 @@ object CodeGen{
   // TODO add more to this map
   val typeSize: immutable.Map[Type, Int] = Map[Type, Int](WInt -> 4, WBool -> 1, WChar -> 1)
   def assignmentsInScope(stats: Stat): Int = {
-    var size = 0;
+    var size = 0
     stats match {
       case Decl(_type, _, _) => size += typeSize(_type)
       case Combine(stats) =>
