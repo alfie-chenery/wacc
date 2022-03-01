@@ -22,6 +22,10 @@ class RegisterAllocator(private var availableRegisters: ListBuffer[Register]) {
 
 
   def next(): Register = {
+    availableRegisters.head
+  }
+
+  def nextRm(): Register = {
     availableRegisters.remove(0)
   }
 

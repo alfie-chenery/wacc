@@ -8,4 +8,5 @@ target
 #ignore other junk files
 .bsp/sbt.json
 *.s
+*.jar
 *~

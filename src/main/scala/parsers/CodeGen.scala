@@ -69,10 +69,12 @@ object CodeGen{
 
       // <Stat>
       case Decl(PairType(t1, t2), ident, PairLiter) => ???
-      case Decl(WInt, ident, rhs) =>
+      case Decl(WInt, Ident(ident), rhs) =>
         val r = ra.next()
         code += LDR(r, traverseExpr(rhs, ra, code), Base)
-        code += STR(r, SP)
+        val location = if (variableLocation.isEmpty) regVal(SP) else regShift(SP, variableLocation.size)
+        variableLocation += (ident -> location)
+        code += STR(r, location)
       case Decl(WBool, Ident(ident), rhs) =>
         val r = ra.next()
         code += MOV(r, traverseExpr(rhs, ra, code), Base)
@@ -80,15 +82,20 @@ object CodeGen{
         val location = if (variableLocation.isEmpty) regVal(SP) else regShift(SP, variableLocation.size)
         variableLocation += (ident -> location)
         code += STRB(r, location)
-      case Decl(WChar, ident, rhs) =>
+      case Decl(WChar, Ident(ident), rhs) =>
         val r = ra.next()
+        // TODO reg shifts
         code += MOV(r, traverseExpr(rhs, ra, code), Base)
-        code += STRB(r, SP)
-      case Decl(WString, ident, rhs) =>
+        val location = if (variableLocation.isEmpty) regVal(SP) else regShift(SP, variableLocation.size)
+        variableLocation += (ident -> location)
+        code += STRB(r, location)
+      case Decl(WString, Ident(ident), rhs) =>
         //todo: string length
         val r = ra.next()
         code += LDR(r, traverseExpr(rhs, ra, code), Base)
-        code += STR(r, SP)
+        val location = if (variableLocation.isEmpty) regVal(SP) else regShift(SP, variableLocation.size)
+        variableLocation += (ident -> location)
+        code += STR(r, location)
       //case Decl
 
       case Assign(Ident(ident), rhs) =>
@@ -358,6 +365,7 @@ object CodeGen{
   def traverseExpr(node: AstNode, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Operand = {
     node match {
       case IntLiter(x) => imm(x)
+      case Negate(IntLiter(x)) => imm(-x)
       case BoolLiter(b) => imm(if (b) 1 else 0)
       case CharLiter(c) => immc(c)
       case StrLiter(s) =>
