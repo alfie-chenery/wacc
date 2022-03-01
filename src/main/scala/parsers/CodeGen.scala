@@ -135,6 +135,7 @@ object CodeGen{
         code += BL(t)
 
       case Print(expr: AstNode) =>
+        //TODO: escape escape characters somehow in data strings? when they get written to the file it treats them literally
         expr match {
           case StrLiter(str_val: String) =>
             val t = "p_print_string"
@@ -420,7 +421,7 @@ object CodeGen{
   }
 
   //TODO add actual IO to file, presumably file passed as parameter
-  def compile(node: AstNode, ra: RegisterAllocator): String = {
+  def compile(node: AstNode, ra: RegisterAllocator = new RegisterAllocator()): String = {
     val sb = new StringBuilder()
     val code: ListBuffer[Mnemonic] = ListBuffer()
     traverse(node, ra, code)
