@@ -37,7 +37,6 @@ object Main {
     val outputFilename = filename.split('.')(0) + ".s"
     val fw = new FileWriter(outputFilename)
     val output = CodeGen.compile(renamedProgram)
-    println(output)
     fw.write(output)
     fw.close()
 

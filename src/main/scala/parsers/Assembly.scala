@@ -30,7 +30,9 @@ object Assembly {
 
   //TODO: to string has conditional comma
   case class LDR(r: Register, o2: Operand, suffix: Suffix) extends Mnemonic {
-    override def toString: String = "LDR" + suffix.toString + " " + r.toString + ", " + o2.toString
+    override def toString: String = {
+      "LDR" + suffix.toString + " " + r.toString + ", " + o2.toString.replace('#', '=')
+    }
   }
   case class PUSH(r: Register) extends Mnemonic {
     override def toString: String = "PUSH {" + r.toString + "}"
