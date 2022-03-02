@@ -19,8 +19,6 @@ object CodeGen{
   val labels = new mutable.LinkedHashMap[String, List[Mnemonic]]
   val variableLocation = new mutable.LinkedHashMap[String, Register]
   var currentShift = 0
-  // todo: refactor so that maps/buffers automatically indent/format strings ?
-  // todo: reformat to use instruction ADT instead of strings
 
   /**
    * Returns the next available 'msg' index in data
@@ -38,7 +36,6 @@ object CodeGen{
     "L" + branchIndex.toString
   }
 
-  //TODO make use of availableRegs to replace
   def traverse(node: AstNode, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Unit = {
     node match {
       case Program(funcs, stat) =>
@@ -119,7 +116,6 @@ object CodeGen{
       case Free(expr) => ???
 
       case Read(lhs: AstNode) =>
-        // todo: needs to account for register availability (?)
         val _type: Type = SemanticPass.checkExprType(lhs, node, new ListBuffer[String])
         val t = _type match {
           case WChar => "p_read_char"
@@ -234,7 +230,6 @@ object CodeGen{
         }
         //TODO: find all functions that are branched to and add (???)
         //TODO: add global messages that can be added (???)
-        //TODO: r4 might not be available?
 
       case Println(expr) =>
         val int_msg = s"msg_$getDataMsgIndex"
@@ -320,7 +315,9 @@ object CodeGen{
         ra.next()
       case PairLiter => ???
       case Ident(x) =>
-        code += LDR(ra.next(), variableLocation(x), Base)
+        // TODO this will probably need to change when pairs and arrays are implemented
+        if (st(Ident(x))._2 == WInt) code += LDR(ra.next(), variableLocation(x), Base)
+        else code += LDR(ra.next(), variableLocation(x), SB)
         ra.next()
       case ArrayElem(Ident(x), elems) => ???
       case ParensExpr(expr) => traverseExpr(expr, ra, code)
@@ -329,7 +326,6 @@ object CodeGen{
         code += BL(name)
         RetReg
 
-        // TODO reduce register use
       case And(expr1, expr2) =>
         val res1 = traverseExpr(expr1, ra, code)
         val reg1 = ra.nextRm()
@@ -420,8 +416,7 @@ object CodeGen{
         if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
         code += ADDS(reg1, reg1, ra.next())
         intOverflow()
-        // TODO factor this out by making it standard in a map
-          code += BLVS("p_throw_overflow_error")
+        code += BLVS("p_throw_overflow_error")
         ra.restore()
         reg1
 
@@ -500,7 +495,6 @@ object CodeGen{
         code += MOV(reg, immc(expr.asInstanceOf[Char]), Base)
         reg
 
-      // TODO binary and unary ops
     }
   }
 
@@ -584,7 +578,6 @@ object CodeGen{
     code += MOV(reg1, imm(0), suffix2)
   }
 
-  //TODO add actual IO to file, presumably file passed as parameter
   def compile(node: AstNode, ra: RegisterAllocator = new RegisterAllocator()): String = {
     val sb = new StringBuilder()
     val code: ListBuffer[Mnemonic] = ListBuffer()
