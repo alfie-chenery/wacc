@@ -452,21 +452,24 @@ object CodeGen{
         if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
         code += MOV(RetReg, reg1, Base)
         code += MOV(reg(1), ra.next(), Base)
+        divByZeroError()
         code += BL("p_check_divide_by_zero")
         code += BL("__aeabi_idiv")
-        if (!labels.contains("p_check_divide_by_zero")) {
-          val int_msg = s"msg_$getDataMsgIndex"
-          data(int_msg) =
-            List(DWord(45),
-              DAscii("DivideByZeroError: divide or modulo by zero\\n\\0"))
-          labels("p_check_divide_by_zero")=
-            List(PUSH(LinkReg),
-              CMP(reg(1), imm(0)),
-              LDR(RetReg, label(int_msg), EQ),
-              BLEQ("p_throw_runtime_error"),
-              POP(PC))
-          runtimeError()
-        }
+        code += MOV(reg1, RetReg, Base)
+        ra.restore()
+        reg1
+
+      case Mod(expr1, expr2) =>
+        val res1 = traverseExpr(expr1, ra, code)
+        val reg1 = ra.nextRm()
+        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
+        val res2 = traverseExpr(expr2, ra, code)
+        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
+        code += MOV(RetReg, reg1, Base)
+        code += MOV(reg(1), ra.next(), Base)
+        divByZeroError()
+        code += BL("p_check_divide_by_zero")
+        code += BL("__aeabi_idivmod")
         code += MOV(reg1, RetReg, Base)
         ra.restore()
         reg1
@@ -517,6 +520,22 @@ object CodeGen{
           BL("fflush"),
           POP(PC)
         )
+    }
+  }
+
+  def divByZeroError(): Unit = {
+    if (!labels.contains("p_check_divide_by_zero")) {
+      val int_msg = s"msg_$getDataMsgIndex"
+      data(int_msg) =
+        List(DWord(45),
+          DAscii("DivideByZeroError: divide or modulo by zero\\n\\0"))
+      labels("p_check_divide_by_zero")=
+        List(PUSH(LinkReg),
+          CMP(reg(1), imm(0)),
+          LDR(RetReg, label(int_msg), EQ),
+          BLEQ("p_throw_runtime_error"),
+          POP(PC))
+      runtimeError()
     }
   }
 
