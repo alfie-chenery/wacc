@@ -42,19 +42,22 @@ object CodeGen{
       case Program(funcs, stat) =>
         code += funcName("main")
         code += PUSH(LinkReg)
-
-        val assignmentSize = assignmentsInScope(stat)
-        if (assignmentSize > 0) {
+        val assignments = assignmentsInScope(stat)
+        currentShift = assignments
+        if (assignments > 0) {
           // 1024 is the maximum immediate value because of shifting
-          for (i <- 0 until assignmentSize / 1024) code += SUB(SP, SP, imm(1024))
-          code += SUB(SP, SP, imm(assignmentSize % 1024))
+          for (i <- 0 until assignments / 1024) code += SUB(SP, SP, imm(1024))
+          code += SUB(SP, SP, imm(assignments % 1024))
         }
         for (func <- funcs) {
           traverse(func, ra, code)
         }
 
         traverse(stat, ra, code)
-        if (assignmentSize > 0) code += ADD(SP, SP, imm(assignmentSize))
+        if (assignments > 0) {
+          code += ADD(SP, SP, imm(assignments % 1024))
+          for (i <- 0 until assignments / 1024) code += ADD(SP, SP, imm(1024))
+        }
 
         code += LDR(RetReg, imm(0), Base)
         code += POP(PC)
@@ -76,42 +79,38 @@ object CodeGen{
       case Decl(PairType(t1, t2), ident, PairLiter) => ???
       case Decl(WInt, Ident(ident), rhs) =>
         val r = ra.next()
-        code += LDR(r, traverseExpr(rhs, ra, code), Base)
+        val ret = traverseExpr(rhs, ra, code)
+        if (ret != RetReg) code += LDR(r, ret, Base)
         // TODO fix the shift size
-        val location = if (variableLocation.isEmpty) regVal(SP) else {
-          currentShift += 4
-          regShift(SP, currentShift)
-        }
+        currentShift -= 4
+        val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift)
         variableLocation += (ident -> location)
         code += STR(r, location)
       case Decl(WBool, Ident(ident), rhs) =>
         val r = ra.next()
-        code += MOV(r, traverseExpr(rhs, ra, code), Base)
+        val ret = traverseExpr(rhs, ra, code)
+        //if (ret != RetReg) code += MOV(r, ret, Base)
         // TODO this isn't quite going to work for variables of different types that take up different amounts of space
-        val location = if (variableLocation.isEmpty) regVal(SP) else {
-          currentShift += 1
-          regShift(SP, currentShift)
-        }
+        currentShift -= 1
+        val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift)
         variableLocation += (ident -> location)
         code += STRB(r, location)
       case Decl(WChar, Ident(ident), rhs) =>
         val r = ra.next()
         // TODO reg shifts
-        code += MOV(r, traverseExpr(rhs, ra, code), Base)
-        val location = if (variableLocation.isEmpty) regVal(SP) else {
-          currentShift += 1
-          regShift(SP, currentShift)
-        }
+        val ret = traverseExpr(rhs, ra, code)
+        if (ret != RetReg) code += MOV(r, ret, Base)
+        currentShift -= 1
+        val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift)
         variableLocation += (ident -> location)
         code += STRB(r, location)
       case Decl(WString, Ident(ident), rhs) =>
         //todo: string length
         val r = ra.next()
-        code += LDR(r, traverseExpr(rhs, ra, code), Base)
-        val location = if (variableLocation.isEmpty) regVal(SP) else {
-          currentShift += 4
-          regShift(SP, currentShift)
-        }
+        val ret = traverseExpr(rhs, ra, code)
+        if (ret != RetReg) code += LDR(r, ret, Base)
+        currentShift -= 4
+        val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift)
         variableLocation += (ident -> location)
         code += STR(r, location)
       //case Decl
@@ -189,8 +188,7 @@ object CodeGen{
                   POP(PC)
                 )
             }
-            code += LDR(reg(4), ret, Base)
-            code += MOV(RetReg, reg(4), Base)
+            if (ret != RetReg) code += MOV(RetReg, ret, Base)
             code += BL("p_print_string")
 
 
@@ -217,8 +215,8 @@ object CodeGen{
                   BL("ffllush"),
                   POP(PC))
             }
-            code += LDR(reg(4), ret, Base)
-            code += MOV(RetReg, reg(4), Base)
+            if (ra.next() != ret) code += LDR(ra.next(), ret, SB)
+            code += MOV(RetReg, ra.next(), Base)
             code += BL("p_print_bool")
 
           case WInt =>
@@ -237,13 +235,12 @@ object CodeGen{
                   BL("fflush"),
                   POP(PC))
             }
-            code += LDR(reg(4), ret, Base)
-            code += MOV(RetReg, reg(4), Base)
+            if (ret != RetReg) code += MOV(RetReg, ret, Base)
             code += BL("p_print_int")
 
           case WChar =>
-            code += LDR(reg(4), ret, Base)
-            code += MOV(RetReg, reg(4), Base)
+            if (ra.next() != ret) code += LDR(ra.next(), ret, Base)
+            code += MOV(RetReg, ra.next(), Base)
             code += BL("putchar")
 
           //TODO: implement all other print types
@@ -386,7 +383,9 @@ object CodeGen{
     node match {
       case IntLiter(x) => imm(x)
       case Negate(IntLiter(x)) => imm(-x)
-      case BoolLiter(b) => imm(if (b) 1 else 0)
+      case BoolLiter(b) =>
+        code += MOV(ra.next(), imm(if (b) 1 else 0), Base)
+        ra.next()
       case CharLiter(c) => immc(c)
       case StrLiter(s) =>
         val int_msg = s"msg_$getDataMsgIndex"
@@ -395,6 +394,7 @@ object CodeGen{
       case PairLiter => ???
       case Ident(x) => variableLocation(x)
       case ArrayElem(Ident(x), elems) => ???
+      case ParensExpr(expr) => traverseExpr(expr, ra, code)
       case Call(Ident(name), args) =>
         // TODO deal with arguments
         code += BL(name)
@@ -402,19 +402,24 @@ object CodeGen{
 
         // TODO reduce register use
       case And(expr1, expr2) =>
-        val reg1 = ra.next()
-        code += LDR(reg1, traverseExpr(expr1, ra, code), SB)
-        val reg2 = ra.next()
-        code += LDR(reg2, traverseExpr(expr2, ra, code), SB)
-        code += AND(reg1, reg1, reg2)
+        // TODO this is now using too many registers
+        val res1 = traverseExpr(expr1, ra, code)
+        val reg1 = ra.nextRm()
+        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
+        val res2 = traverseExpr(expr2, ra, code)
+        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
+        code += AND(reg1, reg1, ra.next())
+        ra.restore()
         reg1
 
       case Or(expr1, expr2) =>
-        val reg1 = ra.next()
+        // TODO this is now using too many registers
+        val reg1 = ra.nextRm()
         code += LDR(reg1, traverseExpr(expr1, ra, code), SB)
         val reg2 = ra.next()
         code += LDR(reg2, traverseExpr(expr2, ra, code), SB)
         code += ORR(reg1, reg1, reg2)
+        ra.restore()
         reg1
 
       // TODO binary and unary ops
