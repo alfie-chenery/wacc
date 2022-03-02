@@ -185,7 +185,8 @@ object CodeGen{
                   POP(PC)
                 )
             }
-            if (ret != RetReg) code += MOV(RetReg, ret, Base)
+            if (!ret.isInstanceOf[reg]) code += LDR(ra.next(), ret, SB)
+            code += MOV(RetReg, ra.next(), Base)
             code += BL("p_print_string")
 
 
@@ -232,11 +233,12 @@ object CodeGen{
                   BL("fflush"),
                   POP(PC))
             }
-            if (ret != RetReg) code += MOV(RetReg, ret, Base)
+            if (!ret.isInstanceOf[reg]) code += LDR(ra.next(), ret, SB)
+            code += MOV(RetReg, ra.next(), Base)
             code += BL("p_print_int")
 
           case WChar =>
-            if (ra.next() != ret) code += LDR(ra.next(), ret, Base)
+            if (!ret.isInstanceOf[reg]) code += LDR(ra.next(), ret, Base)
             code += MOV(RetReg, ra.next(), Base)
             code += BL("putchar")
 
