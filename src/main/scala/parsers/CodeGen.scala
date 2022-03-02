@@ -369,6 +369,7 @@ object CodeGen{
         ra.restore()
         reg1
 
+        // TODO check if reg1 should be moved with LDR or LDRSB
       case Greater(expr1, expr2) =>
         val res1 = traverseExpr(expr1, ra, code)
         val reg1 = ra.nextRm()
@@ -477,10 +478,10 @@ object CodeGen{
         code += BL("putchar")
         reg
 
-        /*
       case Ord(expr) =>
         val reg = traverseExpr(expr, ra, code)
-         */
+        code += MOV(reg, immc(expr.asInstanceOf[Char]), Base)
+        reg
 
       // TODO binary and unary ops
     }
@@ -501,6 +502,24 @@ object CodeGen{
         List(BL("p_print_string"),
           MOV(RetReg, imm(-1), Base),
           BL("exit"))
+    if (!labels.contains("p_print_string")) {
+      val str_format_msg = s"msg_$getDataMsgIndex"
+      data(str_format_msg) = List(
+        DWord(5),
+        DAscii("%.*s\\0")
+      )
+      labels("p_print_string") =
+        List(PUSH(LinkReg),
+          LDR(reg(1), regVal(RetReg), Base),
+          ADD(reg(2), RetReg, imm(4)),
+          LDR(RetReg, label(str_format_msg), Base),
+          ADD(RetReg, RetReg, imm(4)),
+          BL("printf"),
+          MOV(RetReg, imm(0), Base),
+          BL("fflush"),
+          POP(PC)
+        )
+    }
   }
 
   def traverseBinaryExpr(expr1: Expr, expr2: Expr, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Unit = {
