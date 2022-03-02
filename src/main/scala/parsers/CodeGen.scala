@@ -97,6 +97,26 @@ object CodeGen{
         code += STRB(ra.next(), regVal(RetReg))
         code += STR(RetReg, regShift(reg1, 4, false))
         code += STR(reg1, regVal(SP))
+        // TODO this location probably needs to be changed
+        variableLocation += (ident -> regVal(SP))
+        ra.restore()
+      case Decl(ArrayType(_type), Ident(ident), ArrayLiter(exprs)) =>
+        code += LDR(RetReg, imm(exprs.length * typeSize(_type) + 4), Base)
+        code += BL("malloc")
+        val reg =ra.nextRm()
+        code += MOV(reg, RetReg, Base)
+        var location = 4
+        for (expr <- exprs) {
+          val ret = traverseExpr(expr, ra, code)
+          code += STR(ret, regShift(reg, location, false))
+          location += typeSize(_type)
+        }
+        code += LDR(ra.next(), imm(exprs.size), Base)
+        code += STR(ra.next(), regVal(reg))
+        code += STR(reg, regVal(SP))
+        // TODO this location probably needs to be changed
+        variableLocation += (ident -> regVal(SP))
+        ra.restore()
       case Decl(WInt, Ident(ident), rhs) =>
         val r = ra.next()
         traverseExpr(rhs, ra, code)
@@ -341,7 +361,7 @@ object CodeGen{
       case PairLiter => ???
       case Ident(x) =>
         // TODO this will probably need to change when pairs and arrays are implemented
-        if (st(Ident(x))._2 == WInt) code += LDR(ra.next(), variableLocation(x), Base)
+        if (typeSize(st(Ident(x))._2) == 4) code += LDR(ra.next(), variableLocation(x), Base)
         else code += LDR(ra.next(), variableLocation(x), SB)
         ra.next()
       case ArrayElem(Ident(x), elems) => ???
@@ -546,6 +566,11 @@ object CodeGen{
         code += MOV(reg, immc(expr.asInstanceOf[Char]), Base)
         reg
 
+      case Len(expr) =>
+        val reg = traverseExpr(expr,ra,code)
+        code += LDR(reg, regVal(reg), Base)
+        ra.next()
+
     }
   }
 
@@ -683,6 +708,7 @@ object CodeGen{
       case WChar => 1
       case WString => 4
       case PairType(_, _) => 4
+      case ArrayType(_) => 4
     }
   }
   def assignmentsInScope(stats: Stat): Int = {
