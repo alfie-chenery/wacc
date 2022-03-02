@@ -112,7 +112,7 @@ object Assembly {
   case class imm(i: Int) extends Operand {
     override def toString: String = "#" + i.toString
   }
-  case class immc(c: Char) extends Operand {
+  case class immc(c: String) extends Operand {
     override def toString: String = "#'" + c.toString + "'"
   }
   case class label(l: String) extends Operand {

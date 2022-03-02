@@ -37,6 +37,7 @@ object CodeGen{
   }
 
   def traverse(node: AstNode, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Unit = {
+    println(node)
     node match {
       case Program(funcs, stat) =>
         for (func <- funcs) {
@@ -364,7 +365,12 @@ object CodeGen{
         if (typeSize(st(Ident(x))._2) == 4) code += LDR(ra.next(), variableLocation(x), Base)
         else code += LDR(ra.next(), variableLocation(x), SB)
         ra.next()
-      case ArrayElem(Ident(x), elems) => ???
+      case ArrayElem(Ident(x), elems) =>
+        // TODO this wouldn't work for multi-dimensional arrays
+        val reg1 = ra.nextRm()
+        code += ADD(reg1, SP, traverseExpr(elems(0), ra, code))
+        ra.restore()
+        reg1
       case ParensExpr(expr) => traverseExpr(expr, ra, code)
       case Call(Ident(name), ArgList(args)) =>
         var totalSize = 0
@@ -563,7 +569,8 @@ object CodeGen{
 
       case Ord(expr) =>
         val reg = traverseExpr(expr, ra, code)
-        code += MOV(reg, immc(expr.asInstanceOf[Char]), Base)
+        // TODO implement this
+        //code += MOV(reg, immc(expr.asInstanceOf[Char]), Base)
         reg
 
       case Len(expr) =>

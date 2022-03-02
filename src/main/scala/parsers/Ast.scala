@@ -56,7 +56,7 @@ object Ast {
   sealed trait Expr extends AssignRHS
   case class IntLiter(x: Int) extends Term
   case class BoolLiter(b: Boolean) extends Term
-  case class CharLiter(c: Char) extends Term
+  case class CharLiter(c: String) extends Term
   case class StrLiter(s: String) extends Term
   case object PairLiter extends Term
   case class Ident(ident: String) extends Term with AssignLHS
@@ -200,7 +200,7 @@ object Ast {
     def apply(b: Parsley[Boolean]): Parsley[BoolLiter] = b.map(BoolLiter(_))
   }
   object CharLiter {
-    def apply(c: Parsley[Char]): Parsley[CharLiter] = c.map(CharLiter(_))
+    def apply(c: Parsley[String]): Parsley[CharLiter] = c.map(CharLiter(_))
   }
   object StrLiter {
     def apply(s: Parsley[String]): Parsley[StrLiter] = s.map(StrLiter(_))

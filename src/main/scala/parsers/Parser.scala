@@ -5,7 +5,6 @@ import parsley.combinator.{sepBy, sepBy1}
 import parsley.{Parsley, Result}
 
 import java.io.File
-import scala.collection.mutable.ListBuffer
 import scala.language.implicitConversions
 
 object lexer {
@@ -34,11 +33,11 @@ object lexer {
   private [parsers] val INT_LITER: Parsley[Int] = token(optional("+") ~> digit.foldLeft1(0)((x, d) => x * 10 + d.asDigit))
   private [parsers] val BOOL_LITER: Parsley[Boolean] =
     (token("true") #> true) <|> (token("false") #> false)
-  private [parsers] val ESC_CHAR: Parsley[Char] =
-    token('\\' ~> (('0' #> '\u0000') <|> ('b' #> '\b') <|> ('t' #> '\t') <|> ('n' #> '\n') <|>
-      ('f' #> '\f') <|> ('r' #> '\r') <|> '\"' <|> '\'' <|> '\\'))
-  private [parsers] val CHAR: Parsley[Char] = ESC_CHAR <|> anyChar
-  private [parsers] val CHAR_LITER: Parsley[Char] = token('\'' ~> CHAR <~ '\'')
+  private [parsers] val ESC_CHAR: Parsley[String] =
+    token('\\' ~> (('0' #> "\\u0000") <|> ('b' #> "\\b") <|> ('t' #> "\\t") <|> ('n' #> "\\n") <|>
+      ('f' #> "\\f") <|> ('r' #> "\\r") <|> "\\\"" <|> "\\\'" <|> "\\\\"))
+  private [parsers] val CHAR: Parsley[String] = ESC_CHAR <|> anyChar.map(_.toString)
+  private [parsers] val CHAR_LITER: Parsley[String] = token('\'' ~> CHAR <~ '\'')
   private [parsers] val STR_LITER: Parsley[String] = token('\"' ~> manyUntil(CHAR, '\"').map(_.mkString))
   private [parsers] val PAIR_LITER: Parsley[String] = token("null")
   // TODO make this its own case class holding the char
