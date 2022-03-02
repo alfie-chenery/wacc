@@ -105,7 +105,7 @@ object Assembly {
     override def toString: String = "RSBS " + rd.toString + ", " + o2.toString + ", " + o3.toString
   }
   case class B(label: String) extends Mnemonic {
-    override def toString: String = "B" + label
+    override def toString: String = "B " + label
   }
 
   sealed trait Operand

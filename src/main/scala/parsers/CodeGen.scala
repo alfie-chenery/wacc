@@ -260,15 +260,16 @@ object CodeGen{
 
       case IfElse(cond, stat_true, stat_false) =>
         // TODO add stack pointer changes for new scopes
-        val reg = ra.next()
-        traverse(cond, ra, code)
+        val reg = traverseExpr(cond, ra, code)
         code += CMP(reg, imm(0))
-        val newScope = new RegisterAllocator(ra.getAvailable)
-        traverse(stat_true, newScope, code)
-        newScope.restore()
-        code += funcName(nextBranchIndex)
-        traverse(stat_false, newScope, code)
-        code += funcName(nextBranchIndex)
+        val fun1 = nextBranchIndex
+        val fun2 = nextBranchIndex
+        code += BEQ(fun1)
+        traverse(stat_true, ra, code)
+        code += B(fun2)
+        code += funcName(fun1)
+        traverse(stat_false, ra, code)
+        code += funcName(fun2)
 
       case While(cond, stat) =>
         // TODO add stack changes for scoping
@@ -470,7 +471,7 @@ object CodeGen{
         divByZeroError()
         code += BL("p_check_divide_by_zero")
         code += BL("__aeabi_idivmod")
-        code += MOV(reg1, RetReg, Base)
+        code += MOV(reg1, reg(1), Base)
         ra.restore()
         reg1
 
