@@ -81,7 +81,22 @@ object CodeGen{
       case Param(_type, ident) => ???
 
       // <Stat>
-      case Decl(PairType(t1, t2), ident, PairLiter) => ???
+      case Decl(PairType(t1, t2), Ident(ident), NewPair(fst, snd)) =>
+        code += LDR(RetReg, imm(8), Base)
+        code += BL("malloc")
+        code += MOV(ra.next(), RetReg, Base)
+        val reg1 = ra.nextRm()
+        val fstReg = traverseExpr(fst, ra, code)
+        code += LDR(RetReg, imm(typeSize(t1)), Base)
+        code += BL("malloc")
+        code += STR(fstReg, regVal(RetReg))
+        code += STR(RetReg, regVal(reg1))
+        val sndReg = traverseExpr(snd, ra, code)
+        code += LDR(RetReg, imm(typeSize(t2)), Base)
+        code += BL("malloc")
+        code += STRB(ra.next(), regVal(RetReg))
+        code += STR(RetReg, regShift(reg1, 4, false))
+        code += STR(reg1, regVal(SP))
       case Decl(WInt, Ident(ident), rhs) =>
         val r = ra.next()
         traverseExpr(rhs, ra, code)
@@ -661,11 +676,15 @@ object CodeGen{
   }
 
   // TODO add more to this map
-  val typeSize: immutable.Map[Type, Int] = Map[Type, Int](
-    WInt -> 4,
-    WBool -> 1,
-    WChar -> 1,
-    WString -> 4)
+  def typeSize(_type: Type) = {
+    _type match {
+      case WInt => 4
+      case WBool => 1
+      case WChar => 1
+      case WString => 4
+      case PairType(_, _) => 4
+    }
+  }
   def assignmentsInScope(stats: Stat): Int = {
     var size = 0
     stats match {
