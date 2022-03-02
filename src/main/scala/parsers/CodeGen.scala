@@ -402,7 +402,6 @@ object CodeGen{
 
         // TODO reduce register use
       case And(expr1, expr2) =>
-        // TODO this is now using too many registers
         val res1 = traverseExpr(expr1, ra, code)
         val reg1 = ra.nextRm()
         if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
@@ -412,13 +411,14 @@ object CodeGen{
         ra.restore()
         reg1
 
+      // TODO factor out repeated code
       case Or(expr1, expr2) =>
-        // TODO this is now using too many registers
+        val res1 = traverseExpr(expr1, ra, code)
         val reg1 = ra.nextRm()
-        code += LDR(reg1, traverseExpr(expr1, ra, code), SB)
-        val reg2 = ra.next()
-        code += LDR(reg2, traverseExpr(expr2, ra, code), SB)
-        code += ORR(reg1, reg1, reg2)
+        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
+        val res2 = traverseExpr(expr2, ra, code)
+        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
+        code += ORR(reg1, reg1, ra.next())
         ra.restore()
         reg1
 
