@@ -35,7 +35,7 @@ object lexer {
     (token("true") #> true) <|> (token("false") #> false)
   private [parsers] val ESC_CHAR: Parsley[String] =
     token('\\' ~> (('0' #> "\\u0000") <|> ('b' #> "\\b") <|> ('t' #> "\\t") <|> ('n' #> "\\n") <|>
-      ('f' #> "\\f") <|> ('r' #> "\\r") <|> "\\\"" <|> "\\\'" <|> "\\\\"))
+      ('f' #> "\\f") <|> ('r' #> "\\r") <|> ('\"' #> "\\\"") <|> ('\"' #> "\\\'") <|> ('\\' #> "\\\\")))
   private [parsers] val CHAR: Parsley[String] = ESC_CHAR <|> anyChar.map(_.toString)
   private [parsers] val CHAR_LITER: Parsley[String] = token('\'' ~> CHAR <~ '\'')
   private [parsers] val STR_LITER: Parsley[String] = token('\"' ~> manyUntil(CHAR, '\"').map(_.mkString))
