@@ -79,6 +79,9 @@ object Assembly {
   case class BLVS(label: String) extends Mnemonic {
     override def toString: String = "BLVS " + label
   }
+  case class BLNE(label: String) extends Mnemonic {
+    override def toString: String = "BLNE " + label
+  }
   case class ADDS(rd: Register, rn: Register, rm: Register) extends Mnemonic {
     override def toString: String = "ADDS " + rd.toString + ", " + rn.toString + ", " + rm.toString
   }
@@ -87,6 +90,10 @@ object Assembly {
   }
   case class MULTS(rd: Register, rn: Register, rm: Register) extends Mnemonic {
     override def toString: String = "MULTS " + rd.toString + ", " + rn.toString + ", " + rm.toString
+  }
+  case class SMULL(rdLo: Register, rdHi: Register, rm: Register, rs: Register) extends Mnemonic {
+    override def toString: String =
+      "SMULL " + rdLo.toString + ", " + rdHi.toString + ", " + rm.toString + ", " + rs.toString
   }
   case class BLEQ(label: String) extends Mnemonic {
     override def toString: String = "BLEQ " + label
@@ -116,6 +123,9 @@ object Assembly {
   }
   case class regVal(reg: Register) extends Register {
     override def toString: String = "[" + reg.toString + "]"
+  }
+  case class asr(reg: Register, shift: Int) extends Operand {
+    override def toString: String = reg.toString + ", ASR #" + shift
   }
   case object nullOp extends Operand {
     override def toString: String = ""

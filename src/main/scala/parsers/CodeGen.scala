@@ -455,8 +455,43 @@ object CodeGen{
         ra.restore()
         reg1
 
-      case Mult(expr1, expr2) => ???
-      case Div(expr1, expr2) => ???
+      case Mult(expr1, expr2) =>
+        val res1 = traverseExpr(expr1, ra, code)
+        val reg1 = ra.nextRm()
+        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
+        val res2 = traverseExpr(expr2, ra, code)
+        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
+        code += SMULL(reg1, ra.next(), reg1, ra.next())
+        code += CMP(ra.next(), asr(reg1, 31))
+        code += BLNE("p_throw_overflow_error")
+        ra.restore()
+        reg1
+      case Div(expr1, expr2) =>
+        val res1 = traverseExpr(expr1, ra, code)
+        val reg1 = ra.nextRm()
+        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
+        val res2 = traverseExpr(expr2, ra, code)
+        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
+        code += MOV(RetReg, reg1, Base)
+        code += MOV(reg(1), ra.next(), Base)
+        code += BL("p_check_divide_by_zero")
+        code += BL("__aeabi_idiv")
+        if (!labels.contains("p_check_divide_by_zero")) {
+          val int_msg = s"msg_$getDataMsgIndex"
+          data(int_msg) =
+            List(DWord(45),
+              DAscii("DivideByZeroError: divide or modulo by zero\\n\\0"))
+          labels("p_check_divide_by_zero")=
+            List(PUSH(LinkReg),
+              CMP(reg(1), imm(0)),
+              LDR(RetReg, label(int_msg), EQ),
+              BLEQ("p_throw_runtime_error"),
+              POP(PC))
+          runtimeError()
+        }
+        code += MOV(reg1, RetReg, Base)
+        ra.restore()
+        reg1
 
       case Negate(expr) =>
         val reg = traverseExpr(expr, ra, code)
@@ -487,16 +522,7 @@ object CodeGen{
     }
   }
 
-  def intOverflow(): Unit = {
-    val int_msg = s"msg_$getDataMsgIndex"
-    if (!labels.contains("p_throw_overflow_error")) {
-      data(int_msg) =
-        List(DWord(83),
-          DAscii("OverflowError: the result is too small/large to store in a 4-byte signed-integer.\\n\\0"))
-      labels("p_throw_overflow_error") =
-        List(LDR(RetReg, label(int_msg), Base),
-          BL("p_throw_runtime_error"))
-    }
+  def runtimeError(): Unit = {
     if (!labels.contains("p_throw_runtime_error"))
       labels("p_throw_runtime_error") =
         List(BL("p_print_string"),
@@ -520,6 +546,19 @@ object CodeGen{
           POP(PC)
         )
     }
+  }
+
+  def intOverflow(): Unit = {
+    if (!labels.contains("p_throw_overflow_error")) {
+      val int_msg = s"msg_$getDataMsgIndex"
+      data(int_msg) =
+        List(DWord(83),
+          DAscii("OverflowError: the result is too small/large to store in a 4-byte signed-integer.\\n\\0"))
+      labels("p_throw_overflow_error") =
+        List(LDR(RetReg, label(int_msg), Base),
+          BL("p_throw_runtime_error"))
+    }
+    runtimeError()
   }
 
   def traverseBinaryExpr(expr1: Expr, expr2: Expr, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Unit = {
