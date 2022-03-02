@@ -113,9 +113,7 @@ object CodeGen{
       //case Decl
 
       case Assign(Ident(ident), rhs) =>
-        // TODO MOV might be the wrong instruction
-        code += MOV(ra.next(), traverseExpr(rhs, ra, code), Base)
-        code += STR(ra.next(), variableLocation(ident))
+        code += STR(traverseExpr(rhs, ra, code), variableLocation(ident))
       case Assign(lhs, rhs) => ???
 
       case Free(expr) => ???
@@ -394,7 +392,9 @@ object CodeGen{
         code += LDR(ra.next(), label(int_msg), Base)
         ra.next()
       case PairLiter => ???
-      case Ident(x) => variableLocation(x)
+      case Ident(x) =>
+        code += LDR(ra.next(), variableLocation(x), Base)
+        ra.next()
       case ArrayElem(Ident(x), elems) => ???
       case ParensExpr(expr) => traverseExpr(expr, ra, code)
       case Call(Ident(name), args) =>
