@@ -276,7 +276,6 @@ object CodeGen{
       case Return(expr) =>
         code += MOV(RetReg, traverseExpr(expr, ra, code), Base)
 
-
       case Exit(expr) =>
         code += MOV(RetReg, traverseExpr(expr, ra, code), Base)
         code += BL("exit")
@@ -293,7 +292,6 @@ object CodeGen{
         traverse(stat_false, newScope, code)
         code += funcName(nextBranchIndex)
 
-
       case While(cond, stat) =>
         // TODO add stack changes for scoping
         val condLabel = nextBranchIndex
@@ -305,7 +303,6 @@ object CodeGen{
         traverse(cond, ra, code)
         code += BEQ(bodyLabel)
 
-
       case Scope(stat) => traverse(stat, ra, code)
 
       case Combine(stats) =>
@@ -316,12 +313,6 @@ object CodeGen{
       // or make traverse of intLitter(x) return x.toString and nothing else
       // so that the expr and intLiter cases can be combined
       // ie case Greater(expr1, expr2) handles if expr1 and expr2 are already intLiter
-
-      case Plus(IntLiter(x), IntLiter(y)) =>
-        code += ADDS(reg(4), reg(5), reg(5))
-        code += BLVS("p_throw_overflow_error")
-        code += MOV(RetReg, reg(4), Base)
-        //todo
 
       case _ =>
       }
@@ -386,6 +377,7 @@ object CodeGen{
         phonyCaseCompare(code, GT, reg1, ra.next())
         ra.restore()
         reg1
+
       case GreaterEq(expr1, expr2) =>
         val res1 = traverseExpr(expr1, ra, code)
         val reg1 = ra.nextRm()
@@ -395,6 +387,7 @@ object CodeGen{
         phonyCaseCompare(code, GE, reg1, ra.next())
         ra.restore()
         reg1
+
       case Less(expr1, expr2) =>
         val res1 = traverseExpr(expr1, ra, code)
         val reg1 = ra.nextRm()
@@ -404,6 +397,7 @@ object CodeGen{
         phonyCaseCompare(code, LT, reg1, ra.next())
         ra.restore()
         reg1
+
       case LessEq(expr1, expr2) =>
         val res1 = traverseExpr(expr1, ra, code)
         val reg1 = ra.nextRm()
@@ -433,6 +427,34 @@ object CodeGen{
         phonyCaseCompare(code, NE, reg1, ra.next())
         ra.restore()
         reg1
+
+      case Plus(expr1, expr2) =>
+        val res1 = traverseExpr(expr1, ra, code)
+        val reg1 = ra.nextRm()
+        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
+        val res2 = traverseExpr(expr2, ra, code)
+        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
+        code += ADDS(reg1, reg1, ra.next())
+        code += BLVS("p_throw_overflow")
+        ra.restore()
+        reg1
+
+      case Minus(expr1, expr2) =>
+        val res1 = traverseExpr(expr1, ra, code)
+        val reg1 = ra.nextRm()
+        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
+        val res2 = traverseExpr(expr2, ra, code)
+        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
+        code += SUBS(reg1, reg1, ra.next())
+        code += BLVS("p_throw_overflow")
+        ra.restore()
+        reg1
+
+
+      case Negate(expr) =>
+        val reg = traverseExpr(expr, ra, code)
+        reg
+        //code +=
 
       // TODO binary and unary ops
     }

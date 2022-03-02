@@ -97,16 +97,16 @@ object RenamingPass {
         Plus(rename(lhs, localScope, varsInScope, errors).asInstanceOf[Expr5],
           rename(rhs, localScope, varsInScope, errors).asInstanceOf[Expr6])
       case Minus(lhs, rhs) =>
-        Plus(rename(lhs, localScope, varsInScope, errors).asInstanceOf[Expr5],
+        Minus(rename(lhs, localScope, varsInScope, errors).asInstanceOf[Expr5],
           rename(rhs, localScope, varsInScope, errors).asInstanceOf[Expr6])
       case Mult(lhs, rhs) =>
         Mult(rename(lhs, localScope, varsInScope, errors).asInstanceOf[Expr6],
           rename(rhs, localScope, varsInScope, errors).asInstanceOf[Expr7])
       case Div(lhs, rhs) =>
-        Mult(rename(lhs, localScope, varsInScope, errors).asInstanceOf[Expr6],
+        Div(rename(lhs, localScope, varsInScope, errors).asInstanceOf[Expr6],
           rename(rhs, localScope, varsInScope, errors).asInstanceOf[Expr7])
       case Mod(lhs, rhs) =>
-        Mult(rename(lhs, localScope, varsInScope, errors).asInstanceOf[Expr6],
+        Mod(rename(lhs, localScope, varsInScope, errors).asInstanceOf[Expr6],
           rename(rhs, localScope, varsInScope, errors).asInstanceOf[Expr7])
       case Not(expr) => Not(rename(expr, localScope, varsInScope, errors).asInstanceOf[Expr7])
       case Negate(expr) => Negate(rename(expr, localScope, varsInScope, errors).asInstanceOf[Expr7])

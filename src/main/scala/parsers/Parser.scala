@@ -15,7 +15,7 @@ object lexer {
   import parsley.token.{LanguageDef, Lexer, Predicate}
 
   val unaryOperators = Set("!", "-", "len", "ord", "chr")
-  val binaryOperators = Set("*", "/", "%", "+", ">", ">=", "<", "<", "<=", "==", "!=", "&&", "||")
+  val binaryOperators = Set("*", "/", "%", "+", "-", ">", ">=", "<", "<", "<=", "==", "!=", "&&", "||")
 
   private val lang = LanguageDef.plain.copy(
     commentLine = "#",
