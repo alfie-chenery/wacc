@@ -165,25 +165,7 @@ object CodeGen{
         // TODO change this so it doesn't match explicit types
         SemanticPass.checkExprType(expr, expr, new ListBuffer[String]) match {
           case WString =>
-            val t = "p_print_string"
-            if (!labels.contains(t)) {
-              val str_format_msg = s"msg_$getDataMsgIndex"
-              data(str_format_msg) = List(
-                DWord(5),
-                DAscii("%.*s\\0")
-              )
-              labels(t) =
-                List(PUSH(LinkReg),
-                  LDR(reg(1), regVal(RetReg), Base),
-                  ADD(reg(2), RetReg, imm(4)),
-                  LDR(RetReg, label(str_format_msg), Base),
-                  ADD(RetReg, RetReg, imm(4)),
-                  BL("printf"),
-                  MOV(RetReg, imm(0), Base),
-                  BL("fflush"),
-                  POP(PC)
-                )
-            }
+            printString()
             if (!ret.isInstanceOf[reg]) code += LDR(ra.next(), ret, SB)
             code += MOV(RetReg, ra.next(), Base)
             code += BL("p_print_string")
@@ -522,12 +504,7 @@ object CodeGen{
     }
   }
 
-  def runtimeError(): Unit = {
-    if (!labels.contains("p_throw_runtime_error"))
-      labels("p_throw_runtime_error") =
-        List(BL("p_print_string"),
-          MOV(RetReg, imm(-1), Base),
-          BL("exit"))
+  def printString(): Unit = {
     if (!labels.contains("p_print_string")) {
       val str_format_msg = s"msg_$getDataMsgIndex"
       data(str_format_msg) = List(
@@ -546,6 +523,15 @@ object CodeGen{
           POP(PC)
         )
     }
+  }
+
+  def runtimeError(): Unit = {
+    if (!labels.contains("p_throw_runtime_error"))
+      labels("p_throw_runtime_error") =
+        List(BL("p_print_string"),
+          MOV(RetReg, imm(-1), Base),
+          BL("exit"))
+    printString()
   }
 
   def intOverflow(): Unit = {
