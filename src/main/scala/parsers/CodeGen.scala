@@ -312,53 +312,6 @@ object CodeGen{
         for (stat <- stats) {
           traverse(stat, ra, code)
         }
-
-      case Greater(IntLiter(x), IntLiter(y)) =>
-        val reg1 = ra.next()
-        val reg2 = ra.next()
-        code += LDR(reg1, label(x.toString), Base)
-        code += LDR(reg2, label(y.toString), Base)
-        phonyCaseCompare(code, GT, reg1, reg2)
-
-      case GreaterEq(IntLiter(x), IntLiter(y)) =>
-        val reg1 = ra.next()
-        val reg2 = ra.next()
-        code += LDR(reg1, label(x.toString), Base)
-        code += LDR(reg2, label(y.toString), Base)
-        phonyCaseCompare(code, GE, reg1, reg2)
-
-      case Less(IntLiter(x), IntLiter(y)) =>
-        val reg1 = ra.next()
-        val reg2 = ra.next()
-        code += LDR(reg1, label(x.toString), Base)
-        code += LDR(reg2, label(y.toString), Base)
-        phonyCaseCompare(code, LT, reg1, reg2)
-
-      case LessEq(IntLiter(x), IntLiter(y)) =>
-        val reg1 = ra.next()
-        val reg2 = ra.next()
-        code += LDR(reg1, label(x.toString), Base)
-        code += LDR(reg2, label(y.toString), Base)
-        phonyCaseCompare(code, LE, reg1, reg2)
-
-      case Eq(IntLiter(x), IntLiter(y)) =>
-        val reg1 = ra.next()
-        val reg2 = ra.next()
-        code += LDR(reg1, label(x.toString), Base)
-        code += LDR(reg2, label(y.toString), Base)
-        phonyCaseCompare(code, EQ, reg1, reg2)
-
-      case NotEq(IntLiter(x), IntLiter(y)) =>
-        val reg1 = ra.next()
-        val reg2 = ra.next()
-        code += LDR(reg1, label(x.toString), Base)
-        code += LDR(reg2, label(y.toString), Base)
-        phonyCaseCompare(code, NE, reg1, reg2)
-
-
-//      case Greater(expr1, expr2) =>
-//        traverse(expr1, ra)
-//        traverse(expr2, ra)
       //TODO - potentially make an eval function to evaluate expr1 to a intLiter
       // or make traverse of intLitter(x) return x.toString and nothing else
       // so that the expr and intLiter cases can be combined
@@ -460,6 +413,27 @@ object CodeGen{
         phonyCaseCompare(code, LE, reg1, ra.next())
         ra.restore()
         reg1
+
+      case Eq(expr1, expr2) =>
+        val res1 = traverseExpr(expr1, ra, code)
+        val reg1 = ra.nextRm()
+        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
+        val res2 = traverseExpr(expr2, ra, code)
+        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
+        phonyCaseCompare(code, EQ, reg1, ra.next())
+        ra.restore()
+        reg1
+
+      case NotEq(expr1, expr2) =>
+        val res1 = traverseExpr(expr1, ra, code)
+        val reg1 = ra.nextRm()
+        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
+        val res2 = traverseExpr(expr2, ra, code)
+        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
+        phonyCaseCompare(code, NE, reg1, ra.next())
+        ra.restore()
+        reg1
+
       // TODO binary and unary ops
     }
   }
