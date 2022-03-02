@@ -259,6 +259,7 @@ object CodeGen{
 
       case Return(expr) =>
         code += MOV(RetReg, traverseExpr(expr, ra, code), Base)
+        code += POP(PC)
 
       case Exit(expr) =>
         code += MOV(RetReg, traverseExpr(expr, ra, code), Base)
