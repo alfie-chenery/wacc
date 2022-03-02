@@ -94,6 +94,7 @@ object CodeGen{
         currentShift -= 1
         val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift)
         variableLocation += (ident -> location)
+        code += STRB(r, location)
       case Decl(WChar, Ident(ident), rhs) =>
         val r = ra.next()
         traverseExpr(rhs, ra, code)
@@ -435,7 +436,19 @@ object CodeGen{
         val res2 = traverseExpr(expr2, ra, code)
         if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
         code += ADDS(reg1, reg1, ra.next())
-        code += BLVS("p_throw_overflow")
+        val int_msg = s"msg_$getDataMsgIndex"
+        // TODO factor this out by making it standard in a map
+        data(int_msg) =
+          List(DWord(83),
+            DAscii("OverflowError: the result is too small/large to store in a 4-byte signed-integer.\\n\\0"))
+        labels("p_throw_overflow") =
+          List(LDR(RetReg, label(int_msg), Base),
+            BL("p_throw_runtime_error"))
+        labels("p_throw_runtime_error") =
+            List(BL("p_print_string"),
+              MOV(RetReg, imm(-1), Base),
+              BL("exit"))
+          code += BLVS("p_throw_overflow_error")
         ra.restore()
         reg1
 
@@ -446,15 +459,47 @@ object CodeGen{
         val res2 = traverseExpr(expr2, ra, code)
         if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
         code += SUBS(reg1, reg1, ra.next())
-        code += BLVS("p_throw_overflow")
+        val int_msg = s"msg_$getDataMsgIndex"
+        data(int_msg) =
+          List(DWord(83),
+            DAscii("OverflowError: the result is too small/large to store in a 4-byte signed-integer.\\n\\0"))
+        labels("p_throw_overflow") =
+          List(LDR(RetReg, label(int_msg), Base),
+            BL("p_throw_runtime_error"))
+        labels("p_throw_runtime_error") =
+          List(BL("p_print_string"),
+            MOV(RetReg, imm(-1), Base),
+            BL("exit"))
+        code += BLVS("p_throw_overflow_error")
         ra.restore()
         reg1
 
 
       case Negate(expr) =>
         val reg = traverseExpr(expr, ra, code)
+        if (!reg.isInstanceOf[reg]) code += LDR(reg, reg, Base)
+        val int_msg = s"msg_$getDataMsgIndex"
+        data(int_msg) =
+          List(DWord(83),
+            DAscii("OverflowError: the result is too small/large to store in a 4-byte signed-integer.\\n\\0"))
+        labels("p_throw_overflow") =
+          List(LDR(RetReg, label(int_msg), Base),
+            BL("p_throw_runtime_error"))
+        labels("p_throw_runtime_error") =
+          List(BL("p_print_string"),
+            MOV(RetReg, imm(-1), Base),
+            BL("exit"))
+        code += RSBS(reg, reg, imm(0))
+        code += BLVS("p_throw_overflow_error")
         reg
-        //code +=
+
+      case Not(expr) =>
+        val reg = traverseExpr(expr, ra, code)
+        if (!reg.isInstanceOf[reg]) code += LDR(reg, reg, SB)
+        code += EOR(reg, reg, imm(1))
+        reg
+
+      //case
 
       // TODO binary and unary ops
     }
