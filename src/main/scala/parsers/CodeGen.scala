@@ -118,7 +118,8 @@ object CodeGen{
 
       case Assign(Ident(ident), rhs) =>
         // TODO MOV might be the wrong instruction
-        code += MOV(variableLocation(ident), traverseExpr(rhs, ra, code), Base)
+        code += MOV(ra.next(), traverseExpr(rhs, ra, code), Base)
+        code += STRB(ra.next(), variableLocation(ident))
       case Assign(lhs, rhs) => ???
 
       case Free(expr) => ???
