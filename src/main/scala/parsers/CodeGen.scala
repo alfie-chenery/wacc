@@ -440,6 +440,7 @@ object CodeGen{
         if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
         code += SMULL(reg1, ra.next(), reg1, ra.next())
         code += CMP(ra.next(), asr(reg1, 31))
+        intOverflow()
         code += BLNE("p_throw_overflow_error")
         ra.restore()
         reg1
