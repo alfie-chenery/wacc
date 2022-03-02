@@ -1,5 +1,7 @@
 package parsers
 
+import parsers.SemanticPass.st
+
 import scala.collection.mutable
 import scala.collection.immutable
 import scala.collection.mutable.ListBuffer
@@ -113,7 +115,8 @@ object CodeGen{
       //case Decl
 
       case Assign(Ident(ident), rhs) =>
-        code += STR(traverseExpr(rhs, ra, code), variableLocation(ident))
+        if (st(Ident(ident))._2 == WInt) code += STR(traverseExpr(rhs, ra, code), variableLocation(ident))
+        else code += STRB(traverseExpr(rhs, ra, code), variableLocation(ident))
       case Assign(lhs, rhs) => ???
 
       case Free(expr) => ???
