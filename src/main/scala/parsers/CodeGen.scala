@@ -102,7 +102,6 @@ object CodeGen{
         variableLocation += (ident -> location)
         code += STRB(r, location)
       case Decl(WString, Ident(ident), rhs) =>
-        //todo: string length
         val r = ra.next()
         traverseExpr(rhs, ra, code)
         currentShift -= 4
@@ -209,7 +208,7 @@ object CodeGen{
                   ADD(RetReg, RetReg, imm(4)),
                   BL("printf"),
                   MOV(RetReg, imm(0), Base),
-                  BL("ffllush"),
+                  BL("fflush"),
                   POP(PC))
             }
             if (!ret.isInstanceOf[reg]) code += LDR(ra.next(), ret, SB)
