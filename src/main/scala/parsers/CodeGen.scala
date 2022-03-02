@@ -340,7 +340,8 @@ object CodeGen{
           else code += STRB(reg, regShift(SP, -size, true))
         }
         code += BL(name)
-        code += ADD(SP, SP, imm(totalSize))
+        if (totalSize > 0) code += ADD(SP, SP, imm(totalSize))
+        code += MOV(ra.next(), RetReg, Base)
         RetReg
 
       case And(expr1, expr2) =>
