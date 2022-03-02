@@ -98,7 +98,6 @@ object CodeGen{
       case Decl(WChar, Ident(ident), rhs) =>
         val r = ra.next()
         traverseExpr(rhs, ra, code)
-        //if (ret != RetReg) code += MOV(r, ret, Base)
         currentShift -= 1
         val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift)
         variableLocation += (ident -> location)
@@ -107,7 +106,6 @@ object CodeGen{
         //todo: string length
         val r = ra.next()
         traverseExpr(rhs, ra, code)
-        //if (ret != RetReg) code += LDR(r, ret, Base)
         currentShift -= 4
         val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift)
         variableLocation += (ident -> location)
@@ -130,6 +128,7 @@ object CodeGen{
         }
         if (!labels.contains(t)) {
           val read_msg = s"msg_$getDataMsgIndex"
+          // TODO remove massive duplication
           t match {
             case "p_read_char" =>
               data(read_msg) = List(
@@ -145,8 +144,8 @@ object CodeGen{
                   POP(PC))
             case "p_read_int" =>
               data(read_msg) = List(
-                DWord(4),
-                DAscii(" %c\\0")
+                DWord(3),
+                DAscii("%d\\0")
               )
               labels("p_read_int") =
                 List(PUSH(LinkReg),
