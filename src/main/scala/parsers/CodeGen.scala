@@ -280,6 +280,8 @@ object CodeGen{
         traverse(stat, ra, code)
         code += funcName(condLabel)
         traverse(cond, ra, code)
+        val reg = traverseExpr(cond, ra, code)
+        code += CMP(reg, imm(1))
         code += BEQ(bodyLabel)
 
       case Scope(stat) => traverse(stat, ra, code)
@@ -328,23 +330,36 @@ object CodeGen{
         RetReg
 
       case And(expr1, expr2) =>
-        val res1 = traverseExpr(expr1, ra, code)
+        var res1 = traverseExpr(expr1, ra, code)
         val reg1 = ra.nextRm()
-        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
-        val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
-        code += AND(reg1, reg1, ra.next())
+        if (!res1.isInstanceOf[reg]) {
+          code += LDR(reg1, res1, SB)
+          res1 = ra.nextRm()
+        }
+        var res2 = traverseExpr(expr2, ra, code)
+        if (!res2.isInstanceOf[reg]) {
+          code += LDR(ra.next(), res2, SB)
+          res2 = ra.next()
+        }
+        print(ra.next())
+        code += AND(res1, res1, res2)
         ra.restore()
         reg1
 
       // TODO factor out repeated code
       case Or(expr1, expr2) =>
-        val res1 = traverseExpr(expr1, ra, code)
+        var res1 = traverseExpr(expr1, ra, code)
         val reg1 = ra.nextRm()
-        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
-        val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
-        code += ORR(reg1, reg1, ra.next())
+        if (!res1.isInstanceOf[reg]) {
+          code += LDR(reg1, res1, SB)
+          res1 = reg1
+        }
+        var res2 = traverseExpr(expr2, ra, code)
+        if (!res2.isInstanceOf[reg]) {
+          code += LDR(ra.next(), res2, SB)
+          res2 = ra.next()
+        }
+        code += ORR(res1, res1, res2)
         ra.restore()
         reg1
 
