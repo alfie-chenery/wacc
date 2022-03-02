@@ -104,8 +104,8 @@ object CodeGen{
       case Decl(WString, Ident(ident), rhs) =>
         //todo: string length
         val r = ra.next()
-        val ret = traverseExpr(rhs, ra, code)
-        if (ret != RetReg) code += LDR(r, ret, Base)
+        traverseExpr(rhs, ra, code)
+        //if (ret != RetReg) code += LDR(r, ret, Base)
         currentShift -= 4
         val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift)
         variableLocation += (ident -> location)
@@ -156,8 +156,8 @@ object CodeGen{
                   POP(PC))
           }
         }
-        code += ADD(reg(4), SP, imm(0))
-        code += MOV(RetReg, reg(4), Base)
+        code += ADD(ra.next(), SP, imm(0))
+        code += MOV(RetReg, ra.next(), Base)
         code += BL(t)
 
       case Print(expr: AstNode) =>
@@ -212,7 +212,7 @@ object CodeGen{
                   BL("ffllush"),
                   POP(PC))
             }
-            if (ra.next() != ret) code += LDR(ra.next(), ret, SB)
+            if (!ret.isInstanceOf[reg]) code += LDR(ra.next(), ret, SB)
             code += MOV(RetReg, ra.next(), Base)
             code += BL("p_print_bool")
 
@@ -278,9 +278,7 @@ object CodeGen{
 
 
       case Exit(expr) =>
-        val reg = ra.next()
-        code += LDR(reg, traverseExpr(expr, ra, code), Base)
-        code += MOV(RetReg, reg, Base)
+        code += MOV(RetReg, traverseExpr(expr, ra, code), Base)
         code += BL("exit")
 
       case IfElse(cond, stat_true, stat_false) =>
@@ -376,10 +374,10 @@ object CodeGen{
       }
     }
 
-  def traverseExpr(node: AstNode, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Operand = {
+  def traverseExpr(node: AstNode, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Register = {
     node match {
       case IntLiter(x) =>
-        code += LDR(ra.next, imm(x), Base)
+        code += LDR(ra.next(), imm(x), Base)
         ra.next()
       case Negate(IntLiter(x)) => traverseExpr(IntLiter(-x), ra, code)
       case BoolLiter(b) =>
@@ -391,7 +389,8 @@ object CodeGen{
       case StrLiter(s) =>
         val int_msg = s"msg_$getDataMsgIndex"
         data(int_msg) = List(DWord(s.length), DAscii(s))
-        label(int_msg)
+        code += LDR(ra.next(), label(int_msg), Base)
+        ra.next()
       case PairLiter => ???
       case Ident(x) => variableLocation(x)
       case ArrayElem(Ident(x), elems) => ???
