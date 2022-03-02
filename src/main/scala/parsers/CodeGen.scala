@@ -94,7 +94,6 @@ object CodeGen{
         currentShift -= 1
         val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift)
         variableLocation += (ident -> location)
-        code += STRB(r, location)
       case Decl(WChar, Ident(ident), rhs) =>
         val r = ra.next()
         traverseExpr(rhs, ra, code)
@@ -175,7 +174,7 @@ object CodeGen{
               )
               labels(t) =
                 List(PUSH(LinkReg),
-                  // todo: fill in this line
+                  LDR(reg(1), regVal(RetReg), Base),
                   ADD(reg(2), RetReg, imm(4)),
                   LDR(RetReg, label(str_format_msg), Base),
                   ADD(RetReg, RetReg, imm(4)),
