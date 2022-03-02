@@ -1,6 +1,6 @@
 package parsers
 
-import parsers.SemanticPass.st
+import parsers.SemanticPass.{checkExprType, st}
 
 import scala.collection.mutable
 import scala.collection.immutable
@@ -39,6 +39,10 @@ object CodeGen{
   def traverse(node: AstNode, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Unit = {
     node match {
       case Program(funcs, stat) =>
+        for (func <- funcs) {
+          traverse(func, ra, code)
+        }
+
         code += funcName("main")
         code += PUSH(LinkReg)
         val assignments = assignmentsInScope(stat)
@@ -47,9 +51,6 @@ object CodeGen{
           // 1024 is the maximum immediate value because of shifting
           for (i <- 0 until assignments / 1024) code += SUB(SP, SP, imm(1024))
           code += SUB(SP, SP, imm(assignments % 1024))
-        }
-        for (func <- funcs) {
-          traverse(func, ra, code)
         }
 
         traverse(stat, ra, code)
@@ -63,13 +64,18 @@ object CodeGen{
         code += LTORG
 
       case Func((_type, Ident(name)), ParamList(params), stat) =>
+        val assignments = assignmentsInScope(stat)
+        currentShift = assignments
+        for (param <- params) {
+          variableLocation += (param.ident.ident -> regShift(SP, currentShift, false))
+          currentShift += typeSize(param._type)
+        }
         code += funcName(name)
         code += PUSH(LinkReg)
-        val assignmentSize = assignmentsInScope(stat)
-        if (assignmentSize > 0) code += SUB(SP, SP, imm(assignmentSize))
+        if (assignments > 0) code += SUB(SP, SP, imm(assignments))
         traverse(stat, ra, code)
-        if (assignmentSize > 0) code += ADD(SP, SP, imm(assignmentSize))
-        code += POP(LinkReg)
+        if (assignments > 0) code += ADD(SP, SP, imm(assignments))
+        code += POP(PC)
         code += LTORG
 
       case Param(_type, ident) => ???
@@ -81,7 +87,7 @@ object CodeGen{
         traverseExpr(rhs, ra, code)
         //if (ret != RetReg) code += LDR(r, ret, Base)
         currentShift -= 4
-        val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift)
+        val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, false)
         variableLocation += (ident -> location)
         code += STR(r, location)
       case Decl(WBool, Ident(ident), rhs) =>
@@ -89,21 +95,21 @@ object CodeGen{
         traverseExpr(rhs, ra, code)
         //if (ret != RetReg) code += MOV(r, ret, Base)
         currentShift -= 1
-        val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift)
+        val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, false)
         variableLocation += (ident -> location)
         code += STRB(r, location)
       case Decl(WChar, Ident(ident), rhs) =>
         val r = ra.next()
         traverseExpr(rhs, ra, code)
         currentShift -= 1
-        val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift)
+        val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, false)
         variableLocation += (ident -> location)
         code += STRB(r, location)
       case Decl(WString, Ident(ident), rhs) =>
         val r = ra.next()
         traverseExpr(rhs, ra, code)
         currentShift -= 4
-        val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift)
+        val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, false)
         variableLocation += (ident -> location)
         code += STR(r, location)
       //case Decl
@@ -324,9 +330,17 @@ object CodeGen{
         ra.next()
       case ArrayElem(Ident(x), elems) => ???
       case ParensExpr(expr) => traverseExpr(expr, ra, code)
-      case Call(Ident(name), args) =>
-        // TODO deal with arguments
+      case Call(Ident(name), ArgList(args)) =>
+        var totalSize = 0
+        for (arg <- args) {
+          val size = typeSize(checkExprType(arg, arg, new ListBuffer[String]))
+          totalSize += size
+          val reg = traverseExpr(arg, ra, code)
+          if (size == 4) code += STR(reg, regShift(SP, -size, true))
+          else code += STRB(reg, regShift(SP, -size, true))
+        }
         code += BL(name)
+        code += ADD(SP, SP, imm(totalSize))
         RetReg
 
       case And(expr1, expr2) =>

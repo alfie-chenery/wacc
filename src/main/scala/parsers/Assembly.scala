@@ -118,8 +118,8 @@ object Assembly {
   case class label(l: String) extends Operand {
     override def toString: String = "=" + l
   }
-  case class regShift(reg: Register, shift: Int) extends Register {
-    override def toString: String = "[" + reg.toString + ", #" + shift + "]"
+  case class regShift(reg: Register, shift: Int, update: Boolean) extends Register {
+    override def toString: String = "[" + reg.toString + ", #" + shift + "]" + (if (update) "!" else "")
   }
   case class regVal(reg: Register) extends Register {
     override def toString: String = "[" + reg.toString + "]"
