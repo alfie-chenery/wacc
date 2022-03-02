@@ -436,18 +436,8 @@ object CodeGen{
         val res2 = traverseExpr(expr2, ra, code)
         if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
         code += ADDS(reg1, reg1, ra.next())
-        val int_msg = s"msg_$getDataMsgIndex"
+        intOverflow()
         // TODO factor this out by making it standard in a map
-        data(int_msg) =
-          List(DWord(83),
-            DAscii("OverflowError: the result is too small/large to store in a 4-byte signed-integer.\\n\\0"))
-        labels("p_throw_overflow") =
-          List(LDR(RetReg, label(int_msg), Base),
-            BL("p_throw_runtime_error"))
-        labels("p_throw_runtime_error") =
-            List(BL("p_print_string"),
-              MOV(RetReg, imm(-1), Base),
-              BL("exit"))
           code += BLVS("p_throw_overflow_error")
         ra.restore()
         reg1
@@ -459,36 +449,18 @@ object CodeGen{
         val res2 = traverseExpr(expr2, ra, code)
         if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
         code += SUBS(reg1, reg1, ra.next())
-        val int_msg = s"msg_$getDataMsgIndex"
-        data(int_msg) =
-          List(DWord(83),
-            DAscii("OverflowError: the result is too small/large to store in a 4-byte signed-integer.\\n\\0"))
-        labels("p_throw_overflow") =
-          List(LDR(RetReg, label(int_msg), Base),
-            BL("p_throw_runtime_error"))
-        labels("p_throw_runtime_error") =
-          List(BL("p_print_string"),
-            MOV(RetReg, imm(-1), Base),
-            BL("exit"))
+        intOverflow()
         code += BLVS("p_throw_overflow_error")
         ra.restore()
         reg1
 
+      case Mult(expr1, expr2) => ???
+      case Div(expr1, expr2) => ???
 
       case Negate(expr) =>
         val reg = traverseExpr(expr, ra, code)
         if (!reg.isInstanceOf[reg]) code += LDR(reg, reg, Base)
-        val int_msg = s"msg_$getDataMsgIndex"
-        data(int_msg) =
-          List(DWord(83),
-            DAscii("OverflowError: the result is too small/large to store in a 4-byte signed-integer.\\n\\0"))
-        labels("p_throw_overflow") =
-          List(LDR(RetReg, label(int_msg), Base),
-            BL("p_throw_runtime_error"))
-        labels("p_throw_runtime_error") =
-          List(BL("p_print_string"),
-            MOV(RetReg, imm(-1), Base),
-            BL("exit"))
+        intOverflow()
         code += RSBS(reg, reg, imm(0))
         code += BLVS("p_throw_overflow_error")
         reg
@@ -499,10 +471,36 @@ object CodeGen{
         code += EOR(reg, reg, imm(1))
         reg
 
-      //case
+      case Chr(expr) =>
+        val reg = traverseExpr(expr, ra, code)
+        code += MOV(RetReg, reg, Base)
+        code += BL("putchar")
+        reg
+
+        /*
+      case Ord(expr) =>
+        val reg = traverseExpr(expr, ra, code)
+         */
 
       // TODO binary and unary ops
     }
+  }
+
+  def intOverflow(): Unit = {
+    val int_msg = s"msg_$getDataMsgIndex"
+    if (!labels.contains("p_throw_overflow_error")) {
+      data(int_msg) =
+        List(DWord(83),
+          DAscii("OverflowError: the result is too small/large to store in a 4-byte signed-integer.\\n\\0"))
+      labels("p_throw_overflow_error") =
+        List(LDR(RetReg, label(int_msg), Base),
+          BL("p_throw_runtime_error"))
+    }
+    if (!labels.contains("p_throw_runtime_error"))
+      labels("p_throw_runtime_error") =
+        List(BL("p_print_string"),
+          MOV(RetReg, imm(-1), Base),
+          BL("exit"))
   }
 
   def traverseBinaryExpr(expr1: Expr, expr2: Expr, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Unit = {
