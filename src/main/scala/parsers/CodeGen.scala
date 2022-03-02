@@ -117,6 +117,7 @@ object CodeGen{
       //case Decl
 
       case Assign(Ident(ident), rhs) =>
+        // TODO MOV might be the wrong instruction
         code += MOV(variableLocation(ident), traverseExpr(rhs, ra, code), Base)
       case Assign(lhs, rhs) => ???
 
@@ -215,7 +216,7 @@ object CodeGen{
                   BL("ffllush"),
                   POP(PC))
             }
-            code += MOV(reg(4), ret, Base)
+            code += LDR(reg(4), ret, Base)
             code += MOV(RetReg, reg(4), Base)
             code += BL("p_print_bool")
 
@@ -235,12 +236,12 @@ object CodeGen{
                   BL("fflush"),
                   POP(PC))
             }
-            code += MOV(reg(4), ret, Base)
+            code += LDR(reg(4), ret, Base)
             code += MOV(RetReg, reg(4), Base)
             code += BL("p_print_int")
 
           case WChar =>
-            code += MOV(reg(4), ret, Base)
+            code += LDR(reg(4), ret, Base)
             code += MOV(RetReg, reg(4), Base)
             code += BL("putchar")
 
