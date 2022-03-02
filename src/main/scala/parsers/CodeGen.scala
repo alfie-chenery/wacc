@@ -424,8 +424,52 @@ object CodeGen{
         ra.restore()
         reg1
 
+      case Greater(expr1, expr2) =>
+        val res1 = traverseExpr(expr1, ra, code)
+        val reg1 = ra.nextRm()
+        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
+        val res2 = traverseExpr(expr2, ra, code)
+        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
+        phonyCaseCompare(code, GT, reg1, ra.next())
+        ra.restore()
+        reg1
+      case GreaterEq(expr1, expr2) =>
+        val res1 = traverseExpr(expr1, ra, code)
+        val reg1 = ra.nextRm()
+        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
+        val res2 = traverseExpr(expr2, ra, code)
+        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
+        phonyCaseCompare(code, GE, reg1, ra.next())
+        ra.restore()
+        reg1
+      case Less(expr1, expr2) =>
+        val res1 = traverseExpr(expr1, ra, code)
+        val reg1 = ra.nextRm()
+        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
+        val res2 = traverseExpr(expr2, ra, code)
+        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
+        phonyCaseCompare(code, LT, reg1, ra.next())
+        ra.restore()
+        reg1
+      case LessEq(expr1, expr2) =>
+        val res1 = traverseExpr(expr1, ra, code)
+        val reg1 = ra.nextRm()
+        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
+        val res2 = traverseExpr(expr2, ra, code)
+        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
+        phonyCaseCompare(code, LE, reg1, ra.next())
+        ra.restore()
+        reg1
       // TODO binary and unary ops
     }
+  }
+
+  def traverseBinaryExpr(expr1: Expr, expr2: Expr, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Unit = {
+    val res1 = traverseExpr(expr1, ra, code)
+    val reg1 = ra.nextRm()
+    if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
+    val res2 = traverseExpr(expr2, ra, code)
+    if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
   }
 
   def phonyCaseCompare(code: ListBuffer[Mnemonic], suffix1: Suffix, reg1: Register, reg2: Register): Unit = {
@@ -455,7 +499,6 @@ object CodeGen{
     code += CMP(reg1, reg2)
     code += MOV(reg1, imm(1), suffix1)
     code += MOV(reg1, imm(0), suffix2)
-    code += MOV(RetReg, reg1, Base)
   }
 
   //TODO add actual IO to file, presumably file passed as parameter
