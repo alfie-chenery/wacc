@@ -27,6 +27,10 @@ object Main {
     SemanticPass.traverse(renamedProgram, errors)
 
     if (errors.nonEmpty) {
+      for (error <- errors) {
+        if (error.startsWith("Syntax error")) sys.exit(100)
+        println(error)
+      }
       errors.foreach(println(_))
       sys.exit(200)
     }
