@@ -65,7 +65,7 @@ object CodeGen{
 
       case Func((_type, Ident(name)), ParamList(params), stat) =>
         val assignments = assignmentsInScope(stat)
-        currentShift = assignments
+        currentShift = assignments + 4
         for (param <- params) {
           variableLocation += (param.ident.ident -> regShift(SP, currentShift, false))
           currentShift += typeSize(param._type)
