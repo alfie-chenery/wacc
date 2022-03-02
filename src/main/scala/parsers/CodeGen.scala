@@ -79,27 +79,24 @@ object CodeGen{
       case Decl(PairType(t1, t2), ident, PairLiter) => ???
       case Decl(WInt, Ident(ident), rhs) =>
         val r = ra.next()
-        val ret = traverseExpr(rhs, ra, code)
-        if (ret != RetReg) code += LDR(r, ret, Base)
-        // TODO fix the shift size
+        traverseExpr(rhs, ra, code)
+        //if (ret != RetReg) code += LDR(r, ret, Base)
         currentShift -= 4
         val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift)
         variableLocation += (ident -> location)
         code += STR(r, location)
       case Decl(WBool, Ident(ident), rhs) =>
         val r = ra.next()
-        val ret = traverseExpr(rhs, ra, code)
+        traverseExpr(rhs, ra, code)
         //if (ret != RetReg) code += MOV(r, ret, Base)
-        // TODO this isn't quite going to work for variables of different types that take up different amounts of space
         currentShift -= 1
         val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift)
         variableLocation += (ident -> location)
         code += STRB(r, location)
       case Decl(WChar, Ident(ident), rhs) =>
         val r = ra.next()
-        // TODO reg shifts
-        val ret = traverseExpr(rhs, ra, code)
-        if (ret != RetReg) code += MOV(r, ret, Base)
+        traverseExpr(rhs, ra, code)
+        //if (ret != RetReg) code += MOV(r, ret, Base)
         currentShift -= 1
         val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift)
         variableLocation += (ident -> location)
@@ -381,12 +378,16 @@ object CodeGen{
 
   def traverseExpr(node: AstNode, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Operand = {
     node match {
-      case IntLiter(x) => imm(x)
-      case Negate(IntLiter(x)) => imm(-x)
+      case IntLiter(x) =>
+        code += LDR(ra.next, imm(x), Base)
+        ra.next()
+      case Negate(IntLiter(x)) => traverseExpr(IntLiter(-x), ra, code)
       case BoolLiter(b) =>
         code += MOV(ra.next(), imm(if (b) 1 else 0), Base)
         ra.next()
-      case CharLiter(c) => immc(c)
+      case CharLiter(c) =>
+        code += MOV(ra.next(), immc(c), Base)
+        ra.next()
       case StrLiter(s) =>
         val int_msg = s"msg_$getDataMsgIndex"
         data(int_msg) = List(DWord(s.length), DAscii(s))
