@@ -483,6 +483,7 @@ object CodeGen{
     }
 
   def traverseExpr(node: AstNode, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Register = {
+    val spill = ra.size==2 // defines whether we are in a register spill state
     node match {
       case IntLiter(x) =>
         code += LDR(ra.next, imm(x), Base)
@@ -569,6 +570,30 @@ object CodeGen{
 
       case And(expr1, expr2) =>
         var res1 = traverseExpr(expr1, ra, code)
+        val reg1 = if (spill) ra.next else ra.nextRm
+        if (!res1.isInstanceOf[reg]) {
+          code += LDR(reg1, res1, SB)
+          res1 = reg1
+        }
+        if (spill) code += PUSH(res1)
+        var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
+        if (!res2.isInstanceOf[reg]) {
+          code += LDR(ra.next, res2, SB)
+          res2 = ra.next
+        }
+        if (spill) {
+          res1 = ra.getAvailable(1)
+          code += POP(res1)
+          code += AND(res2, res2, res1)
+        } else {
+          code += AND(res1, res1, res2)
+        }
+        intOverflow()
+        code += BL("p_throw_overflow_error", VS)
+        ra.restore()
+        reg1
+        /*
+        var res1 = traverseExpr(expr1, ra, code)
         val reg1 = ra.nextRm
         if (!res1.isInstanceOf[reg]) {
           code += LDR(reg1, res1, SB)
@@ -582,7 +607,7 @@ object CodeGen{
         print(ra.next)
         code += AND(res1, res1, res2)
         ra.restore()
-        reg1
+        reg1*/
 
       // TODO factor out repeated code
       case Or(expr1, expr2) =>
@@ -665,16 +690,34 @@ object CodeGen{
         ra.restore()
         reg1
 
+      /**
+       * @return a register containing the result of expr1 PLUS expr2
+       *
+       * Note on 'spill' state:
+       * If there are only 2 remaining registers in the RegisterAllocator, this function will
+       * operate in a 'spill' state; upon computing the first expression its value will be pushed to
+       * the stack and the register freed for use when computing expr2.
+       */
       case Plus(expr1, expr2) =>
-        val res1 = traverseExpr(expr1, ra, code)
-        val reg1 = ra.nextRm
-        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
-        var res2 = traverseExpr(expr2, ra , code)
+        var res1 = traverseExpr(expr1, ra, code)
+        val reg1 = if (spill) ra.next else ra.nextRm
+        if (!res1.isInstanceOf[reg]) {
+          code += LDR(reg1, res1, SB)
+          res1 = reg1
+        }
+        if (spill) code += PUSH(res1) // now that res1 is on the stack, its old reg is free to be overwritten
+        var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
         if (!res2.isInstanceOf[reg]) {
           code += LDR(ra.next, res2, SB)
-          res2 = ra.next
+          res2 = ra.next // res2 now contains the result of expr 2
         }
-        code += ADDS(reg1, reg1, res2)
+        if (spill) {
+          res1 = ra.getAvailable(1)
+          code += POP(res1)
+          code += ADDS(res2, res1, res2)
+        } else { // needs separate ADD cases, since the res1 or res2 will be the lower register address depending on whether we're in a spill state
+          code += ADDS(res1, res1, res2)
+        }
         intOverflow()
         code += BL("p_throw_overflow_error", VS)
         ra.restore()

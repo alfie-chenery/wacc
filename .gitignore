@@ -1,6 +1,8 @@
 #ignore output directories
 .idea
 target
+src/main/scala/parsers/project
+src/test/scala/parsers/project
 
 #ignore Java class files
 *.class
