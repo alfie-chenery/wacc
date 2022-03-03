@@ -260,11 +260,20 @@ object CodeGen{
             code += MOV(RetReg, ra.next(), Base)
             code += BL("putchar")
 
+
+          case ArrayType(_type) =>
+            //printing an array variable prints its address
+            printReference()
+            if (!ret.isInstanceOf[reg]) code += LDR(ra.next(), ret, SB)
+            code += MOV(RetReg, ra.next(), Base)
+            code += BL("p_print_reference")
+
+
           //TODO: implement all other print types
           /*
-          case PairLiter => ???
-          case Ident(ident: String) => ??? // ?
           case ArrayElem(ident: Ident, expr: List[Expr]) => ???
+          case PairLiter => ???
+          case Ident(ident: String) => ???
           case ParensExpr(expr: Expr) => ??? // is this actually a possibility or are these removed in the previous passes?
            */
 
@@ -592,6 +601,26 @@ object CodeGen{
           LDR(reg(1), regVal(RetReg), Base),
           ADD(reg(2), RetReg, imm(4)),
           LDR(RetReg, label(str_format_msg), Base),
+          ADD(RetReg, RetReg, imm(4)),
+          BL("printf"),
+          MOV(RetReg, imm(0), Base),
+          BL("fflush"),
+          POP(PC)
+        )
+    }
+  }
+
+  def printReference(): Unit = {
+    if (!labels.contains("p_print_reference")) {
+      val ptr_format_msg = s"msg_$getDataMsgIndex"
+      data(ptr_format_msg) = List(
+        DWord(3),
+        DAscii("%p\\0")
+      )
+      labels("p_print_reference") =
+        List(PUSH(LinkReg),
+          MOV(reg(1), RetReg, Base),
+          LDR(RetReg, label(ptr_format_msg), Base),
           ADD(RetReg, RetReg, imm(4)),
           BL("printf"),
           MOV(RetReg, imm(0), Base),
