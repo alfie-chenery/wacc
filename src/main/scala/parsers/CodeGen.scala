@@ -446,8 +446,9 @@ object CodeGen{
       case ArrayElem(Ident(x), elems) =>
         // TODO this wouldn't work for multi-dimensional arrays
         val arr = variableLocation(x)
+        val arrReg = if (arr.isInstanceOf[regVal]) arr.asInstanceOf[regVal].reg else arr
         val arrLoc = ra.nextRm()
-        code += ADD(arrLoc, arr, imm(0))
+        code += ADD(arrLoc, arrReg, imm(0))
         if (!labels.contains("p_check_array_bounds")) {
           val negMessage = s"msg_$getDataMsgIndex"
           data(negMessage) = List(
