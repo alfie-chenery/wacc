@@ -290,6 +290,7 @@ object CodeGen{
               BL("scanf", Base),
               POP(PC))
         }
+        // TODO this immediate value needs to be decremented for each read from 4 * no. of reads
         code += ADD(ra.next, SP, imm(0))
         code += MOV(RetReg, ra.next, Base)
         code += BL(t, Base)
