@@ -595,8 +595,6 @@ object CodeGen{
         } else {
           code += AND(res1, res1, res2)
         }
-        intOverflow()
-        code += BL("p_throw_overflow_error", VS)
         ra.restore()
         reg1
         /*
@@ -611,27 +609,48 @@ object CodeGen{
           code += LDR(ra.next, res2, SB)
           res2 = ra.next
         }
-        print(ra.next)
         code += AND(res1, res1, res2)
         ra.restore()
-        reg1*/
+        reg1
+        */
 
       // TODO factor out repeated code
       case Or(expr1, expr2) =>
         var res1 = traverseExpr(expr1, ra, code)
-        val reg1 = ra.nextRm
+        val reg1 = if (spill) ra.next else ra.nextRm
         if (!res1.isInstanceOf[reg]) {
           code += LDR(reg1, res1, SB)
           res1 = reg1
         }
-        var res2 = traverseExpr(expr2, ra, code)
+        if (spill) code += PUSH(res1)
+        var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
         if (!res2.isInstanceOf[reg]) {
           code += LDR(ra.next, res2, SB)
           res2 = ra.next
         }
-        code += ORR(res1, res1, res2)
+        if (spill) {
+          res1 = ra.getAvailable(1)
+          code += POP(res1)
+          code += ORR(res2, res2, res1)
+        } else {
+          code += ORR(res1, res1, res2)
+        }
         ra.restore()
         reg1
+//        var res1 = traverseExpr(expr1, ra, code)
+//        val reg1 = ra.nextRm
+//        if (!res1.isInstanceOf[reg]) {
+//          code += LDR(reg1, res1, SB)
+//          res1 = reg1
+//        }
+//        var res2 = traverseExpr(expr2, ra, code)
+//        if (!res2.isInstanceOf[reg]) {
+//          code += LDR(ra.next, res2, SB)
+//          res2 = ra.next
+//        }
+//        code += ORR(res1, res1, res2)
+//        ra.restore()
+//        reg1
 
         // TODO check if reg1 should be moved with LDR or LDRSB
       case Greater(expr1, expr2) =>
