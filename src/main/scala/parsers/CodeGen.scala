@@ -77,8 +77,6 @@ object CodeGen{
         code += POP(PC)
         code += LTORG
 
-      case Param(_type, ident) => ???
-
       // <Stat>
       case Decl(PairType(t1, t2), Ident(ident), NewPair(fst, snd)) =>
         code += LDR(RetReg, imm(8), Base)
@@ -146,17 +144,62 @@ object CodeGen{
         val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, update = false)
         variableLocation += (ident -> location)
         code += STR(r, location)
-      //case Decl
 
       case Assign(Ident(ident), rhs) =>
         if (st(Ident(ident))._2 == WInt) code += STR(traverseExpr(rhs, ra, code), variableLocation(ident))
         else code += STRB(traverseExpr(rhs, ra, code), variableLocation(ident))
       case Assign(ArrayElem(ident, expr), rhs) =>
-        var ret = traverseExpr(rhs, ra, code)
+        val ret = traverseExpr(rhs, ra, code)
         ra.nextRm()
-        var arr = traverseExpr(ArrayElem(ident, expr), ra, code)
+        val arr = traverseExpr(ArrayElem(ident, expr), ra, code)
         code += STR(ret, arr)
-      // TODO pair assignment
+        //TODO: remove duplication
+      case Assign(FstPair(expr), rhs) =>
+        val reg = traverseExpr(rhs, ra, code)
+        var r = ra.next()
+        code += LDR(r, regVal(SP), Base)
+        code += MOV(RetReg, r, Base)
+        code += BL("p_check_null_pointer")
+        code += LDR(r, regVal(r), Base)
+        code += STR(reg, regVal(r))
+        runtimeError()
+        val null_msg: String = s"msg_$getDataMsgIndex"
+        data(null_msg) =
+          List(DWord(50),
+            DAscii("NullReferenceError: dereference a null reference\\n\\0"))
+        val pair_check_null_pointer = "p_check_null_pointer"
+        if (!labels.contains(pair_check_null_pointer)) {
+          labels(pair_check_null_pointer) =
+            List(PUSH(LinkReg),
+              CMP(RetReg, imm(0)),
+              LDR(RetReg, label(null_msg), Base),
+              BLEQ("p_throw_runtime_error"),
+              POP(PC)
+            )
+        }
+      case Assign(SndPair(expr), rhs) =>
+        val reg = traverseExpr(rhs, ra, code)
+        var r = ra.next()
+        code += LDR(r, regVal(SP), Base)
+        code += MOV(RetReg, r, Base)
+        code += BL("p_check_null_pointer")
+        code += LDR(r, regShift(r, 4, false), Base)
+        code += STRB(reg, regVal(r))
+        runtimeError()
+        val null_msg: String = s"msg_$getDataMsgIndex"
+        data(null_msg) =
+          List(DWord(50),
+            DAscii("NullReferenceError: dereference a null reference\\n\\0"))
+        val pair_check_null_pointer = "p_check_null_pointer"
+        if (!labels.contains(pair_check_null_pointer)) {
+          labels(pair_check_null_pointer) =
+            List(PUSH(LinkReg),
+              CMP(RetReg, imm(0)),
+              LDR(RetReg, label(null_msg), Base),
+              BLEQ("p_throw_runtime_error"),
+              POP(PC)
+            )
+        }
 
       case Free(expr) =>
         val r = ra.next()
