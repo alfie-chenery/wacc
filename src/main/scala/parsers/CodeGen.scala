@@ -279,33 +279,25 @@ object CodeGen{
         }
         if (!labels.contains(t)) {
           val read_msg = s"msg_$getDataMsgIndex"
-          // TODO remove massive duplication
           t match {
             case "p_read_char" =>
               data(read_msg) = List(
                 DWord(4),
                 DAscii(" %c\\0")
               )
-              labels("p_read_char") =
-                List(PUSH(LinkReg),
-                  MOV(reg(1), RetReg, Base),
-                  LDR(RetReg, label(read_msg), Base),
-                  ADD(RetReg, RetReg, imm(4)),
-                  BL("scanf"),
-                  POP(PC))
             case "p_read_int" =>
               data(read_msg) = List(
                 DWord(3),
                 DAscii("%d\\0")
               )
-              labels("p_read_int") =
-                List(PUSH(LinkReg),
-                  MOV(reg(1), RetReg, Base),
-                  LDR(RetReg, label(read_msg), Base),
-                  ADD(RetReg, RetReg, imm(4)),
-                  BL("scanf"),
-                  POP(PC))
           }
+          labels(t) =
+            List(PUSH(LinkReg),
+              MOV(reg(1), RetReg, Base),
+              LDR(RetReg, label(read_msg), Base),
+              ADD(RetReg, RetReg, imm(4)),
+              BL("scanf"),
+              POP(PC))
         }
         code += ADD(ra.next(), SP, imm(0))
         code += MOV(RetReg, ra.next(), Base)
