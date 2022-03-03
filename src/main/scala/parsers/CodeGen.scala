@@ -115,7 +115,7 @@ object CodeGen{
         code += STR(ra.next(), regVal(reg))
         code += STR(reg, regVal(SP))
         // TODO this location probably needs to be changed
-        variableLocation += (ident -> regVal(SP))
+        variableLocation += (ident -> SP)
         ra.restore()
       case Decl(WInt, Ident(ident), rhs) =>
         val r = ra.next()
@@ -373,10 +373,45 @@ object CodeGen{
         ra.next()
       case ArrayElem(Ident(x), elems) =>
         // TODO this wouldn't work for multi-dimensional arrays
-        val reg1 = ra.nextRm()
-        code += ADD(reg1, SP, traverseExpr(elems.head, ra, code))
+        val arr = variableLocation(x)
+        val arrLoc = ra.nextRm()
+        code += ADD(arrLoc, arr, imm(0))
+        if (!labels.contains("p_check_array_bounds")) {
+          val negMessage = s"msg_$getDataMsgIndex"
+          data(negMessage) = List(
+            DWord(44),
+            DAscii("ArrayIndexOutOfBoundsError: negative index\\n\\0")
+          )
+          val largeMessage = s"msg_$getDataMsgIndex"
+          data(largeMessage) = List(
+            DWord(45),
+            DAscii("ArrayIndexOutOfBoundsError: index too large\\n\\0")
+          )
+          runtimeError()
+          labels("p_check_array_bounds") =
+            List(PUSH(LinkReg),
+              CMP(RetReg, imm(0)),
+              LDR(RetReg, label(negMessage), LT),
+              BLLT("p_throw_runtime_error"),
+              LDR(reg(1), regVal(reg(1)), Base),
+              CMP(RetReg, reg(1)),
+              LDR(RetReg, label(largeMessage), CS),
+              BLCS("p_throw_runtime_error"),
+              POP(PC)
+            )
+        }
+        for (elem <- elems) {
+          val ret = traverseExpr(elem, ra, code)
+          code += LDR(arrLoc, regVal(arrLoc), Base)
+          code += MOV(RetReg, ret, Base)
+          code += MOV(reg(1), arrLoc, Base)
+          // TODO this constants should probably changed based on the size of the things in the array
+          code += BL("p_check_array_bounds")
+          code += ADD(arrLoc, arrLoc, imm(4))
+          code += ADD(arrLoc, arrLoc, lsl(ret, 2))
+        }
         ra.restore()
-        reg1
+        regVal(arrLoc)
       case ParensExpr(expr) => traverseExpr(expr, ra, code)
       case Call(Ident(name), ArgList(args)) =>
         var totalSize = 0

@@ -201,7 +201,11 @@ object SemanticPass {
           null
         }
       case ParensExpr(expr) => checkExprType(expr, node, errors)
-      case ArrayElem(ident, _) => checkType(st(ident)._1, errors)
+      case ArrayElem(ident, _) =>
+        checkType(st(ident)._1, errors) match {
+          case ArrayType(t) => t
+          case t => t
+        }
       case Ord(_) => WInt
       case Chr(_) => WChar
       case Len(_) => WInt

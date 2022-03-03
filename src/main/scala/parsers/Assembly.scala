@@ -76,11 +76,15 @@ object Assembly {
   case class ORR(rd: Register, rn: Register, rm: Register) extends Mnemonic {
     override def toString: String = "ORR " + rd.toString + ", " + rn.toString + ", " + rm.toString
   }
+  // TODO give BL a suffix
   case class BLVS(label: String) extends Mnemonic {
     override def toString: String = "BLVS " + label
   }
   case class BLNE(label: String) extends Mnemonic {
     override def toString: String = "BLNE " + label
+  }
+  case class BLCS(label: String) extends Mnemonic {
+    override def toString: String = "BLCS " + label
   }
   case class ADDS(rd: Register, rn: Register, rm: Register) extends Mnemonic {
     override def toString: String = "ADDS " + rd.toString + ", " + rn.toString + ", " + rm.toString
@@ -97,6 +101,9 @@ object Assembly {
   }
   case class BLEQ(label: String) extends Mnemonic {
     override def toString: String = "BLEQ " + label
+  }
+  case class BLLT(label: String) extends Mnemonic {
+    override def toString: String = "BLLT " + label
   }
   case class EOR(rd: Register, o2: Operand, o3: Operand) extends Mnemonic {
     override def toString: String = "EOR " + rd.toString + ", " + o2.toString + ", " + o3.toString
@@ -163,6 +170,9 @@ object Assembly {
   }
   case object GT extends Suffix {
     override def toString: String = "GT"
+  }
+  case object CS extends Suffix {
+    override def toString: String = "CS"
   }
   case object NE extends Suffix {
     override def toString: String = "NE"
