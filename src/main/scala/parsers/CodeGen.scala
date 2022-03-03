@@ -152,7 +152,7 @@ object CodeGen{
       case Assign(Ident(ident), rhs) =>
         if (st(Ident(ident))._2 == WInt) code += STR(traverseExpr(rhs, ra, code), variableLocation(ident))
         else code += STRB(traverseExpr(rhs, ra, code), variableLocation(ident))
-      case Assign(lhs, rhs) => ???
+      case Assign(lhs, rhs) => ??? //TODO is this case possible? surely a lhs not being an identifier was removed in parsing
 
       case Free(expr) => ???
 
@@ -341,10 +341,6 @@ object CodeGen{
         for (stat <- stats) {
           traverse(stat, ra, code)
         }
-      //TODO - potentially make an eval function to evaluate expr1 to a intLiter
-      // or make traverse of intLitter(x) return x.toString and nothing else
-      // so that the expr and intLiter cases can be combined
-      // ie case Greater(expr1, expr2) handles if expr1 and expr2 are already intLiter
 
       case _ =>
       }
@@ -571,14 +567,10 @@ object CodeGen{
 
       case Chr(expr) =>
         val reg = traverseExpr(expr, ra, code)
-        code += MOV(RetReg, reg, Base)
-        code += BL("putchar")
         reg
 
       case Ord(expr) =>
         val reg = traverseExpr(expr, ra, code)
-        // TODO implement this
-        //code += MOV(reg, immc(expr.asInstanceOf[Char]), Base)
         reg
 
       case Len(expr) =>
@@ -693,7 +685,7 @@ object CodeGen{
       case LT =>
         suffix2 = GE
       case LE =>
-    suffix2 = GT
+        suffix2 = GT
       case EQ =>
         suffix2 = NE
       case NE =>

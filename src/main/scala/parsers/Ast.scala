@@ -56,7 +56,7 @@ object Ast {
   sealed trait Expr extends AssignRHS
   case class IntLiter(x: Int) extends Term
   case class BoolLiter(b: Boolean) extends Term
-  case class CharLiter(c: String) extends Term
+  case class CharLiter(c: String) extends Term //charLiter stores a string to allow us to deal with escape characters easier
   case class StrLiter(s: String) extends Term
   case object PairLiter extends Term
   case class Ident(ident: String) extends Term with AssignLHS
