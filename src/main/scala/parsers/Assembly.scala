@@ -56,8 +56,8 @@ object Assembly {
   case class MOV(rd: Register, o2: Operand, suffix: Suffix) extends Mnemonic {
     override def toString: String = "MOV" + suffix.toString + " " + rd.toString + ", " + o2.toString
   }
-  case class BL(label: String) extends Mnemonic {
-    override def toString: String = "BL " + label
+  case class BL(label: String, suffix: Suffix) extends Mnemonic {
+    override def toString: String = "BL" + suffix.toString + " " + label
   }
   case class CMP(r: Register, o2: Operand) extends Mnemonic {
     override def toString: String = "CMP " + r.toString + ", " + o2.toString
@@ -76,16 +76,6 @@ object Assembly {
   case class ORR(rd: Register, rn: Register, rm: Register) extends Mnemonic {
     override def toString: String = "ORR " + rd.toString + ", " + rn.toString + ", " + rm.toString
   }
-  // TODO give BL a suffix
-  case class BLVS(label: String) extends Mnemonic {
-    override def toString: String = "BLVS " + label
-  }
-  case class BLNE(label: String) extends Mnemonic {
-    override def toString: String = "BLNE " + label
-  }
-  case class BLCS(label: String) extends Mnemonic {
-    override def toString: String = "BLCS " + label
-  }
   case class ADDS(rd: Register, rn: Register, rm: Register) extends Mnemonic {
     override def toString: String = "ADDS " + rd.toString + ", " + rn.toString + ", " + rm.toString
   }
@@ -98,12 +88,6 @@ object Assembly {
   case class SMULL(rdLo: Register, rdHi: Register, rm: Register, rs: Register) extends Mnemonic {
     override def toString: String =
       "SMULL " + rdLo.toString + ", " + rdHi.toString + ", " + rm.toString + ", " + rs.toString
-  }
-  case class BLEQ(label: String) extends Mnemonic {
-    override def toString: String = "BLEQ " + label
-  }
-  case class BLLT(label: String) extends Mnemonic {
-    override def toString: String = "BLLT " + label
   }
   case class EOR(rd: Register, o2: Operand, o3: Operand) extends Mnemonic {
     override def toString: String = "EOR " + rd.toString + ", " + o2.toString + ", " + o3.toString
@@ -182,6 +166,9 @@ object Assembly {
   }
   case object SB extends Suffix {
     override def toString: String = "SB"
+  }
+  case object VS extends Suffix {
+    override def toString: String = "VS"
   }
   case object Base extends Suffix { // todo: is there any way of overloading function definitions instead?
     override def toString: String = ""

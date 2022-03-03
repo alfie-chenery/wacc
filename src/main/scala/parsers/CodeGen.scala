@@ -80,17 +80,17 @@ object CodeGen{
       // <Stat>
       case Decl(PairType(t1, t2), Ident(ident), NewPair(fst, snd)) =>
         code += LDR(RetReg, imm(8), Base)
-        code += BL("malloc")
+        code += BL("malloc", Base)
         code += MOV(ra.next(), RetReg, Base)
         val reg1 = ra.nextRm()
         val fstReg = traverseExpr(fst, ra, code)
         code += LDR(RetReg, imm(typeSize(t1)), Base)
-        code += BL("malloc")
+        code += BL("malloc", Base)
         code += STR(fstReg, regVal(RetReg))
         code += STR(RetReg, regVal(reg1))
         val sndReg = traverseExpr(snd, ra, code)
         code += LDR(RetReg, imm(typeSize(t2)), Base)
-        code += BL("malloc")
+        code += BL("malloc", Base)
         code += STRB(ra.next(), regVal(RetReg))
         code += STR(RetReg, regShift(reg1, 4, update = false))
         code += STR(reg1, regVal(SP))
@@ -99,7 +99,7 @@ object CodeGen{
         ra.restore()
       case Decl(ArrayType(_type), Ident(ident), ArrayLiter(exprs)) =>
         code += LDR(RetReg, imm(exprs.length * typeSize(_type) + 4), Base)
-        code += BL("malloc")
+        code += BL("malloc", Base)
         val reg =ra.nextRm()
         code += MOV(reg, RetReg, Base)
         var location = 4
@@ -159,7 +159,7 @@ object CodeGen{
         var r = ra.next()
         code += LDR(r, regVal(SP), Base)
         code += MOV(RetReg, r, Base)
-        code += BL("p_check_null_pointer")
+        code += BL("p_check_null_pointer", Base)
         code += LDR(r, regVal(r), Base)
         code += STR(reg, regVal(r))
         runtimeError()
@@ -173,7 +173,7 @@ object CodeGen{
             List(PUSH(LinkReg),
               CMP(RetReg, imm(0)),
               LDR(RetReg, label(null_msg), Base),
-              BLEQ("p_throw_runtime_error"),
+              BL("p_throw_runtime_error", EQ),
               POP(PC)
             )
         }
@@ -182,8 +182,8 @@ object CodeGen{
         var r = ra.next()
         code += LDR(r, regVal(SP), Base)
         code += MOV(RetReg, r, Base)
-        code += BL("p_check_null_pointer")
-        code += LDR(r, regShift(r, 4, false), Base)
+        code += BL("p_check_null_pointer", Base)
+        code += LDR(r, regShift(r, 4, update = false), Base)
         code += STRB(reg, regVal(r))
         runtimeError()
         val null_msg: String = s"msg_$getDataMsgIndex"
@@ -196,7 +196,7 @@ object CodeGen{
             List(PUSH(LinkReg),
               CMP(RetReg, imm(0)),
               LDR(RetReg, label(null_msg), Base),
-              BLEQ("p_throw_runtime_error"),
+              BL("p_throw_runtime_error", EQ),
               POP(PC)
             )
         }
@@ -213,7 +213,7 @@ object CodeGen{
         val t = checkExprType(expr, node, new ListBuffer[String])
         t match{
           case PairType(_, _) =>
-            code += BL("p_free_pair")
+            code += BL("p_free_pair", Base)
             val pair_free_msg = "p_free_pair"
             if (!labels.contains(pair_free_msg)) {
               labels(pair_free_msg) =
@@ -223,17 +223,17 @@ object CodeGen{
                   BEQ("p_throw_runtime_error"),
                   PUSH(RetReg),
                   LDR(RetReg, RetReg, Base),
-                  BL("free"),
+                  BL("free", Base),
                   LDR(RetReg, SP, Base),
-                  LDR(RetReg, regShift(RetReg, 4, false), Base),
-                  BL("free"),
+                  LDR(RetReg, regShift(RetReg, 4, update = false), Base),
+                  BL("free", Base),
                   POP(RetReg),
-                  BL("fflush"),
+                  BL("fflush", Base),
                   POP(PC)
                 )
             }
           case ArrayType(_) =>
-            code += BL("p_free_array")
+            code += BL("p_free_array", Base)
             val neg_index_msg = s"msg_$getDataMsgIndex"
             data(neg_index_msg) =
               List(DWord(44),
@@ -242,7 +242,7 @@ object CodeGen{
             data(large_index_msg) =
               List(DWord(45),
                 DAscii("ArrayIndexOutOfBoundsError: index too large\\n\\0"))
-            code += BL("p_free_array")
+            code += BL("p_free_array", Base)
             val array_free_msg = "p_free_array"
             if (!labels.contains(array_free_msg)) {
               labels(array_free_msg) =
@@ -250,7 +250,7 @@ object CodeGen{
                   CMP(RetReg, imm(0)),
                   LDR(RetReg, label(free_msg), EQ),
                   BEQ("p_throw_runtime_error"),
-                  BL("free"),
+                  BL("free", Base),
                   POP(PC)
                 )
             }
@@ -260,11 +260,11 @@ object CodeGen{
                 List(PUSH(LinkReg),
                   CMP(RetReg, imm(0)),
                   LDR(RetReg, label(neg_index_msg), LT),
-                  BLLT("p_throw_runtime_error"),
+                  BL("p_throw_runtime_error", LT),
                   LDR(reg(1), reg(1), Base),
                   CMP(RetReg, reg(1)),
                   LDR(RetReg, label(free_msg), CS),
-                  BLCS("p_throw_runtime_error"),
+                  BL("p_throw_runtime_error", CS),
                   POP(PC)
                 )
             }
@@ -296,12 +296,12 @@ object CodeGen{
               MOV(reg(1), RetReg, Base),
               LDR(RetReg, label(read_msg), Base),
               ADD(RetReg, RetReg, imm(4)),
-              BL("scanf"),
+              BL("scanf", Base),
               POP(PC))
         }
         code += ADD(ra.next(), SP, imm(0))
         code += MOV(RetReg, ra.next(), Base)
-        code += BL(t)
+        code += BL(t, Base)
 
       case Print(expr: AstNode) =>
         //TODO: escape escape characters somehow in data strings? when they get written to the file it treats them literally
@@ -312,7 +312,7 @@ object CodeGen{
             printString()
             if (!ret.isInstanceOf[reg]) code += LDR(ra.next(), ret, SB)
             code += MOV(RetReg, ra.next(), Base)
-            code += BL("p_print_string")
+            code += BL("p_print_string", Base)
 
           case WBool =>
             if (!labels.contains("p_print_bool")) {
@@ -332,14 +332,14 @@ object CodeGen{
                   LDR(RetReg, label(bool_true_msg), NE),
                   LDR(RetReg, label(bool_false_msg), EQ),
                   ADD(RetReg, RetReg, imm(4)),
-                  BL("printf"),
+                  BL("printf", Base),
                   MOV(RetReg, imm(0), Base),
-                  BL("fflush"),
+                  BL("fflush", Base),
                   POP(PC))
             }
             if (!ret.isInstanceOf[reg]) code += LDR(ra.next(), ret, SB)
             code += MOV(RetReg, ra.next(), Base)
-            code += BL("p_print_bool")
+            code += BL("p_print_bool", Base)
 
           case WInt =>
             if (!labels.contains("p_print_int")) {
@@ -352,19 +352,19 @@ object CodeGen{
                   MOV(reg(1), RetReg, Base),
                   LDR(RetReg, label(int_msg), Base),
                   ADD(RetReg, RetReg, imm(4)),
-                  BL("printf"),
+                  BL("printf", Base),
                   MOV(RetReg, imm(0), Base),
-                  BL("fflush"),
+                  BL("fflush", Base),
                   POP(PC))
             }
             if (!ret.isInstanceOf[reg]) code += LDR(ra.next(), ret, SB)
             code += MOV(RetReg, ra.next(), Base)
-            code += BL("p_print_int")
+            code += BL("p_print_int", Base)
 
           case WChar =>
             if (!ret.isInstanceOf[reg]) code += LDR(ra.next(), ret, Base)
             code += MOV(RetReg, ra.next(), Base)
-            code += BL("putchar")
+            code += BL("putchar", Base)
 
           case ArrayType(_type) =>
             if(_type == WChar){
@@ -372,13 +372,13 @@ object CodeGen{
               printString()
               code += LDR(ra.next(), regVal(SP), Base)
               code += MOV(RetReg, ra.next(), Base)
-              code += BL("p_print_string")
+              code += BL("p_print_string", Base)
             } else {
               //printing an array variable prints its address
               printReference()
               if (!ret.isInstanceOf[reg]) code += LDR(ra.next(), ret, SB)
               code += MOV(RetReg, ra.next(), Base)
-              code += BL("p_print_reference")
+              code += BL("p_print_reference", Base)
             }
 
 
@@ -406,14 +406,14 @@ object CodeGen{
             List(PUSH(LinkReg),
               LDR(RetReg, label(int_msg), Base),
               ADD(RetReg, RetReg, imm(4)),
-              BL("puts"),
+              BL("puts", Base),
               MOV(RetReg, imm(0), Base),
-              BL("fflush"),
+              BL("fflush", Base),
               POP(PC)
             )
         }
         traverse(Print(expr), ra, code)
-        code += BL("p_print_ln")
+        code += BL("p_print_ln", Base)
 
       case Return(expr) =>
         code += MOV(RetReg, traverseExpr(expr, ra, code), Base)
@@ -421,7 +421,7 @@ object CodeGen{
 
       case Exit(expr) =>
         code += MOV(RetReg, traverseExpr(expr, ra, code), Base)
-        code += BL("exit")
+        code += BL("exit", Base)
 
       case IfElse(cond, stat_true, stat_false) =>
         // TODO add stack pointer changes for new scopes
@@ -507,11 +507,11 @@ object CodeGen{
             List(PUSH(LinkReg),
               CMP(RetReg, imm(0)),
               LDR(RetReg, label(negMessage), LT),
-              BLLT("p_throw_runtime_error"),
+              BL("p_throw_runtime_error", LT),
               LDR(reg(1), regVal(reg(1)), Base),
               CMP(RetReg, reg(1)),
               LDR(RetReg, label(largeMessage), CS),
-              BLCS("p_throw_runtime_error"),
+              BL("p_throw_runtime_error", CS),
               POP(PC)
             )
         }
@@ -521,7 +521,7 @@ object CodeGen{
           code += MOV(RetReg, ret, Base)
           code += MOV(reg(1), arrLoc, Base)
           // TODO this constants should probably changed based on the size of the things in the array
-          code += BL("p_check_array_bounds")
+          code += BL("p_check_array_bounds", Base)
           code += ADD(arrLoc, arrLoc, imm(4))
           code += ADD(arrLoc, arrLoc, lsl(ret, 2))
         }
@@ -537,7 +537,7 @@ object CodeGen{
           if (size == 4) code += STR(reg, regShift(SP, -size, update = true))
           else code += STRB(reg, regShift(SP, -size, update = true))
         }
-        code += BL(name)
+        code += BL(name, Base)
         if (totalSize > 0) code += ADD(SP, SP, imm(totalSize))
         code += MOV(ra.next(), RetReg, Base)
         RetReg
@@ -651,7 +651,7 @@ object CodeGen{
         }
         code += ADDS(reg1, reg1, res2)
         intOverflow()
-        code += BLVS("p_throw_overflow_error")
+        code += BL("p_throw_overflow_error", VS)
         ra.restore()
         reg1
 
@@ -663,7 +663,7 @@ object CodeGen{
         if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
         code += SUBS(reg1, reg1, ra.next())
         intOverflow()
-        code += BLVS("p_throw_overflow_error")
+        code += BL("p_throw_overflow_error", VS)
         ra.restore()
         reg1
 
@@ -676,7 +676,7 @@ object CodeGen{
         code += SMULL(reg1, ra.next(), reg1, ra.next())
         code += CMP(ra.next(), asr(reg1, 31))
         intOverflow()
-        code += BLNE("p_throw_overflow_error")
+        code += BL("p_throw_overflow_error", NE)
         ra.restore()
         reg1
       case Div(expr1, expr2) =>
@@ -688,8 +688,8 @@ object CodeGen{
         code += MOV(RetReg, reg1, Base)
         code += MOV(reg(1), ra.next(), Base)
         divByZeroError()
-        code += BL("p_check_divide_by_zero")
-        code += BL("__aeabi_idiv")
+        code += BL("p_check_divide_by_zero", Base)
+        code += BL("__aeabi_idiv", Base)
         code += MOV(reg1, RetReg, Base)
         ra.restore()
         reg1
@@ -703,8 +703,8 @@ object CodeGen{
         code += MOV(RetReg, reg1, Base)
         code += MOV(reg(1), ra.next(), Base)
         divByZeroError()
-        code += BL("p_check_divide_by_zero")
-        code += BL("__aeabi_idivmod")
+        code += BL("p_check_divide_by_zero", Base)
+        code += BL("__aeabi_idivmod", Base)
         code += MOV(reg1, reg(1), Base)
         ra.restore()
         reg1
@@ -714,7 +714,7 @@ object CodeGen{
         if (!reg.isInstanceOf[reg]) code += LDR(reg, reg, Base)
         intOverflow()
         code += RSBS(reg, reg, imm(0))
-        code += BLVS("p_throw_overflow_error")
+        code += BL("p_throw_overflow_error", VS)
         reg
 
       case Not(expr) =>
@@ -752,9 +752,9 @@ object CodeGen{
           ADD(reg(2), RetReg, imm(4)),
           LDR(RetReg, label(str_format_msg), Base),
           ADD(RetReg, RetReg, imm(4)),
-          BL("printf"),
+          BL("printf", Base),
           MOV(RetReg, imm(0), Base),
-          BL("fflush"),
+          BL("fflush", Base),
           POP(PC)
         )
     }
@@ -772,9 +772,9 @@ object CodeGen{
           MOV(reg(1), RetReg, Base),
           LDR(RetReg, label(ptr_format_msg), Base),
           ADD(RetReg, RetReg, imm(4)), //value of 4 is not dependent on array's type
-          BL("printf"),
+          BL("printf", Base),
           MOV(RetReg, imm(0), Base),
-          BL("fflush"),
+          BL("fflush", Base),
           POP(PC)
         )
     }
@@ -790,7 +790,7 @@ object CodeGen{
         List(PUSH(LinkReg),
           CMP(reg(1), imm(0)),
           LDR(RetReg, label(int_msg), EQ),
-          BLEQ("p_throw_runtime_error"),
+          BL("p_throw_runtime_error", EQ),
           POP(PC))
       runtimeError()
     }
@@ -799,9 +799,9 @@ object CodeGen{
   def runtimeError(): Unit = {
     if (!labels.contains("p_throw_runtime_error"))
       labels("p_throw_runtime_error") =
-        List(BL("p_print_string"),
+        List(BL("p_print_string", Base),
           MOV(RetReg, imm(-1), Base),
-          BL("exit"))
+          BL("exit", Base))
     printString()
   }
 
@@ -813,7 +813,7 @@ object CodeGen{
           DAscii("OverflowError: the result is too small/large to store in a 4-byte signed-integer.\\n\\0"))
       labels("p_throw_overflow_error") =
         List(LDR(RetReg, label(int_msg), Base),
-          BL("p_throw_runtime_error"))
+          BL("p_throw_runtime_error", Base))
     }
     runtimeError()
   }
@@ -833,26 +833,26 @@ object CodeGen{
      * But this isn't reflected in the current AST implementation hence phony
      * The main case in traverse should ensure reg1 and reg2 store the correct
      * values before calling this function
+     *
+     * @param suffix1  : The suffix of the positive branch of the compare.
+     *                For example, when pattern matching a Greater than comparison, suffix1 should be GT
+     *                Since this function should only be called in comparison cases, for suffix1 in {Base,CS,SB,VS}
+     *                the output is undefined
      */
     var suffix2: Suffix = null
-    suffix1 match{
-      case GT =>
-        suffix2 = LE
-      case GE =>
-        suffix2 = LT
-      case LT =>
-        suffix2 = GE
-      case LE =>
-        suffix2 = GT
-      case EQ =>
-        suffix2 = NE
-      case NE =>
-        suffix2 = EQ
-    }
+    suffix1 match {
+      case GT => suffix2 = LE
+      case GE => suffix2 = LT
+      case LT => suffix2 = GE
+      case LE => suffix2 = GT
+      case EQ => suffix2 = NE
+      case NE => suffix2 = EQ
 
-    code += CMP(reg1, reg2)
-    code += MOV(reg1, imm(1), suffix1)
-    code += MOV(reg1, imm(0), suffix2)
+      //All other cases should not be passed into this function as they arent compare suffixes.
+      //To suppress warnings a catch all case is added, but the generated code would not function as expected.
+      case _ =>
+        suffix2 = Base
+    }
   }
 
   def compile(node: AstNode, ra: RegisterAllocator = new RegisterAllocator()): String = {
