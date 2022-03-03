@@ -763,11 +763,17 @@ object CodeGen{
         reg1
 
       case Mod(expr1, expr2) =>
-        val res1 = traverseExpr(expr1, ra, code)
+        var res1 = traverseExpr(expr1, ra, code)
         val reg1 = ra.nextRm
-        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
-        val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next, res2, SB)
+        if (!res1.isInstanceOf[reg]) {
+          code += LDR(reg1, res1, SB)
+          res1 = reg1
+        }
+        var res2 = traverseExpr(expr2, ra, code)
+        if (!res2.isInstanceOf[reg]) {
+          code += LDR(ra.next, res2, SB)
+          res2 = ra.next // res2 now contains the result of expr 2
+        }
         code += MOV(RetReg, reg1, Base)
         code += MOV(reg(1), ra.next, Base)
         divByZeroError()
