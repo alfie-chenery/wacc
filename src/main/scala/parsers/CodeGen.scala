@@ -399,6 +399,21 @@ object CodeGen{
                   POP(PC)
                 )
             }
+          case ArrayType(_type) =>
+            val r = ra.next
+            _type match{
+              case WChar =>
+                printString()
+                printLn()
+                code += MOV(RetReg, r, Base)
+                code += BL("p_print_string", Base)
+                code += BL("p_print_ln", Base)
+              case _ =>
+                printReference()
+                code += LDR(r, regVal(SP), Base)
+                code += MOV(RetReg, r, Base)
+                code += BL("p_print_reference", Base)
+            }
 
           //TODO: implement all other print types
           /*
@@ -413,22 +428,7 @@ object CodeGen{
         //TODO: add global messages that can be added (???)
 
       case Println(expr) =>
-        val int_msg = s"msg_$getDataMsgIndex"
-        if (!labels.contains("p_print_ln")) {
-          data(int_msg) = List(
-            DWord(1),
-            DAscii("\\0")
-          )
-          labels("p_print_ln") =
-            List(PUSH(LinkReg),
-              LDR(RetReg, label(int_msg), Base),
-              ADD(RetReg, RetReg, imm(4)),
-              BL("puts", Base),
-              MOV(RetReg, imm(0), Base),
-              BL("fflush", Base),
-              POP(PC)
-            )
-        }
+        printLn()
         traverse(Print(expr), ra, code)
         code += BL("p_print_ln", Base)
 
@@ -956,6 +956,25 @@ object CodeGen{
         code += LDR(reg, regVal(reg), Base)
         ra.next
 
+    }
+  }
+
+  def printLn(): Unit = {
+    val int_msg = s"msg_$getDataMsgIndex"
+    if (!labels.contains("p_print_ln")) {
+      data(int_msg) = List(
+        DWord(1),
+        DAscii("\\0")
+      )
+      labels("p_print_ln") =
+        List(PUSH(LinkReg),
+          LDR(RetReg, label(int_msg), Base),
+          ADD(RetReg, RetReg, imm(4)),
+          BL("puts", Base),
+          MOV(RetReg, imm(0), Base),
+          BL("fflush", Base),
+          POP(PC)
+        )
     }
   }
 
