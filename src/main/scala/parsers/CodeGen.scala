@@ -322,7 +322,6 @@ object CodeGen{
             code += MOV(RetReg, ra.next(), Base)
             code += BL("p_print_string")
 
-
           case WBool =>
             if (!labels.contains("p_print_bool")) {
               val bool_true_msg = s"msg_$getDataMsgIndex"
@@ -375,13 +374,21 @@ object CodeGen{
             code += MOV(RetReg, ra.next(), Base)
             code += BL("putchar")
 
-
           case ArrayType(_type) =>
-            //printing an array variable prints its address
-            printReference()
-            if (!ret.isInstanceOf[reg]) code += LDR(ra.next(), regVal(ret), SB)
-            code += MOV(RetReg, ra.next(), Base)
-            code += BL("p_print_reference")
+            if(_type == WChar){
+              //arrays of chars may be treated as strings
+              printString()
+              code += LDR(ra.next(), regVal(SP), Base)
+              code += MOV(RetReg, ra.next(), Base)
+              code += BL("p_print_string")
+            } else {
+              //printing an array variable prints its address
+              printReference()
+              if (!ret.isInstanceOf[reg]) code += LDR(ra.next(), ret, SB)
+              code += MOV(RetReg, ra.next(), Base)
+              code += BL("p_print_reference")
+            }
+
 
 
           //TODO: implement all other print types
@@ -489,8 +496,9 @@ object CodeGen{
       case ArrayElem(Ident(x), elems) =>
         // TODO this wouldn't work for multi-dimensional arrays
         val arr = variableLocation(x)
+        val arrReg = if (arr.isInstanceOf[regVal]) arr.asInstanceOf[regVal].reg else arr
         val arrLoc = ra.nextRm()
-        code += ADD(arrLoc, arr, imm(0))
+        code += ADD(arrLoc, arrReg, imm(0))
         if (!labels.contains("p_check_array_bounds")) {
           val negMessage = s"msg_$getDataMsgIndex"
           data(negMessage) = List(
@@ -621,9 +629,12 @@ object CodeGen{
         val res1 = traverseExpr(expr1, ra, code)
         val reg1 = ra.nextRm()
         if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
-        val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
-        phonyCaseCompare(code, EQ, reg1, ra.next())
+        var res2 = traverseExpr(expr2, ra, code)
+        if (!res2.isInstanceOf[reg]) {
+          code += LDR(ra.next(), res2, SB)
+          res2 = ra.next()
+        }
+        phonyCaseCompare(code, EQ, reg1, res2)
         ra.restore()
         reg1
 
@@ -641,9 +652,12 @@ object CodeGen{
         val res1 = traverseExpr(expr1, ra, code)
         val reg1 = ra.nextRm()
         if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
-        val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
-        code += ADDS(reg1, reg1, ra.next())
+        var res2 = traverseExpr(expr2, ra , code)
+        if (!res2.isInstanceOf[reg]) {
+          code += LDR(ra.next(), res2, SB)
+          res2 = ra.next()
+        }
+        code += ADDS(reg1, reg1, res2)
         intOverflow()
         code += BLVS("p_throw_overflow_error")
         ra.restore()
