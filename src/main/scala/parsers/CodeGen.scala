@@ -1,6 +1,6 @@
 package parsers
 
-import parsers.SemanticPass.{checkExprType, st}
+import parsers.SemanticPass.{checkExprType, checkType, st}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -398,21 +398,6 @@ object CodeGen{
                   BL("fflush", Base),
                   POP(PC)
                 )
-            }
-          case ArrayType(_type) =>
-            val r = ra.next
-            _type match{
-              case WChar =>
-                printString()
-                printLn()
-                code += MOV(RetReg, r, Base)
-                code += BL("p_print_string", Base)
-                code += BL("p_print_ln", Base)
-              case _ =>
-                printReference()
-                code += LDR(r, regVal(SP), Base)
-                code += MOV(RetReg, r, Base)
-                code += BL("p_print_reference", Base)
             }
 
           //TODO: implement all other print types
