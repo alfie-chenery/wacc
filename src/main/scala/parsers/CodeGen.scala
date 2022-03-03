@@ -1,6 +1,6 @@
 package parsers
 
-import parsers.SemanticPass.{checkExprType, checkType, st}
+import parsers.SemanticPass.{checkExprType, st}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -500,18 +500,18 @@ object CodeGen{
         val _type = checkExprType(exprs.head, exprs.head, new ListBuffer[String])
         code += LDR(RetReg, imm(exprs.length * typeSize(_type) + 4), Base)
         code += BL("malloc", Base)
-        val ret =ra.nextRm
-        code += MOV(ret, RetReg, Base)
+        val reg1 =ra.nextRm
+        code += MOV(reg1, RetReg, Base)
         var location = 4
         for (expr <- exprs) {
           val ret = traverseExpr(expr, ra, code)
-          code += STR(ret, regShift(ret, location, update = false))
+          code += STR(ret, regShift(reg1, location, update = false))
           location += typeSize(_type)
         }
         code += LDR(ra.next, imm(exprs.size), Base)
-        code += STR(ra.next, regVal(ret))
+        code += STR(ra.next, regVal(reg1))
         ra.restore()
-        ret
+        reg1
       case PairLiter => ???
       case FstPair(expr) =>
         traverseExpr(expr, ra, code)
