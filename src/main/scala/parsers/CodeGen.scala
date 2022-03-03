@@ -384,7 +384,7 @@ object CodeGen{
             val r = ra.next()
             code += LDR(r, regVal(SP), Base)
             code += MOV(RetReg, r, Base)
-            BL("p_print_reference")
+            BL("p_print_reference", Base)
             val p_msg = s"msg_$getDataMsgIndex"
             data(p_msg) = List(
               DWord(3),
@@ -397,9 +397,9 @@ object CodeGen{
                   MOV(reg(1), RetReg, Base),
                   LDR(RetReg, label(p_msg), Base),
                   ADD(RetReg, RetReg, imm(4)),
-                  BL("printf"),
+                  BL("printf", Base),
                   MOV(RetReg, imm(0), Base),
-                  BL("fflush"),
+                  BL("fflush", Base),
                   POP(PC)
                 )
             }
