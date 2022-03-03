@@ -380,8 +380,29 @@ object CodeGen{
               code += MOV(RetReg, ra.next(), Base)
               code += BL("p_print_reference", Base)
             }
-
-
+          case PairType(_, _) =>
+            val r = ra.next()
+            code += LDR(r, regVal(SP), Base)
+            code += MOV(RetReg, r, Base)
+            BL("p_print_reference")
+            val p_msg = s"msg_$getDataMsgIndex"
+            data(p_msg) = List(
+              DWord(3),
+              DAscii("%p\\0")
+            )
+            val print_ref_msg = "p_print_reference"
+            if (!labels.contains(print_ref_msg)) {
+              labels(print_ref_msg) =
+                List(PUSH(LinkReg),
+                  MOV(reg(1), RetReg, Base),
+                  LDR(RetReg, label(p_msg), Base),
+                  ADD(RetReg, RetReg, imm(4)),
+                  BL("printf"),
+                  MOV(RetReg, imm(0), Base),
+                  BL("fflush"),
+                  POP(PC)
+                )
+            }
 
           //TODO: implement all other print types
           /*
