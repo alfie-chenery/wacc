@@ -47,7 +47,6 @@ object SemanticPass {
       case Assign(lhs, rhs) =>
         val t: Type = checkType(rhs, errors)
         val t1: Type = checkType(lhs, errors)
-        print(t + " : " + t1)
         if (t1 != t) {
           errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: " + prettyPrint(t1) + ", actual: " + prettyPrint(t))
         }

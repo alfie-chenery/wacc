@@ -114,7 +114,7 @@ object CodeGen{
         code += STR(ra.next(), regVal(reg))
         code += STR(reg, regVal(SP))
         // TODO this location probably needs to be changed
-        variableLocation += (ident -> SP)
+        variableLocation += (ident -> regVal(SP))
         ra.restore()
       case Decl(WInt, Ident(ident), rhs) =>
         val r = ra.next()
