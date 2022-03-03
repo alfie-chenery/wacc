@@ -586,9 +586,12 @@ object CodeGen{
         val res1 = traverseExpr(expr1, ra, code)
         val reg1 = ra.nextRm()
         if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
-        val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
-        phonyCaseCompare(code, EQ, reg1, ra.next())
+        var res2 = traverseExpr(expr2, ra, code)
+        if (!res2.isInstanceOf[reg]) {
+          code += LDR(ra.next(), res2, SB)
+          res2 = ra.next()
+        }
+        phonyCaseCompare(code, EQ, reg1, res2)
         ra.restore()
         reg1
 
@@ -606,9 +609,12 @@ object CodeGen{
         val res1 = traverseExpr(expr1, ra, code)
         val reg1 = ra.nextRm()
         if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
-        val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
-        code += ADDS(reg1, reg1, ra.next())
+        var res2 = traverseExpr(expr2, ra , code)
+        if (!res2.isInstanceOf[reg]) {
+          code += LDR(ra.next(), res2, SB)
+          res2 = ra.next()
+        }
+        code += ADDS(reg1, reg1, res2)
         intOverflow()
         code += BLVS("p_throw_overflow_error")
         ra.restore()
