@@ -56,14 +56,11 @@ object Assembly {
   case class MOV(rd: Register, o2: Operand, suffix: Suffix) extends Mnemonic {
     override def toString: String = "MOV" + suffix.toString + " " + rd.toString + ", " + o2.toString
   }
-  case class BL(label: String) extends Mnemonic {
-    override def toString: String = "BL " + label
+  case class BL(label: String, suffix: Suffix) extends Mnemonic {
+    override def toString: String = "BL" + suffix.toString + " " + label
   }
   case class CMP(r: Register, o2: Operand) extends Mnemonic {
     override def toString: String = "CMP " + r.toString + ", " + o2.toString
-  }
-  case class BEQ(label: String) extends Mnemonic {
-    override def toString: String = "BEQ " + label
   }
   case class STRB(rd: Register, rn: Register) extends Mnemonic {
     override def toString: String = {
@@ -75,12 +72,6 @@ object Assembly {
   }
   case class ORR(rd: Register, rn: Register, rm: Register) extends Mnemonic {
     override def toString: String = "ORR " + rd.toString + ", " + rn.toString + ", " + rm.toString
-  }
-  case class BLVS(label: String) extends Mnemonic {
-    override def toString: String = "BLVS " + label
-  }
-  case class BLNE(label: String) extends Mnemonic {
-    override def toString: String = "BLNE " + label
   }
   case class ADDS(rd: Register, rn: Register, rm: Register) extends Mnemonic {
     override def toString: String = "ADDS " + rd.toString + ", " + rn.toString + ", " + rm.toString
@@ -95,17 +86,14 @@ object Assembly {
     override def toString: String =
       "SMULL " + rdLo.toString + ", " + rdHi.toString + ", " + rm.toString + ", " + rs.toString
   }
-  case class BLEQ(label: String) extends Mnemonic {
-    override def toString: String = "BLEQ " + label
-  }
   case class EOR(rd: Register, o2: Operand, o3: Operand) extends Mnemonic {
     override def toString: String = "EOR " + rd.toString + ", " + o2.toString + ", " + o3.toString
   }
   case class RSBS(rd: Register, o2: Operand, o3: Operand) extends Mnemonic {
     override def toString: String = "RSBS " + rd.toString + ", " + o2.toString + ", " + o3.toString
   }
-  case class B(label: String) extends Mnemonic {
-    override def toString: String = "B " + label
+  case class B(label: String, suffix: Suffix) extends Mnemonic {
+    override def toString: String = "B" + suffix.toString + " " + label
   }
 
   sealed trait Operand
@@ -164,6 +152,9 @@ object Assembly {
   case object GT extends Suffix {
     override def toString: String = "GT"
   }
+  case object CS extends Suffix {
+    override def toString: String = "CS"
+  }
   case object NE extends Suffix {
     override def toString: String = "NE"
   }
@@ -173,7 +164,10 @@ object Assembly {
   case object SB extends Suffix {
     override def toString: String = "SB"
   }
-  case object Base extends Suffix { // todo: is there any way of overloading function definitions instead?
+  case object VS extends Suffix {
+    override def toString: String = "VS"
+  }
+  case object Base extends Suffix {
     override def toString: String = ""
   }
 
