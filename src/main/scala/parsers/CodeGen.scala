@@ -865,7 +865,7 @@ object CodeGen{
       for ((k, body) <- data) {
         sb.append("\n" + k + ":\n\t")
         for (line <- body) {
-          sb.append(line + "\n\t")
+          sb.append(line.toString + "\n\t")
         }
       }
     }
@@ -879,7 +879,7 @@ object CodeGen{
     for((k,v) <- labels){
       sb.append("\n" + k + ":\n\t")
       for (line <- v) {
-        sb.append(line + "\n\t")
+        sb.append(line.toString + "\n\t")
       }
     }
     sb.toString()

@@ -167,7 +167,7 @@ object Assembly {
   case object VS extends Suffix {
     override def toString: String = "VS"
   }
-  case object Base extends Suffix { // todo: is there any way of overloading function definitions instead?
+  case object Base extends Suffix {
     override def toString: String = ""
   }
 
