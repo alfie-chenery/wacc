@@ -590,22 +590,6 @@ object CodeGen{
         }
         ra.restore()
         reg1
-        /*
-        var res1 = traverseExpr(expr1, ra, code)
-        val reg1 = ra.nextRm
-        if (!res1.isInstanceOf[reg]) {
-          code += LDR(reg1, res1, SB)
-          res1 = ra.nextRm
-        }
-        var res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) {
-          code += LDR(ra.next, res2, SB)
-          res2 = ra.next
-        }
-        code += AND(res1, res1, res2)
-        ra.restore()
-        reg1
-        */
 
       // TODO factor out repeated code
       case Or(expr1, expr2) =>
@@ -630,84 +614,147 @@ object CodeGen{
         }
         ra.restore()
         reg1
-//        var res1 = traverseExpr(expr1, ra, code)
-//        val reg1 = ra.nextRm
-//        if (!res1.isInstanceOf[reg]) {
-//          code += LDR(reg1, res1, SB)
-//          res1 = reg1
-//        }
-//        var res2 = traverseExpr(expr2, ra, code)
-//        if (!res2.isInstanceOf[reg]) {
-//          code += LDR(ra.next, res2, SB)
-//          res2 = ra.next
-//        }
-//        code += ORR(res1, res1, res2)
-//        ra.restore()
-//        reg1
 
         // TODO check if reg1 should be moved with LDR or LDRSB
       case Greater(expr1, expr2) =>
-        val res1 = traverseExpr(expr1, ra, code)
-        val reg1 = ra.nextRm
-        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
-        val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next, res2, SB)
-        phonyCaseCompare(code, GT, reg1, ra.next)
-        ra.restore()
-        reg1
-
-      case GreaterEq(expr1, expr2) =>
-        val res1 = traverseExpr(expr1, ra, code)
-        val reg1 = ra.nextRm
-        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
-        val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next, res2, SB)
-        phonyCaseCompare(code, GE, reg1, ra.next)
-        ra.restore()
-        reg1
-
-      case Less(expr1, expr2) =>
-        val res1 = traverseExpr(expr1, ra, code)
-        val reg1 = ra.nextRm
-        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
-        val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next, res2, SB)
-        phonyCaseCompare(code, LT, reg1, ra.next)
-        ra.restore()
-        reg1
-
-      case LessEq(expr1, expr2) =>
-        val res1 = traverseExpr(expr1, ra, code)
-        val reg1 = ra.nextRm
-        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
-        val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next, res2, SB)
-        phonyCaseCompare(code, LE, reg1, ra.next)
-        ra.restore()
-        reg1
-
-      case Eq(expr1, expr2) =>
-        val res1 = traverseExpr(expr1, ra, code)
-        val reg1 = ra.nextRm
-        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
-        var res2 = traverseExpr(expr2, ra, code)
+        var res1 = traverseExpr(expr1, ra, code)
+        val reg1 = if (spill) ra.next else ra.nextRm
+        if (!res1.isInstanceOf[reg]) {
+          code += LDR(reg1, res1, SB)
+          res1 = reg1
+        }
+        if (spill) code += PUSH(res1)
+        var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
         if (!res2.isInstanceOf[reg]) {
           code += LDR(ra.next, res2, SB)
           res2 = ra.next
         }
-        phonyCaseCompare(code, EQ, reg1, res2)
+        if (spill) {
+          res1 = ra.getAvailable(1)
+          code += POP(res1)
+          phonyCaseCompare(code, GT, res1, res2)
+        } else {
+          phonyCaseCompare(code, GT, reg1, ra.next)
+        }
+        ra.restore()
+        reg1
+
+
+      case GreaterEq(expr1, expr2) =>
+        var res1 = traverseExpr(expr1, ra, code)
+        val reg1 = if (spill) ra.next else ra.nextRm
+        if (!res1.isInstanceOf[reg]) {
+          code += LDR(reg1, res1, SB)
+          res1 = reg1
+        }
+        if (spill) code += PUSH(res1)
+        var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
+        if (!res2.isInstanceOf[reg]) {
+          code += LDR(ra.next, res2, SB)
+          res2 = ra.next
+        }
+        if (spill) {
+          res1 = ra.getAvailable(1)
+          code += POP(res1)
+          phonyCaseCompare(code, GE, res1, res2)
+        } else {
+          phonyCaseCompare(code, GE, reg1, ra.next)
+        }
+        ra.restore()
+        reg1
+
+      case Less(expr1, expr2) =>
+        var res1 = traverseExpr(expr1, ra, code)
+        val reg1 = if (spill) ra.next else ra.nextRm
+        if (!res1.isInstanceOf[reg]) {
+          code += LDR(reg1, res1, SB)
+          res1 = reg1
+        }
+        if (spill) code += PUSH(res1)
+        var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
+        if (!res2.isInstanceOf[reg]) {
+          code += LDR(ra.next, res2, SB)
+          res2 = ra.next
+        }
+        if (spill) {
+          res1 = ra.getAvailable(1)
+          code += POP(res1)
+          phonyCaseCompare(code, LT, res1, res2)
+        } else {
+          phonyCaseCompare(code, LT, reg1, ra.next)
+        }
+        ra.restore()
+        reg1
+
+      case LessEq(expr1, expr2) =>
+        var res1 = traverseExpr(expr1, ra, code)
+        val reg1 = if (spill) ra.next else ra.nextRm
+        if (!res1.isInstanceOf[reg]) {
+          code += LDR(reg1, res1, SB)
+          res1 = reg1
+        }
+        if (spill) code += PUSH(res1)
+        var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
+        if (!res2.isInstanceOf[reg]) {
+          code += LDR(ra.next, res2, SB)
+          res2 = ra.next
+        }
+        if (spill) {
+          res1 = ra.getAvailable(1)
+          code += POP(res1)
+          phonyCaseCompare(code, LE, res1, res2)
+        } else {
+          phonyCaseCompare(code, LE, reg1, ra.next)
+        }
+        ra.restore()
+        reg1
+
+      case Eq(expr1, expr2) =>
+        var res1 = traverseExpr(expr1, ra, code)
+        val reg1 = if (spill) ra.next else ra.nextRm
+        if (!res1.isInstanceOf[reg]) {
+          code += LDR(reg1, res1, SB)
+          res1 = reg1
+        }
+        if (spill) code += PUSH(res1)
+        var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
+        if (!res2.isInstanceOf[reg]) {
+          code += LDR(ra.next, res2, SB)
+          res2 = ra.next
+        }
+        if (spill) {
+          res1 = ra.getAvailable(1)
+          code += POP(res1)
+          phonyCaseCompare(code, EQ, res1, res2)
+        } else {
+          phonyCaseCompare(code, EQ, reg1, res2)
+        }
         ra.restore()
         reg1
 
       case NotEq(expr1, expr2) =>
-        val res1 = traverseExpr(expr1, ra, code)
-        val reg1 = ra.nextRm
-        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
-        val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next, res2, SB)
-        phonyCaseCompare(code, NE, reg1, ra.next)
+        var res1 = traverseExpr(expr1, ra, code)
+        val reg1 = if (spill) ra.next else ra.nextRm
+        if (!res1.isInstanceOf[reg]) {
+          code += LDR(reg1, res1, SB)
+          res1 = reg1
+        }
+        if (spill) code += PUSH(res1)
+        var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
+        if (!res2.isInstanceOf[reg]) {
+          code += LDR(ra.next, res2, SB)
+          res2 = ra.next
+        }
+        if (spill) {
+          res1 = ra.getAvailable(1)
+          code += POP(res1)
+          phonyCaseCompare(code, NE, res1, res2)
+        } else {
+          phonyCaseCompare(code, NE, reg1, ra.next)
+        }
         ra.restore()
         reg1
+
 
       /**
        * @return a register containing the result of expr1 PLUS expr2
