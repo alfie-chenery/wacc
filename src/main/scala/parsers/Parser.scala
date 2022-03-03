@@ -33,9 +33,10 @@ object lexer {
   private [parsers] val INT_LITER: Parsley[Int] = token(optional("+") ~> digit.foldLeft1(0)((x, d) => x * 10 + d.asDigit))
   private [parsers] val BOOL_LITER: Parsley[Boolean] =
     (token("true") #> true) <|> (token("false") #> false)
-  private [parsers] val ESC_CHAR: Parsley[String] =
-    token('\\' ~> (('0' #> "\\u0000") <|> ('b' #> "\\b") <|> ('t' #> "\\t") <|> ('n' #> "\\n") <|>
-      ('f' #> "\\f") <|> ('r' #> "\\r") <|> ('\"' #> "\\\"") <|> ('\"' #> "\\\'") <|> ('\\' #> "\\\\")))
+  private [parsers] val ESC_CHAR: Parsley[String] = {
+    '\\' ~> (('0' #> "\\u0000") <|> ('b' #> "\\b") <|> ('t' #> "\\t") <|> ('n' #> "\\n") <|>
+      ('f' #> "\\f") <|> ('r' #> "\\r") <|> ('\"' #> "\\\"") <|> ('\"' #> "\\\'") <|> ('\\' #> "\\\\"))
+  }
   private [parsers] val CHAR: Parsley[String] = ESC_CHAR <|> anyChar.map(_.toString)
   private [parsers] val CHAR_LITER: Parsley[String] = token('\'' ~> CHAR <~ '\'')
   private [parsers] val STR_LITER: Parsley[String] = token('\"' ~> manyUntil(CHAR, '\"').map(_.mkString))
