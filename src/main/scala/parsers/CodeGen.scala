@@ -207,7 +207,6 @@ object CodeGen{
             code += MOV(RetReg, ra.next(), Base)
             code += BL("p_print_string")
 
-
           case WBool =>
             if (!labels.contains("p_print_bool")) {
               val bool_true_msg = s"msg_$getDataMsgIndex"
@@ -260,13 +259,20 @@ object CodeGen{
             code += MOV(RetReg, ra.next(), Base)
             code += BL("putchar")
 
-
           case ArrayType(_type) =>
-            //printing an array variable prints its address
-            printReference()
-            if (!ret.isInstanceOf[reg]) code += LDR(ra.next(), ret, SB)
-            code += MOV(RetReg, ra.next(), Base)
-            code += BL("p_print_reference")
+            if(_type == WChar){
+              //arrays of chars may be treated as strings
+              printString()
+              code += LDR(ra.next(), regVal(SP), Base)
+              code += MOV(RetReg, ra.next(), Base)
+              code += BL("p_print_string")
+            } else {
+              //printing an array variable prints its address
+              printReference()
+              if (!ret.isInstanceOf[reg]) code += LDR(ra.next(), ret, SB)
+              code += MOV(RetReg, ra.next(), Base)
+              code += BL("p_print_reference")
+            }
 
 
           //TODO: implement all other print types
