@@ -118,7 +118,15 @@ object SemanticPass {
     node match {
       //AssignLHS
       case ident: Ident => st(ident)._2
-      case ArrayElem(ident, exprs) => st(ident)._2 //TODO make sure this works for multi-dimensional arrays
+      case ArrayElem(ident, exprs) =>
+        var t = st(ident)._2 //TODO make sure this works for multi-dimensional arrays
+        for (expr <- exprs) {
+          t match {
+            case ArrayType(arr) => t = arr
+            case a => a
+          }
+        }
+        t
       case FstPair(pair) =>
         val rhs_type = checkType(pair, errors)
         rhs_type match {
