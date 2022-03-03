@@ -84,8 +84,8 @@ object CodeGen{
       case Decl(PairType(t1, t2), Ident(ident), NewPair(fst, snd)) =>
         code += LDR(RetReg, imm(8), Base)
         code += BL("malloc")
-        code += MOV(ra.next(), RetReg, Base)
-        val reg1 = ra.nextRm()
+        code += MOV(ra.next, RetReg, Base)
+        val reg1 = ra.nextRm
         val fstReg = traverseExpr(fst, ra, code)
         code += LDR(RetReg, imm(typeSize(t1)), Base)
         code += BL("malloc")
@@ -94,7 +94,7 @@ object CodeGen{
         val sndReg = traverseExpr(snd, ra, code)
         code += LDR(RetReg, imm(typeSize(t2)), Base)
         code += BL("malloc")
-        code += STRB(ra.next(), regVal(RetReg))
+        code += STRB(ra.next, regVal(RetReg))
         code += STR(RetReg, regShift(reg1, 4, update = false))
         code += STR(reg1, regVal(SP))
         // TODO this location probably needs to be changed
@@ -103,7 +103,7 @@ object CodeGen{
       case Decl(ArrayType(_type), Ident(ident), ArrayLiter(exprs)) =>
         code += LDR(RetReg, imm(exprs.length * typeSize(_type) + 4), Base)
         code += BL("malloc")
-        val reg =ra.nextRm()
+        val reg =ra.nextRm
         code += MOV(reg, RetReg, Base)
         var location = 4
         for (expr <- exprs) {
@@ -111,14 +111,14 @@ object CodeGen{
           code += STR(ret, regShift(reg, location, update = false))
           location += typeSize(_type)
         }
-        code += LDR(ra.next(), imm(exprs.size), Base)
-        code += STR(ra.next(), regVal(reg))
+        code += LDR(ra.next, imm(exprs.size), Base)
+        code += STR(ra.next, regVal(reg))
         code += STR(reg, regVal(SP))
         // TODO this location probably needs to be changed
         variableLocation += (ident -> regVal(SP))
         ra.restore()
       case Decl(WInt, Ident(ident), rhs) =>
-        val r = ra.next()
+        val r = ra.next
         traverseExpr(rhs, ra, code)
         //if (ret != RetReg) code += LDR(r, ret, Base)
         currentShift -= 4
@@ -126,7 +126,7 @@ object CodeGen{
         variableLocation += (ident -> location)
         code += STR(r, location)
       case Decl(WBool, Ident(ident), rhs) =>
-        val r = ra.next()
+        val r = ra.next
         traverseExpr(rhs, ra, code)
         //if (ret != RetReg) code += MOV(r, ret, Base)
         currentShift -= 1
@@ -134,14 +134,14 @@ object CodeGen{
         variableLocation += (ident -> location)
         code += STRB(r, location)
       case Decl(WChar, Ident(ident), rhs) =>
-        val r = ra.next()
+        val r = ra.next
         traverseExpr(rhs, ra, code)
         currentShift -= 1
         val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, update = false)
         variableLocation += (ident -> location)
         code += STRB(r, location)
       case Decl(WString, Ident(ident), rhs) =>
-        val r = ra.next()
+        val r = ra.next
         traverseExpr(rhs, ra, code)
         currentShift -= 4
         val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, update = false)
@@ -192,8 +192,8 @@ object CodeGen{
                   POP(PC))
           }
         }
-        code += ADD(ra.next(), SP, imm(0))
-        code += MOV(RetReg, ra.next(), Base)
+        code += ADD(ra.next, SP, imm(0))
+        code += MOV(RetReg, ra.next, Base)
         code += BL(t)
 
       case Print(expr: AstNode) =>
@@ -203,8 +203,8 @@ object CodeGen{
         SemanticPass.checkExprType(expr, expr, new ListBuffer[String]) match {
           case WString =>
             printString()
-            if (!ret.isInstanceOf[reg]) code += LDR(ra.next(), ret, SB)
-            code += MOV(RetReg, ra.next(), Base)
+            if (!ret.isInstanceOf[reg]) code += LDR(ra.next, ret, SB)
+            code += MOV(RetReg, ra.next, Base)
             code += BL("p_print_string")
 
 
@@ -231,8 +231,8 @@ object CodeGen{
                   BL("fflush"),
                   POP(PC))
             }
-            if (!ret.isInstanceOf[reg]) code += LDR(ra.next(), ret, SB)
-            code += MOV(RetReg, ra.next(), Base)
+            if (!ret.isInstanceOf[reg]) code += LDR(ra.next, ret, SB)
+            code += MOV(RetReg, ra.next, Base)
             code += BL("p_print_bool")
 
           case WInt =>
@@ -251,21 +251,21 @@ object CodeGen{
                   BL("fflush"),
                   POP(PC))
             }
-            if (!ret.isInstanceOf[reg]) code += LDR(ra.next(), ret, SB)
-            code += MOV(RetReg, ra.next(), Base)
+            if (!ret.isInstanceOf[reg]) code += LDR(ra.next, ret, SB)
+            code += MOV(RetReg, ra.next, Base)
             code += BL("p_print_int")
 
           case WChar =>
-            if (!ret.isInstanceOf[reg]) code += LDR(ra.next(), ret, Base)
-            code += MOV(RetReg, ra.next(), Base)
+            if (!ret.isInstanceOf[reg]) code += LDR(ra.next, ret, Base)
+            code += MOV(RetReg, ra.next, Base)
             code += BL("putchar")
 
 
           case ArrayType(_type) =>
             //printing an array variable prints its address
             printReference()
-            if (!ret.isInstanceOf[reg]) code += LDR(ra.next(), ret, SB)
-            code += MOV(RetReg, ra.next(), Base)
+            if (!ret.isInstanceOf[reg]) code += LDR(ra.next, ret, SB)
+            code += MOV(RetReg, ra.next, Base)
             code += BL("p_print_reference")
 
 
@@ -353,31 +353,31 @@ object CodeGen{
   def traverseExpr(node: AstNode, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Register = {
     node match {
       case IntLiter(x) =>
-        code += LDR(ra.next(), imm(x), Base)
-        ra.next()
+        code += LDR(ra.next, imm(x), Base)
+        ra.next
       case Negate(IntLiter(x)) => traverseExpr(IntLiter(-x), ra, code)
       case BoolLiter(b) =>
-        code += MOV(ra.next(), imm(if (b) 1 else 0), Base)
-        ra.next()
+        code += MOV(ra.next, imm(if (b) 1 else 0), Base)
+        ra.next
       case CharLiter(c) =>
         // todo: is this the correct solution or does it only solve one case?
         val _c = if (c=="\\u0000") imm(0) else immc(c)
-        code += MOV(ra.next(), _c, Base)
-        ra.next()
+        code += MOV(ra.next, _c, Base)
+        ra.next
       case StrLiter(s) =>
         val int_msg = s"msg_$getDataMsgIndex"
         data(int_msg) = List(DWord(s.length), DAscii(s))
-        code += LDR(ra.next(), label(int_msg), Base)
-        ra.next()
+        code += LDR(ra.next, label(int_msg), Base)
+        ra.next
       case PairLiter => ???
       case Ident(x) =>
         // TODO this will probably need to change when pairs and arrays are implemented
-        if (typeSize(st(Ident(x))._2) == 4) code += LDR(ra.next(), variableLocation(x), Base)
-        else code += LDR(ra.next(), variableLocation(x), SB)
-        ra.next()
+        if (typeSize(st(Ident(x))._2) == 4) code += LDR(ra.next, variableLocation(x), Base)
+        else code += LDR(ra.next, variableLocation(x), SB)
+        ra.next
       case ArrayElem(Ident(x), elems) =>
         // TODO this wouldn't work for multi-dimensional arrays
-        val reg1 = ra.nextRm()
+        val reg1 = ra.nextRm
         code += ADD(reg1, SP, traverseExpr(elems.head, ra, code))
         ra.restore()
         reg1
@@ -393,22 +393,22 @@ object CodeGen{
         }
         code += BL(name)
         if (totalSize > 0) code += ADD(SP, SP, imm(totalSize))
-        code += MOV(ra.next(), RetReg, Base)
+        code += MOV(ra.next, RetReg, Base)
         RetReg
 
       case And(expr1, expr2) =>
         var res1 = traverseExpr(expr1, ra, code)
-        val reg1 = ra.nextRm()
+        val reg1 = ra.nextRm
         if (!res1.isInstanceOf[reg]) {
           code += LDR(reg1, res1, SB)
-          res1 = ra.nextRm()
+          res1 = ra.nextRm
         }
         var res2 = traverseExpr(expr2, ra, code)
         if (!res2.isInstanceOf[reg]) {
-          code += LDR(ra.next(), res2, SB)
-          res2 = ra.next()
+          code += LDR(ra.next, res2, SB)
+          res2 = ra.next
         }
-        print(ra.next())
+        print(ra.next)
         code += AND(res1, res1, res2)
         ra.restore()
         reg1
@@ -416,15 +416,15 @@ object CodeGen{
       // TODO factor out repeated code
       case Or(expr1, expr2) =>
         var res1 = traverseExpr(expr1, ra, code)
-        val reg1 = ra.nextRm()
+        val reg1 = ra.nextRm
         if (!res1.isInstanceOf[reg]) {
           code += LDR(reg1, res1, SB)
           res1 = reg1
         }
         var res2 = traverseExpr(expr2, ra, code)
         if (!res2.isInstanceOf[reg]) {
-          code += LDR(ra.next(), res2, SB)
-          res2 = ra.next()
+          code += LDR(ra.next, res2, SB)
+          res2 = ra.next
         }
         code += ORR(res1, res1, res2)
         ra.restore()
@@ -433,71 +433,71 @@ object CodeGen{
         // TODO check if reg1 should be moved with LDR or LDRSB
       case Greater(expr1, expr2) =>
         val res1 = traverseExpr(expr1, ra, code)
-        val reg1 = ra.nextRm()
+        val reg1 = ra.nextRm
         if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
         val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
-        phonyCaseCompare(code, GT, reg1, ra.next())
+        if (!res2.isInstanceOf[reg]) code += LDR(ra.next, res2, SB)
+        phonyCaseCompare(code, GT, reg1, ra.next)
         ra.restore()
         reg1
 
       case GreaterEq(expr1, expr2) =>
         val res1 = traverseExpr(expr1, ra, code)
-        val reg1 = ra.nextRm()
+        val reg1 = ra.nextRm
         if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
         val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
-        phonyCaseCompare(code, GE, reg1, ra.next())
+        if (!res2.isInstanceOf[reg]) code += LDR(ra.next, res2, SB)
+        phonyCaseCompare(code, GE, reg1, ra.next)
         ra.restore()
         reg1
 
       case Less(expr1, expr2) =>
         val res1 = traverseExpr(expr1, ra, code)
-        val reg1 = ra.nextRm()
+        val reg1 = ra.nextRm
         if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
         val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
-        phonyCaseCompare(code, LT, reg1, ra.next())
+        if (!res2.isInstanceOf[reg]) code += LDR(ra.next, res2, SB)
+        phonyCaseCompare(code, LT, reg1, ra.next)
         ra.restore()
         reg1
 
       case LessEq(expr1, expr2) =>
         val res1 = traverseExpr(expr1, ra, code)
-        val reg1 = ra.nextRm()
+        val reg1 = ra.nextRm
         if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
         val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
-        phonyCaseCompare(code, LE, reg1, ra.next())
+        if (!res2.isInstanceOf[reg]) code += LDR(ra.next, res2, SB)
+        phonyCaseCompare(code, LE, reg1, ra.next)
         ra.restore()
         reg1
 
       case Eq(expr1, expr2) =>
         val res1 = traverseExpr(expr1, ra, code)
-        val reg1 = ra.nextRm()
+        val reg1 = ra.nextRm
         if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
         val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
-        phonyCaseCompare(code, EQ, reg1, ra.next())
+        if (!res2.isInstanceOf[reg]) code += LDR(ra.next, res2, SB)
+        phonyCaseCompare(code, EQ, reg1, ra.next)
         ra.restore()
         reg1
 
       case NotEq(expr1, expr2) =>
         val res1 = traverseExpr(expr1, ra, code)
-        val reg1 = ra.nextRm()
+        val reg1 = ra.nextRm
         if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
         val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
-        phonyCaseCompare(code, NE, reg1, ra.next())
+        if (!res2.isInstanceOf[reg]) code += LDR(ra.next, res2, SB)
+        phonyCaseCompare(code, NE, reg1, ra.next)
         ra.restore()
         reg1
 
       case Plus(expr1, expr2) =>
         val res1 = traverseExpr(expr1, ra, code)
-        val reg1 = ra.nextRm()
+        val reg1 = ra.nextRm
         if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
         val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
-        code += ADDS(reg1, reg1, ra.next())
+        if (!res2.isInstanceOf[reg]) code += LDR(ra.next, res2, SB)
+        code += ADDS(reg1, reg1, ra.next)
         intOverflow()
         code += BLVS("p_throw_overflow_error")
         ra.restore()
@@ -505,11 +505,11 @@ object CodeGen{
 
       case Minus(expr1, expr2) =>
         val res1 = traverseExpr(expr1, ra, code)
-        val reg1 = ra.nextRm()
+        val reg1 = ra.nextRm
         if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
         val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
-        code += SUBS(reg1, reg1, ra.next())
+        if (!res2.isInstanceOf[reg]) code += LDR(ra.next, res2, SB)
+        code += SUBS(reg1, reg1, ra.next)
         intOverflow()
         code += BLVS("p_throw_overflow_error")
         ra.restore()
@@ -517,24 +517,24 @@ object CodeGen{
 
       case Mult(expr1, expr2) =>
         val res1 = traverseExpr(expr1, ra, code)
-        val reg1 = ra.nextRm()
+        val reg1 = ra.nextRm
         if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
         val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
-        code += SMULL(reg1, ra.next(), reg1, ra.next())
-        code += CMP(ra.next(), asr(reg1, 31))
+        if (!res2.isInstanceOf[reg]) code += LDR(ra.next, res2, SB)
+        code += SMULL(reg1, ra.next, reg1, ra.next)
+        code += CMP(ra.next, asr(reg1, 31))
         intOverflow()
         code += BLNE("p_throw_overflow_error")
         ra.restore()
         reg1
       case Div(expr1, expr2) =>
         val res1 = traverseExpr(expr1, ra, code)
-        val reg1 = ra.nextRm()
+        val reg1 = ra.nextRm
         if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
         val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
+        if (!res2.isInstanceOf[reg]) code += LDR(ra.next, res2, SB)
         code += MOV(RetReg, reg1, Base)
-        code += MOV(reg(1), ra.next(), Base)
+        code += MOV(reg(1), ra.next, Base)
         divByZeroError()
         code += BL("p_check_divide_by_zero")
         code += BL("__aeabi_idiv")
@@ -544,12 +544,12 @@ object CodeGen{
 
       case Mod(expr1, expr2) =>
         val res1 = traverseExpr(expr1, ra, code)
-        val reg1 = ra.nextRm()
+        val reg1 = ra.nextRm
         if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
         val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
+        if (!res2.isInstanceOf[reg]) code += LDR(ra.next, res2, SB)
         code += MOV(RetReg, reg1, Base)
-        code += MOV(reg(1), ra.next(), Base)
+        code += MOV(reg(1), ra.next, Base)
         divByZeroError()
         code += BL("p_check_divide_by_zero")
         code += BL("__aeabi_idivmod")
@@ -586,7 +586,7 @@ object CodeGen{
       case Len(expr) =>
         val reg = traverseExpr(expr,ra,code)
         code += LDR(reg, regVal(reg), Base)
-        ra.next()
+        ra.next
 
     }
   }
@@ -672,10 +672,10 @@ object CodeGen{
 
   def traverseBinaryExpr(expr1: Expr, expr2: Expr, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Unit = {
     val res1 = traverseExpr(expr1, ra, code)
-    val reg1 = ra.nextRm()
+    val reg1 = ra.nextRm
     if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
     val res2 = traverseExpr(expr2, ra, code)
-    if (!res2.isInstanceOf[reg]) code += LDR(ra.next(), res2, SB)
+    if (!res2.isInstanceOf[reg]) code += LDR(ra.next, res2, SB)
   }
 
   def phonyCaseCompare(code: ListBuffer[Mnemonic], suffix1: Suffix, reg1: Register, reg2: Register): Unit = {

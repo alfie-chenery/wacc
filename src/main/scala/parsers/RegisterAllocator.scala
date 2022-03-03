@@ -7,7 +7,9 @@ import parsers.Assembly._
 //companion object to store global values needed by all RegisterAllocators
 object RegisterAllocator{
   //unreserved registers we have access to use in our code generator
-  val allRegisters = List(reg(4), reg(5), reg(6), reg(7), reg(8), reg(9), reg(10), reg(11), reg(12))
+  val allRegisters = List(reg(4), reg(5), reg(6), reg(7), reg(8), reg(9), reg(10)) // reserve 11 for pushing/popping
+//  val allRegisters = List(reg(4), reg(5), reg(6), reg(7), reg(8), reg(9), reg(10), reg(11))
+//  val allRegisters = List(reg(4), reg(5), reg(6), reg(7), reg(8), reg(9), reg(10), reg(11), reg(12))
 }
 
 class RegisterAllocator(private var availableRegisters: ListBuffer[Register]) {
@@ -21,21 +23,35 @@ class RegisterAllocator(private var availableRegisters: ListBuffer[Register]) {
   }
 
 
-  def next(): Register = {
+  def next: Register = {
     availableRegisters.head
   }
 
-  def nextRm(): Register = {
+  def nextRm: Register = {
     availableRegisters.remove(0)
   }
 
   def restore(): Unit = {
     availableRegisters = initialAvailable.clone()
   }
+  def restore(reg: Register): Unit = {
+    availableRegisters += reg
+  }
 
   def getAvailable: ListBuffer[Register] = {
     availableRegisters
   }
 
+  def isEmpty: Boolean = {
+    availableRegisters.isEmpty
+  }
+
+  def isOnLastReg: Boolean = {
+    availableRegisters.size == 1
+  }
+
+  def getLast: Register = {
+    if (!isEmpty) availableRegisters.last else initialAvailable.last
+  }
 
 }
