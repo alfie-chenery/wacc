@@ -113,7 +113,7 @@ object Assembly {
     override def toString: String = "#" + i.toString
   }
   case class immc(c: String) extends Operand {
-    override def toString: String = "#'" + c.toString + "'"
+    override def toString: String = "#'" + c + "'"
   }
   case class label(l: String) extends Operand {
     override def toString: String = "=" + l
@@ -126,6 +126,9 @@ object Assembly {
   }
   case class asr(reg: Register, shift: Int) extends Operand {
     override def toString: String = reg.toString + ", ASR #" + shift
+  }
+  case class lsl(reg: Register, shift: Int) extends Operand {
+    override def toString: String = reg.toString + ", LSL #" + shift
   }
   case object nullOp extends Operand {
     override def toString: String = ""

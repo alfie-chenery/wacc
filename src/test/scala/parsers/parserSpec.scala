@@ -9,6 +9,7 @@ class parserSpec extends AnyFlatSpec{
 
   def runFrontEnd(dir: File, expectedReturn: Int): Unit = {
     val files: List[File] = dir.listFiles().toList
+    println(files)
     var returnVal = -1
     for (currFile <- files) {
       if (currFile.isFile) {
@@ -43,15 +44,15 @@ class parserSpec extends AnyFlatSpec{
     runFrontEnd(new File(testDir + "valid/basic/"), 0)
   }
   /*
+  they should "parse array programs" in {
+    runFrontEnd(new File(testDir + "valid/array/"), 0)
+  }
+   */
+  /*
   they should "parse advanced programs" in {
     runFrontEnd(new File(testDir + "valid/advanced/"), 0)
   }
    */
-  /*
-  they should "parse array programs" in {
-    runFrontEnd(new File(testDir + "valid/array/"), 0)
-  }
-  */
   they should "parse expression programs" in {
     runFrontEnd(new File(testDir + "valid/expressions/"), 0)
   }

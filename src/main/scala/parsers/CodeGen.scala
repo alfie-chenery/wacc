@@ -3,7 +3,6 @@ package parsers
 import parsers.SemanticPass.{checkExprType, st}
 
 import scala.collection.mutable
-import scala.collection.immutable
 import scala.collection.mutable.ListBuffer
 
 object CodeGen{
@@ -50,21 +49,21 @@ object CodeGen{
         currentShift = assignments
         if (assignments > 0) {
           // 1024 is the maximum immediate value because of shifting
-          for (i <- 0 until assignments / 1024) code += SUB(SP, SP, imm(1024))
+          for (_ <- 0 until assignments / 1024) code += SUB(SP, SP, imm(1024))
           code += SUB(SP, SP, imm(assignments % 1024))
         }
 
         traverse(stat, ra, code)
         if (assignments > 0) {
           code += ADD(SP, SP, imm(assignments % 1024))
-          for (i <- 0 until assignments / 1024) code += ADD(SP, SP, imm(1024))
+          for (_ <- 0 until assignments / 1024) code += ADD(SP, SP, imm(1024))
         }
 
         code += LDR(RetReg, imm(0), Base)
         code += POP(PC)
         code += LTORG
 
-      case Func((_type, Ident(name)), ParamList(params), stat) =>
+      case Func((_, Ident(name)), ParamList(params), stat) =>
         val assignments = assignmentsInScope(stat)
         currentShift = assignments + 4
         for (param <- params) {
