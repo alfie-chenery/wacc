@@ -790,41 +790,94 @@ object CodeGen{
         reg1
 
       case Minus(expr1, expr2) =>
-        val res1 = traverseExpr(expr1, ra, code)
-        val reg1 = ra.nextRm
-        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
-        val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next, res2, SB)
-        code += SUBS(reg1, reg1, ra.next)
+        var res1 = traverseExpr(expr1, ra, code)
+        val reg1 = if (spill) ra.next else ra.nextRm
+        if (!res1.isInstanceOf[reg]) {
+          code += LDR(reg1, res1, SB)
+          res1 = reg1
+        }
+        if (spill) code += PUSH(res1) // now that res1 is on the stack, its old reg is free to be overwritten
+        var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
+        if (!res2.isInstanceOf[reg]) {
+          code += LDR(ra.next, res2, SB)
+          res2 = ra.next // res2 now contains the result of expr 2
+        }
+        if (spill) {
+          res1 = ra.getAvailable(1)
+          code += POP(res1)
+          code += SUBS(res2, res1, res2)
+        } else { // needs separate ADD cases, since the res1 or res2 will be the lower register address depending on whether we're in a spill state
+          code += SUBS(res1, res1, res2)
+        }
         intOverflow()
         code += BL("p_throw_overflow_error", VS)
         ra.restore()
         reg1
 
       case Mult(expr1, expr2) =>
-        val res1 = traverseExpr(expr1, ra, code)
-        val reg1 = ra.nextRm
-        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
-        val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next, res2, SB)
-        code += SMULL(reg1, ra.next, reg1, ra.next)
-        code += CMP(ra.next, asr(reg1, 31))
+        println(expr1)
+        println(ra.getAvailable)
+        var res1 = traverseExpr(expr1, ra, code)
+        println(ra.getAvailable)
+        println("\n")
+        val reg1 = if (spill) ra.next else ra.nextRm
+        if (!res1.isInstanceOf[reg]) {
+          code += LDR(reg1, res1, SB)
+          res1 = reg1
+        }
+        if (spill) code += PUSH(res1) // now that res1 is on the stack, its old reg is free to be overwritten
+        var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
+        if (!res2.isInstanceOf[reg]) {
+          code += LDR(ra.next, res2, SB)
+          res2 = ra.next // res2 now contains the result of expr 2
+        }
+        if (spill) {
+          println("got to spill case")
+          res1 = ra.getAvailable(1)
+          code += POP(res1)
+          code += SMULL(res1, res2, res1, res2)
+          code += CMP(res2, asr(res1, 31))
+        } else { // needs separate ADD cases, since the res1 or res2 will be the lower register address depending on whether we're in a spill state
+          code += SMULL(res1, res2, res1, res2)
+          code += CMP(res2, asr(res1, 31))
+        }
         intOverflow()
         code += BL("p_throw_overflow_error", NE)
         ra.restore()
         reg1
+
       case Div(expr1, expr2) =>
-        val res1 = traverseExpr(expr1, ra, code)
-        val reg1 = ra.nextRm
-        if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
-        val res2 = traverseExpr(expr2, ra, code)
-        if (!res2.isInstanceOf[reg]) code += LDR(ra.next, res2, SB)
-        code += MOV(RetReg, reg1, Base)
-        code += MOV(reg(1), ra.next, Base)
-        divByZeroError()
-        code += BL("p_check_divide_by_zero", Base)
-        code += BL("__aeabi_idiv", Base)
-        code += MOV(reg1, RetReg, Base)
+        var res1 = traverseExpr(expr1, ra, code)
+        val reg1 = if (spill) ra.next else ra.nextRm
+        if (!res1.isInstanceOf[reg]) {
+          code += LDR(reg1, res1, SB)
+          res1 = reg1
+        }
+        if (spill) code += PUSH(res1) // now that res1 is on the stack, its old reg is free to be overwritten
+        var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
+        if (!res2.isInstanceOf[reg]) {
+          code += LDR(ra.next, res2, SB)
+          res2 = ra.next // res2 now contains the result of expr 2
+        }
+        if (spill) {
+          println("got to spill case")
+          res1 = ra.getAvailable(1)
+          code += POP(res1)
+          code += MOV(RetReg, res1, Base) // <-- todo?
+          code += MOV(reg(1), res2, Base)
+          divByZeroError()
+          code += BL("p_check_divide_by_zero", Base)
+          code += BL("__aeabi_idiv", Base)
+          code += MOV(res1, RetReg, Base)
+        } else { // needs separate ADD cases, since the res1 or res2 will be the lower register address depending on whether we're in a spill state
+          code += MOV(RetReg, res1, Base)
+          code += MOV(reg(1), res2, Base)
+          divByZeroError()
+          code += BL("p_check_divide_by_zero", Base)
+          code += BL("__aeabi_idiv", Base)
+          code += MOV(res1, RetReg, Base)
+        }
+
         ra.restore()
         reg1
 
