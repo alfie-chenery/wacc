@@ -1,6 +1,6 @@
 package parsers
 
-import parsers.SemanticPass.{checkExprType, st}
+import parsers.SemanticPass.{checkExprType, checkType, st}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -98,19 +98,8 @@ object CodeGen{
         variableLocation += (ident -> regVal(SP))
         ra.restore()
       case Decl(ArrayType(_type), Ident(ident), ArrayLiter(exprs)) =>
-        code += LDR(RetReg, imm(exprs.length * typeSize(_type) + 4), Base)
-        code += BL("malloc", Base)
-        val reg =ra.nextRm
-        code += MOV(reg, RetReg, Base)
-        var location = 4
-        for (expr <- exprs) {
-          val ret = traverseExpr(expr, ra, code)
-          code += STR(ret, regShift(reg, location, update = false))
-          location += typeSize(_type)
-        }
-        code += LDR(ra.next, imm(exprs.size), Base)
-        code += STR(ra.next, regVal(reg))
-        code += STR(reg, regVal(SP))
+        val ret = traverseExpr(ArrayLiter(exprs), ra, code)
+        code += STR(ret, regVal(SP))
         // TODO this location probably needs to be changed
         variableLocation += (ident -> regVal(SP))
         ra.restore()
@@ -146,7 +135,7 @@ object CodeGen{
         code += STR(r, location)
 
       case Assign(Ident(ident), rhs) =>
-        if (st(Ident(ident))._2 == WInt) code += STR(traverseExpr(rhs, ra, code), variableLocation(ident))
+        if (typeSize(st(Ident(ident))._2) == 4) code += STR(traverseExpr(rhs, ra, code), variableLocation(ident))
         else code += STRB(traverseExpr(rhs, ra, code), variableLocation(ident))
       case Assign(ArrayElem(ident, expr), rhs) =>
         val ret = traverseExpr(rhs, ra, code)
@@ -155,6 +144,8 @@ object CodeGen{
         code += STR(ret, arr)
         //TODO: remove duplication
       case Assign(FstPair(expr), rhs) =>
+        /*
+        val fst = traverseExpr(FstPair(expr), ra, code)
         val reg = traverseExpr(rhs, ra, code)
         var r = ra.next
         code += LDR(r, regVal(SP), Base)
@@ -163,6 +154,7 @@ object CodeGen{
         code += LDR(r, regVal(r), Base)
         code += STR(reg, regVal(r))
         runtimeError()
+         */
         val null_msg: String = s"msg_$getDataMsgIndex"
         data(null_msg) =
           List(DWord(50),
@@ -313,6 +305,8 @@ object CodeGen{
             if (!ret.isInstanceOf[reg]) code += LDR(ra.next, ret, SB)
             code += MOV(RetReg, ra.next, Base)
             code += BL("p_print_string", Base)
+
+          case PairType(t1, t2) =>
 
 
           case WBool =>
@@ -502,7 +496,27 @@ object CodeGen{
         data(int_msg) = List(DWord(s.length), DAscii(s))
         code += LDR(ra.next, label(int_msg), Base)
         ra.next
+      case ArrayLiter(exprs) =>
+        val _type = checkExprType(exprs.head, exprs.head, new ListBuffer[String])
+        code += LDR(RetReg, imm(exprs.length * typeSize(_type) + 4), Base)
+        code += BL("malloc", Base)
+        val ret =ra.nextRm
+        code += MOV(ret, RetReg, Base)
+        var location = 4
+        for (expr <- exprs) {
+          val ret = traverseExpr(expr, ra, code)
+          code += STR(ret, regShift(ret, location, update = false))
+          location += typeSize(_type)
+        }
+        code += LDR(ra.next, imm(exprs.size), Base)
+        code += STR(ra.next, regVal(ret))
+        ra.restore()
+        ret
       case PairLiter => ???
+      case FstPair(expr) =>
+        traverseExpr(expr, ra, code)
+      case SndPair(expr) =>
+        traverseExpr(expr, ra, code)
       case Ident(x) =>
         // TODO this will probably need to change when pairs and arrays are implemented
         if (typeSize(st(Ident(x))._2) == 4) code += LDR(ra.next, variableLocation(x), Base)
