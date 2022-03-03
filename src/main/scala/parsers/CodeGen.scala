@@ -220,7 +220,7 @@ object CodeGen{
                 List(PUSH(LinkReg),
                   CMP(RetReg, imm(0)),
                   LDR(RetReg, label(free_msg), EQ),
-                  BEQ("p_throw_runtime_error"),
+                  B("p_throw_runtime_error", EQ),
                   PUSH(RetReg),
                   LDR(RetReg, RetReg, Base),
                   BL("free", Base),
@@ -249,7 +249,7 @@ object CodeGen{
                 List(PUSH(LinkReg),
                   CMP(RetReg, imm(0)),
                   LDR(RetReg, label(free_msg), EQ),
-                  BEQ("p_throw_runtime_error"),
+                  B("p_throw_runtime_error",EQ),
                   BL("free", Base),
                   POP(PC)
                 )
@@ -429,9 +429,9 @@ object CodeGen{
         code += CMP(reg, imm(0))
         val fun1 = nextBranchIndex
         val fun2 = nextBranchIndex
-        code += BEQ(fun1)
+        code += B(fun1, EQ)
         traverse(stat_true, ra, code)
-        code += B(fun2)
+        code += B(fun2, Base)
         code += funcName(fun1)
         traverse(stat_false, ra, code)
         code += funcName(fun2)
@@ -440,14 +440,14 @@ object CodeGen{
         // TODO add stack changes for scoping
         val condLabel = nextBranchIndex
         val bodyLabel = nextBranchIndex
-        code += B(condLabel)
+        code += B(condLabel, Base)
         code += funcName(bodyLabel)
         traverse(stat, ra, code)
         code += funcName(condLabel)
         traverse(cond, ra, code)
         val reg = traverseExpr(cond, ra, code)
         code += CMP(reg, imm(1))
-        code += BEQ(bodyLabel)
+        code += B(bodyLabel, EQ)
 
       case Scope(stat) => traverse(stat, ra, code)
 

@@ -62,9 +62,6 @@ object Assembly {
   case class CMP(r: Register, o2: Operand) extends Mnemonic {
     override def toString: String = "CMP " + r.toString + ", " + o2.toString
   }
-  case class BEQ(label: String) extends Mnemonic {
-    override def toString: String = "BEQ " + label
-  }
   case class STRB(rd: Register, rn: Register) extends Mnemonic {
     override def toString: String = {
       "STRB " + rd.toString + ", " + rn.toString
@@ -95,8 +92,8 @@ object Assembly {
   case class RSBS(rd: Register, o2: Operand, o3: Operand) extends Mnemonic {
     override def toString: String = "RSBS " + rd.toString + ", " + o2.toString + ", " + o3.toString
   }
-  case class B(label: String) extends Mnemonic {
-    override def toString: String = "B " + label
+  case class B(label: String, suffix: Suffix) extends Mnemonic {
+    override def toString: String = "B" + suffix.toString + " " + label
   }
 
   sealed trait Operand
