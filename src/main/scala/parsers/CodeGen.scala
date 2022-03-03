@@ -67,7 +67,7 @@ object CodeGen{
         val assignments = assignmentsInScope(stat)
         currentShift = assignments + 4
         for (param <- params) {
-          variableLocation += (param.ident.ident -> regShift(SP, currentShift, false))
+          variableLocation += (param.ident.ident -> regShift(SP, currentShift, update = false))
           currentShift += typeSize(param._type)
         }
         code += funcName(name)
@@ -95,7 +95,7 @@ object CodeGen{
         code += LDR(RetReg, imm(typeSize(t2)), Base)
         code += BL("malloc")
         code += STRB(ra.next(), regVal(RetReg))
-        code += STR(RetReg, regShift(reg1, 4, false))
+        code += STR(RetReg, regShift(reg1, 4, update = false))
         code += STR(reg1, regVal(SP))
         // TODO this location probably needs to be changed
         variableLocation += (ident -> regVal(SP))
@@ -108,7 +108,7 @@ object CodeGen{
         var location = 4
         for (expr <- exprs) {
           val ret = traverseExpr(expr, ra, code)
-          code += STR(ret, regShift(reg, location, false))
+          code += STR(ret, regShift(reg, location, update = false))
           location += typeSize(_type)
         }
         code += LDR(ra.next(), imm(exprs.size), Base)
@@ -122,7 +122,7 @@ object CodeGen{
         traverseExpr(rhs, ra, code)
         //if (ret != RetReg) code += LDR(r, ret, Base)
         currentShift -= 4
-        val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, false)
+        val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, update = false)
         variableLocation += (ident -> location)
         code += STR(r, location)
       case Decl(WBool, Ident(ident), rhs) =>
@@ -130,21 +130,21 @@ object CodeGen{
         traverseExpr(rhs, ra, code)
         //if (ret != RetReg) code += MOV(r, ret, Base)
         currentShift -= 1
-        val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, false)
+        val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, update = false)
         variableLocation += (ident -> location)
         code += STRB(r, location)
       case Decl(WChar, Ident(ident), rhs) =>
         val r = ra.next()
         traverseExpr(rhs, ra, code)
         currentShift -= 1
-        val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, false)
+        val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, update = false)
         variableLocation += (ident -> location)
         code += STRB(r, location)
       case Decl(WString, Ident(ident), rhs) =>
         val r = ra.next()
         traverseExpr(rhs, ra, code)
         currentShift -= 4
-        val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, false)
+        val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, update = false)
         variableLocation += (ident -> location)
         code += STR(r, location)
       //case Decl
@@ -376,7 +376,7 @@ object CodeGen{
       case ArrayElem(Ident(x), elems) =>
         // TODO this wouldn't work for multi-dimensional arrays
         val reg1 = ra.nextRm()
-        code += ADD(reg1, SP, traverseExpr(elems(0), ra, code))
+        code += ADD(reg1, SP, traverseExpr(elems.head, ra, code))
         ra.restore()
         reg1
       case ParensExpr(expr) => traverseExpr(expr, ra, code)
@@ -386,8 +386,8 @@ object CodeGen{
           val size = typeSize(checkExprType(arg, arg, new ListBuffer[String]))
           totalSize += size
           val reg = traverseExpr(arg, ra, code)
-          if (size == 4) code += STR(reg, regShift(SP, -size, true))
-          else code += STRB(reg, regShift(SP, -size, true))
+          if (size == 4) code += STR(reg, regShift(SP, -size, update = true))
+          else code += STRB(reg, regShift(SP, -size, update = true))
         }
         code += BL(name)
         if (totalSize > 0) code += ADD(SP, SP, imm(totalSize))
@@ -621,7 +621,7 @@ object CodeGen{
         List(PUSH(LinkReg),
           MOV(reg(1), RetReg, Base),
           LDR(RetReg, label(ptr_format_msg), Base),
-          ADD(RetReg, RetReg, imm(4)),
+          ADD(RetReg, RetReg, imm(4)), //value of 4 is not dependent on array's type
           BL("printf"),
           MOV(RetReg, imm(0), Base),
           BL("fflush"),
@@ -736,7 +736,7 @@ object CodeGen{
   }
 
   // TODO add more to this map
-  def typeSize(_type: Type) = {
+  def typeSize(_type: Type): Int = {
     _type match {
       case WInt => 4
       case WBool => 1
