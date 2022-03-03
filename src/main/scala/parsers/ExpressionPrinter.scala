@@ -42,7 +42,7 @@ object ExpressionPrinter {
       case Pair => "pair"
       case IntLiter(i) => i.toString
       case BoolLiter(b) => b.toString
-      case CharLiter(c) => c.toString
+      case CharLiter(c) => c
       case StrLiter(s) => s
       case PairLiter => "null"
       case Ident(i) => i.split('$')(0)
