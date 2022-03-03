@@ -154,7 +154,75 @@ object CodeGen{
         else code += STRB(traverseExpr(rhs, ra, code), variableLocation(ident))
       case Assign(lhs, rhs) => ??? //TODO is this case possible? surely a lhs not being an identifier was removed in parsing
 
-      case Free(expr) => ???
+      case Free(expr) =>
+        val r = ra.next()
+        code += LDR(traverseExpr(node, ra, code),SP, Base)
+        code += MOV(RetReg, r, Base)
+        val free_msg: String = s"msg_$getDataMsgIndex"
+        data(free_msg) =
+          List(DWord(50),
+            DAscii("NullReferenceError: dereference a null reference\\n\\0"))
+        runtimeError()
+        val t = checkExprType(expr, node, new ListBuffer[String])
+        t match{
+          case PairType(_, _) =>
+            code += BL("p_free_pair")
+            val pair_free_msg = "p_free_pair"
+            if (!labels.contains(pair_free_msg)) {
+              labels(pair_free_msg) =
+                List(PUSH(LinkReg),
+                  CMP(RetReg, imm(0)),
+                  LDR(RetReg, label(free_msg), EQ),
+                  BEQ("p_throw_runtime_error"),
+                  PUSH(RetReg),
+                  LDR(RetReg, RetReg, Base),
+                  BL("free"),
+                  LDR(RetReg, SP, Base),
+                  LDR(RetReg, regShift(RetReg, 4, false), Base),
+                  BL("free"),
+                  POP(RetReg),
+                  BL("fflush"),
+                  POP(PC)
+                )
+            }
+          case ArrayType(_) =>
+            code += BL("p_free_array")
+            val neg_index_msg = s"msg_$getDataMsgIndex"
+            data(neg_index_msg) =
+              List(DWord(44),
+                DAscii("ArrayIndexOutOfBoundsError: negative index\\n\\0"))
+            val large_index_msg = s"msg_$getDataMsgIndex"
+            data(large_index_msg) =
+              List(DWord(45),
+                DAscii("ArrayIndexOutOfBoundsError: index too large\\n\\0"))
+            code += BL("p_free_array")
+            val array_free_msg = "p_free_array"
+            if (!labels.contains(array_free_msg)) {
+              labels(array_free_msg) =
+                List(PUSH(LinkReg),
+                  CMP(RetReg, imm(0)),
+                  LDR(RetReg, label(free_msg), EQ),
+                  BEQ("p_throw_runtime_error"),
+                  BL("free"),
+                  POP(PC)
+                )
+            }
+            val array_bounds_msg = "p_check_array_bounds"
+            if (!labels.contains(array_bounds_msg)) {
+              labels(array_bounds_msg) =
+                List(PUSH(LinkReg),
+                  CMP(RetReg, imm(0)),
+                  LDR(RetReg, label(neg_index_msg), LT),
+                  BLLT("p_throw_runtime_error"),
+                  LDR(reg(1), reg(1), Base),
+                  CMP(RetReg, reg(1)),
+                  LDR(RetReg, label(free_msg), CS),
+                  BLCS("p_throw_runtime_error"),
+                  POP(PC)
+                )
+            }
+        }
+
 
       case Read(lhs: AstNode) =>
         val _type: Type = SemanticPass.checkExprType(lhs, node, new ListBuffer[String])
