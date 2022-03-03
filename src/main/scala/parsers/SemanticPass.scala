@@ -47,6 +47,7 @@ object SemanticPass {
       case Assign(lhs, rhs) =>
         val t: Type = checkType(rhs, errors)
         val t1: Type = checkType(lhs, errors)
+        print(t + " : " + t1)
         if (t1 != t) {
           errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: " + prettyPrint(t1) + ", actual: " + prettyPrint(t))
         }
@@ -118,7 +119,15 @@ object SemanticPass {
     node match {
       //AssignLHS
       case ident: Ident => st(ident)._2
-      case ArrayElem(ident, exprs) => st(ident)._2 //TODO make sure this works for multi-dimensional arrays
+      case ArrayElem(ident, exprs) =>
+        var t = st(ident)._2 //TODO make sure this works for multi-dimensional arrays
+        for (expr <- exprs) {
+          t match {
+            case ArrayType(arr) => t = arr
+            case a => a
+          }
+        }
+        t
       case FstPair(pair) =>
         val rhs_type = checkType(pair, errors)
         rhs_type match {

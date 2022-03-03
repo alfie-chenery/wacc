@@ -36,7 +36,6 @@ object CodeGen{
   }
 
   def traverse(node: AstNode, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Unit = {
-    println(node)
     node match {
       case Program(funcs, stat) =>
         for (func <- funcs) {
@@ -152,7 +151,12 @@ object CodeGen{
       case Assign(Ident(ident), rhs) =>
         if (st(Ident(ident))._2 == WInt) code += STR(traverseExpr(rhs, ra, code), variableLocation(ident))
         else code += STRB(traverseExpr(rhs, ra, code), variableLocation(ident))
-      case Assign(lhs, rhs) => ??? //TODO is this case possible? surely a lhs not being an identifier was removed in parsing
+      case Assign(ArrayElem(ident, expr), rhs) =>
+        var ret = traverseExpr(rhs, ra, code)
+        ra.nextRm()
+        var arr = traverseExpr(ArrayElem(ident, expr), ra, code)
+        code += STR(ret, arr)
+      // TODO pair assignment
 
       case Free(expr) =>
         val r = ra.next()
@@ -332,7 +336,7 @@ object CodeGen{
           case ArrayType(_type) =>
             //printing an array variable prints its address
             printReference()
-            if (!ret.isInstanceOf[reg]) code += LDR(ra.next(), ret, SB)
+            if (!ret.isInstanceOf[reg]) code += LDR(ra.next(), regVal(ret), SB)
             code += MOV(RetReg, ra.next(), Base)
             code += BL("p_print_reference")
 
