@@ -278,37 +278,30 @@ object CodeGen{
         }
         if (!labels.contains(t)) {
           val read_msg = s"msg_$getDataMsgIndex"
-          // TODO remove massive duplication
           t match {
             case "p_read_char" =>
               data(read_msg) = List(
                 DWord(4),
                 DAscii(" %c\\0")
               )
-              labels("p_read_char") =
-                List(PUSH(LinkReg),
-                  MOV(reg(1), RetReg, Base),
-                  LDR(RetReg, label(read_msg), Base),
-                  ADD(RetReg, RetReg, imm(4)),
-                  BL("scanf", Base),
-                  POP(PC))
             case "p_read_int" =>
               data(read_msg) = List(
                 DWord(3),
                 DAscii("%d\\0")
               )
-              labels("p_read_int") =
-                List(PUSH(LinkReg),
-                  MOV(reg(1), RetReg, Base),
-                  LDR(RetReg, label(read_msg), Base),
-                  ADD(RetReg, RetReg, imm(4)),
-                  BL("scanf", Base),
-                  POP(PC))
           }
+          labels(t) =
+            List(PUSH(LinkReg),
+              MOV(reg(1), RetReg, Base),
+              LDR(RetReg, label(read_msg), Base),
+              ADD(RetReg, RetReg, imm(4)),
+              BL("scanf", Base),
+              POP(PC))
         }
         code += ADD(ra.next, SP, imm(0))
         code += MOV(RetReg, ra.next, Base)
         code += BL(t, Base)
+
 
       case Print(expr: AstNode) =>
         //TODO: escape escape characters somehow in data strings? when they get written to the file it treats them literally
@@ -947,6 +940,10 @@ object CodeGen{
       case _ =>
         suffix2 = Base
     }
+
+    code += CMP(reg1, reg2)
+    code += MOV(reg1, imm(1), suffix1)
+    code += MOV(reg1, imm(0), suffix2)
   }
 
   def compile(node: AstNode, ra: RegisterAllocator = new RegisterAllocator()): String = {
