@@ -834,7 +834,7 @@ object CodeGen{
      * The main case in traverse should ensure reg1 and reg2 store the correct
      * values before calling this function
      *
-     * @param suffix1  : The suffix of the positive branch of the compare.
+     *@param suffix1  : The suffix of the positive branch of the compare.
      *                For example, when pattern matching a Greater than comparison, suffix1 should be GT
      *                Since this function should only be called in comparison cases, for suffix1 in {Base,CS,SB,VS}
      *                the output is undefined
