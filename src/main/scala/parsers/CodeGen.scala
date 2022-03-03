@@ -345,11 +345,7 @@ object CodeGen{
               code += MOV(RetReg, ra.next(), Base)
               code += BL("p_print_reference")
             }
-            //printing an array variable prints its address
-            printReference()
-            if (!ret.isInstanceOf[reg]) code += LDR(ra.next(), regVal(ret), SB)
-            code += MOV(RetReg, ra.next(), Base)
-            code += BL("p_print_reference")
+
 
 
           //TODO: implement all other print types
