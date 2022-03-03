@@ -168,8 +168,8 @@ object CodeGen{
           t match {
             case "p_read_char" =>
               data(read_msg) = List(
-                DWord(3),
-                DAscii("%d\\0")
+                DWord(4),
+                DAscii(" %c\\0")
               )
               labels("p_read_char") =
                 List(PUSH(LinkReg),
@@ -356,7 +356,9 @@ object CodeGen{
         code += MOV(ra.next(), imm(if (b) 1 else 0), Base)
         ra.next()
       case CharLiter(c) =>
-        code += MOV(ra.next(), immc(c), Base)
+        // todo: is this the correct solution or does it only solve one case?
+        val _c = if (c=="\\u0000") imm(0) else immc(c)
+        code += MOV(ra.next(), _c, Base)
         ra.next()
       case StrLiter(s) =>
         val int_msg = s"msg_$getDataMsgIndex"
