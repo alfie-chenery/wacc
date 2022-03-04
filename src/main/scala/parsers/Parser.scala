@@ -47,7 +47,6 @@ object lexer {
   private [parsers] val CHAR_LITER: Parsley[String] = token('\'' ~> CHAR <~ '\'')
   private [parsers] val STR_LITER: Parsley[String] = token('\"' ~> manyUntil(CHAR, '\"').map(_.mkString))
   private [parsers] val PAIR_LITER: Parsley[String] = token("null")
-  // TODO make this its own case class holding the char
 
   val unacceptable = Set("\"", "\'", "\\")
 
@@ -75,7 +74,6 @@ object Parser {
   import parsley.io.ParseFromIO
 
 
-  // TODO Make sure this means identifiers can't be keywords
   private [parsers] lazy val `<ident>`: Parsley[Ident] = attempt(Ident(lex.identifier))
 
   private [parsers] lazy val `<array-liter>`: Parsley[ArrayLiter] = ArrayLiter('[' ~> sepBy(`<expr>`, ',') <~ ']')
@@ -91,7 +89,6 @@ object Parser {
                SOps(Prefix)  (Chr <# attempt("chr "), Len <# attempt("len "), Ord <# attempt("ord "), Not <# "!" , Negate <# attempt("-" <~ notFollowedBy(digit))) +:
                Atoms(`<expr-atoms>`))
 
-  // TODO refactor this to put ident at the top and reduce backtracking
   private [parsers] lazy val `<expr-atoms>`: Parsley[Term] =
     attempt(IntLiter(INT_LITER))       <|> attempt(BoolLiter(BOOL_LITER)) <|>
       attempt(CharLiter(CHAR_LITER))   <|> StrLiter(STR_LITER)  <|>
@@ -112,7 +109,6 @@ object Parser {
   private [parsers] lazy val `<array-type-pair-elem>`: Parsley[PairElemType] =
     chain.postfix1(`<type-atoms>`, '[' ~> ']' #> ((_type: Type) => ArrayType(_type)))
 
-  // TODO figure out why or if we need parser.parser builder for W types
   private [parsers] lazy val `<base-type>`: Parsley[BaseType] =
     (WInt <# "int") <|> (WBool <# "bool") <|> (WChar <# "char") <|> (WString <# "string")
 
@@ -158,7 +154,6 @@ object Parser {
 
   private [parsers] lazy val `<param-list>` = ParamList(sepBy(`<param>`, ','))
 
-  //TODO return or exit needed before end
   private [parsers] lazy val `<func>` =
     Func(attempt(`<type>` <~> `<ident>` <~ '('), `<param-list>`  <~ ')', "is" ~> `<terminate-stat>` <~ "end")
 
