@@ -40,10 +40,18 @@ object Main {
     val filename = args(0).split('/').last
     val outputFilename = filename.split('.')(0) + ".s"
     val fw = new FileWriter(outputFilename)
-    val output = CodeGen.compile(renamedProgram)
+    var failed = false
+    val output = try {
+      CodeGen.compile(renamedProgram)
+    } catch {
+      case c: SemanticError =>
+        failed = true
+        s"""Errors detected during compilation! Exit code 200 returned.
+           |${c.toString}""".stripMargin
+    }
+    println(output)
     fw.write(output)
     fw.close()
-
-    sys.exit(0)
+    if (failed) sys.exit(200) else sys.exit(0)
   }
 }

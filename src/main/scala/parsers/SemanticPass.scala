@@ -50,11 +50,11 @@ object SemanticPass {
         if (t1 != t) {
           errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: " + prettyPrint(t1) + ", actual: " + prettyPrint(t))
         }
-      case Read(lhs) =>
-        val _type = checkType(lhs, errors)
-        if (!(_type == WChar || _type == WInt)) {
-          println("type error")
-        }
+//      case Read(lhs) =>
+//        val _type = checkType(lhs, errors)
+//        if (!(_type == WChar || _type == WInt)) {
+//          println("type error")
+//        }
       case Free(expr) => // TODO come back to this
         val _type = checkExprType(expr, node, errors)
         if (!(_type.isInstanceOf[PairType] || _type.isInstanceOf[ArrayType])) {

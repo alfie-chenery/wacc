@@ -220,6 +220,8 @@ object CodeGen{
         val t = _type match {
           case WChar => "p_read_char"
           case WInt => "p_read_int"
+          case _ =>
+            throw SemanticError(s"Incompatible type: ${_type.toString} with call to Read")
         }
         if (!labels.contains(t)) {
           val read_msg = s"msg_$getDataMsgIndex"
