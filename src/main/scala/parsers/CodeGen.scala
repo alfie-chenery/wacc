@@ -36,7 +36,6 @@ object CodeGen{
   }
 
   def traverse(node: AstNode, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Unit = {
-    println(node)
     node match {
       case Program(funcs, stat) =>
         for (func <- funcs) {
@@ -89,10 +88,7 @@ object CodeGen{
         ra.restore()
       case Decl(ArrayType(_type), Ident(ident), ArrayLiter(exprs)) =>
         val ret = traverseExpr(ArrayLiter(exprs), ra, code)
-        currentShift -= 4
-        val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, update = false)
-        variableLocation += (ident -> location)
-        code += STR(ret, location)
+        code += STR(ret, regVal(SP))
         ra.restore()
       case Decl(WInt, Ident(ident), rhs) =>
         val r = ra.next
