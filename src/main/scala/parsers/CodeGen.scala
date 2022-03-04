@@ -88,6 +88,7 @@ object CodeGen{
         ra.restore()
       case Decl(ArrayType(_type), Ident(ident), ArrayLiter(exprs)) =>
         val ret = traverseExpr(ArrayLiter(exprs), ra, code)
+        variableLocation += (ident -> regVal(SP))
         code += STR(ret, regVal(SP))
         ra.restore()
       case Decl(WInt, Ident(ident), rhs) =>
@@ -182,8 +183,7 @@ object CodeGen{
 
       case Free(expr) =>
         val r = ra.next
-        code += LDR(traverseExpr(node, ra, code),SP, Base)
-        code += MOV(RetReg, r, Base)
+        code += MOV(RetReg, traverseExpr(expr, ra, code), Base)
         val free_msg: String = s"msg_$getDataMsgIndex"
         data(free_msg) =
           List(DWord(50),
@@ -201,13 +201,13 @@ object CodeGen{
                   LDR(RetReg, label(free_msg), EQ),
                   B("p_throw_runtime_error", EQ),
                   PUSH(RetReg),
-                  LDR(RetReg, RetReg, Base),
+                  LDR(RetReg, regVal(RetReg), Base),
                   BL("free", Base),
-                  LDR(RetReg, SP, Base),
+                  LDR(RetReg, regVal(SP), Base),
                   LDR(RetReg, regShift(RetReg, 4, update = false), Base),
                   BL("free", Base),
                   POP(RetReg),
-                  BL("fflush", Base),
+                  BL("free", Base),
                   POP(PC)
                 )
             }
