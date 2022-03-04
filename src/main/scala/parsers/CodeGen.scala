@@ -458,16 +458,16 @@ object CodeGen{
       case FstPair(expr) =>
         val ret = traverseExpr(expr, ra, code)
         code += MOV(RetReg, ret, Base)
+        checkNullPointer()
         code += BL("p_check_null_pointer", Base)
-        code += LDR(ret, regVal(ret), Base)
         code += LDR(ret, regVal(ret), Base)
         ret
       case SndPair(expr) =>
         val ret = traverseExpr(expr, ra, code)
         code += MOV(RetReg, ret, Base)
+        checkNullPointer()
         code += BL("p_check_null_pointer", Base)
-        code += LDR(ret, regVal(ret), Base)
-        code += LDR(ret, regVal(ret), Base)
+        code += LDR(ret, regShift(ret, 4, update = false), Base)
         ret
       case NewPair(fst, snd) =>
         code += LDR(RetReg, imm(8), Base)
