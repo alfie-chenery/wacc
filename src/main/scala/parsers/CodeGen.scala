@@ -35,7 +35,7 @@ object CodeGen{
   var readCounter: Int = -1
   def getReadOffset: Int = {
     readCounter += 1
-    4 * readCounter
+    4 * readCounter //4 bytes * number of reads so far
   }
 
   def traverse(node: AstNode, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Unit = {
@@ -441,7 +441,7 @@ object CodeGen{
         ra.next
       case StrLiter(s) =>
         val int_msg = s"msg_$getDataMsgIndex"
-        data(int_msg) = List(DWord(s.length), DAscii(s))
+        data(int_msg) = List(DWord(s.replace("\\","").length), DAscii(s))
         code += LDR(ra.next, label(int_msg), Base)
         ra.next
       case ArrayLiter(exprs) =>
