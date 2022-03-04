@@ -19,20 +19,23 @@ object CodeGen{
   val variableLocation = new mutable.LinkedHashMap[String, Register]
   var currentShift = 0
 
-  /**
-   * Returns the next available 'msg' index in data
-   */
+  /** Returns the next available 'msg' index in data */
   def getDataMsgIndex: Int = {
     data.size
   }
 
-  /**
-   * value used for conditional branch labels L0, L1 etc
-   */
+  /** Value used for conditional branch labels L0, L1 etc */
   var branchIndex: Int = -1
   def nextBranchIndex: String = {
     branchIndex += 1
     "L" + branchIndex.toString
+  }
+
+  /** value used to increase offset when reading multiple times */
+  var readCounter: Int = -1
+  def getReadOffset: Int = {
+    readCounter += 1
+    4 * readCounter
   }
 
   def traverse(node: AstNode, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Unit = {
@@ -245,14 +248,13 @@ object CodeGen{
               BL("scanf", Base),
               POP(PC))
         }
-        // TODO this immediate value needs to be decremented for each read from 4 * no. of reads
-        code += ADD(ra.next, SP, imm(0))
+
+        code += ADD(ra.next, SP, imm(getReadOffset))
         code += MOV(RetReg, ra.next, Base)
         code += BL(t, Base)
 
 
       case Print(expr: AstNode) =>
-        //TODO: escape escape characters somehow in data strings? when they get written to the file it treats them literally
         val ret = traverseExpr(expr, ra, code)
         // TODO change this so it doesn't match explicit types
         SemanticPass.checkExprType(expr, expr, new ListBuffer[String]) match {
