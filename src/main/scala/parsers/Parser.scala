@@ -84,7 +84,7 @@ object Parser {
                SOps(NonAssoc)(NotEq <# attempt("!="), Eq <# attempt("==")) +:
                SOps(NonAssoc)(LessEq <# attempt("<="), Less <# "<",
                               GreaterEq <# attempt(">="), Greater <# ">") +:
-               SOps(InfixL)  (Minus <# "-" <~ notFollowedBy(digit), Plus <# "+") +:
+               SOps(InfixL)  (Minus <# "-", Plus <# "+") +:
                SOps(InfixL)  (Mod <# "%", Div <# "/", Mult <# "*") +:
                SOps(Prefix)  (Chr <# attempt("chr "), Len <# attempt("len "), Ord <# attempt("ord "), Not <# "!" , Negate <# "-") +:
                Atoms(`<expr-atoms>`))

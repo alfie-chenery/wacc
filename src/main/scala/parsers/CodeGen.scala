@@ -42,7 +42,6 @@ object CodeGen{
   }
 
   def traverse(node: AstNode, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Unit = {
-    println(node)
     node match {
       case Program(funcs, stat) =>
         for (func <- funcs) {
@@ -67,9 +66,6 @@ object CodeGen{
           code += ADD(SP, SP, imm(assignments % 1024))
           for (_ <- 0 until assignments / 1024) code += ADD(SP, SP, imm(1024))
         }
-
-
-
         code += LDR(RetReg, imm(0), Base)
         code += POP(PC)
         code += LTORG
