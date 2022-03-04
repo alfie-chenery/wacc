@@ -132,54 +132,20 @@ object CodeGen{
         code += STR(ret, arr)
         //TODO: remove duplication
       case Assign(FstPair(expr), rhs) =>
-        /*
+        val ret = traverseExpr(rhs, ra, code)
+        ra.nextRm
         val fst = traverseExpr(FstPair(expr), ra, code)
-        val reg = traverseExpr(rhs, ra, code)
-        var r = ra.next
-        code += LDR(r, regVal(SP), Base)
-        code += MOV(RetReg, r, Base)
-        code += BL("p_check_null_pointer", Base)
-        code += LDR(r, regVal(r), Base)
-        code += STR(reg, regVal(r))
-        runtimeError()
-         */
-        val null_msg: String = s"msg_$getDataMsgIndex"
-        data(null_msg) =
-          List(DWord(50),
-            DAscii("NullReferenceError: dereference a null reference\\n\\0"))
-        val pair_check_null_pointer = "p_check_null_pointer"
-        if (!labels.contains(pair_check_null_pointer)) {
-          labels(pair_check_null_pointer) =
-            List(PUSH(LinkReg),
-              CMP(RetReg, imm(0)),
-              LDR(RetReg, label(null_msg), Base),
-              BL("p_throw_runtime_error", EQ),
-              POP(PC)
-            )
-        }
+        code += STR(ret, regVal(fst))
+        checkNullPointer()
+        ra.restore()
+
       case Assign(SndPair(expr), rhs) =>
-        val reg = traverseExpr(rhs, ra, code)
-        var r = ra.next
-        code += LDR(r, regVal(SP), Base)
-        code += MOV(RetReg, r, Base)
-        code += BL("p_check_null_pointer", Base)
-        code += LDR(r, regShift(r, 4, update = false), Base)
-        code += STRB(reg, regVal(r))
-        runtimeError()
-        val null_msg: String = s"msg_$getDataMsgIndex"
-        data(null_msg) =
-          List(DWord(50),
-            DAscii("NullReferenceError: dereference a null reference\\n\\0"))
-        val pair_check_null_pointer = "p_check_null_pointer"
-        if (!labels.contains(pair_check_null_pointer)) {
-          labels(pair_check_null_pointer) =
-            List(PUSH(LinkReg),
-              CMP(RetReg, imm(0)),
-              LDR(RetReg, label(null_msg), Base),
-              BL("p_throw_runtime_error", EQ),
-              POP(PC)
-            )
-        }
+        val ret = traverseExpr(rhs, ra, code)
+        ra.nextRm
+        val snd = traverseExpr(SndPair(expr), ra, code)
+        code += STR(ret, regVal(snd))
+        checkNullPointer()
+        ra.restore()
 
       case Free(expr) =>
         val r = ra.next
@@ -488,9 +454,19 @@ object CodeGen{
       case PairLiter => ???
       // TODO implement these correctly
       case FstPair(expr) =>
-        traverseExpr(expr, ra, code)
+        val ret = traverseExpr(expr, ra, code)
+        code += MOV(RetReg, ret, Base)
+        code += BL("p_check_null_pointer", Base)
+        code += LDR(ret, regVal(ret), Base)
+        code += LDR(ret, regVal(ret), Base)
+        ret
       case SndPair(expr) =>
-        traverseExpr(expr, ra, code)
+        val ret = traverseExpr(expr, ra, code)
+        code += MOV(RetReg, ret, Base)
+        code += BL("p_check_null_pointer", Base)
+        code += LDR(ret, regVal(ret), Base)
+        code += LDR(ret, regVal(ret), Base)
+        ret
       case NewPair(fst, snd) =>
         code += LDR(RetReg, imm(8), Base)
         code += BL("malloc", Base)
@@ -983,6 +959,24 @@ object CodeGen{
           BL("printf", Base),
           MOV(RetReg, imm(0), Base),
           BL("fflush", Base),
+          POP(PC)
+        )
+    }
+  }
+
+  def checkNullPointer(): Unit = {
+    runtimeError()
+    val null_msg: String = s"msg_$getDataMsgIndex"
+    data(null_msg) =
+      List(DWord(50),
+        DAscii("NullReferenceError: dereference a null reference\\n\\0"))
+    val pair_check_null_pointer = "p_check_null_pointer"
+    if (!labels.contains(pair_check_null_pointer)) {
+      labels(pair_check_null_pointer) =
+        List(PUSH(LinkReg),
+          CMP(RetReg, imm(0)),
+          LDR(RetReg, label(null_msg), Base),
+          BL("p_throw_runtime_error", EQ),
           POP(PC)
         )
     }
