@@ -75,11 +75,12 @@ object CodeGen{
 
       case Func((_, Ident(name)), ParamList(params), stat) =>
         val assignments = assignmentsInScope(stat)
-        currentShift = assignments + 4
+        currentShift = assignments
         for (param <- params) {
-          variableLocation += (param.ident.ident -> regShift(SP, currentShift, update = false))
           currentShift += typeSize(param._type)
+          variableLocation += (param.ident.ident -> regShift(SP, currentShift, update = false))
         }
+        currentShift = assignments
         readCounter = readsInScope(stat)
         code += funcName(name)
         code += PUSH(LinkReg)
