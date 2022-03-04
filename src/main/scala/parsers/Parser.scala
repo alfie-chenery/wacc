@@ -148,9 +148,9 @@ object Parser {
       attempt(Read("read" ~> `<assign-lhs>`))      <|> Free("free" ~> `<expr>`)                    <|>
       Return("return" ~> `<expr>`)        <|> Exit("exit" ~> `<expr>`)                             <|>
       attempt(Print("print" ~> `<expr>`)) <|>Println("println" ~> `<expr>`)                        <|>
-      IfElse("if" ~> `<expr>`, "then" ~> `<terminate-stat>`, "else" ~> `<terminate-stat>` <~ "fi") <|>
-      While("while" ~> `<expr>`, "do" ~> `<terminate-stat>` <~ "done")                             <|>
-      Scope("begin" ~> `<terminate-stat>` <~ "end")
+      IfElse("if" ~> `<expr>`, "then" ~> `<stat>`, "else" ~> `<stat>` <~ "fi") <|>
+      While("while" ~> `<expr>`, "do" ~> `<stat>` <~ "done")                             <|>
+      Scope("begin" ~> `<stat>` <~ "end")
 
   private [parsers] lazy val `<param>` = Param(`<type>`, `<ident>`)
 
@@ -158,7 +158,7 @@ object Parser {
 
   //TODO return or exit needed before end
   private [parsers] lazy val `<func>` =
-    Func(attempt(`<type>` <~> `<ident>` <~ '('), `<param-list>`  <~ ')', "is" ~> `<stat>` <~ "end")
+    Func(attempt(`<type>` <~> `<ident>` <~ '('), `<param-list>`  <~ ')', "is" ~> `<terminate-stat>` <~ "end")
 
   private [parsers] lazy val `<program>` = fully(Program("begin" ~> many(`<func>`), `<stat>` <~ "end"))
 
