@@ -98,7 +98,7 @@ object SemanticPass {
     node match {
       case Return(expr) =>
         if(main) {
-          errors += ("Syntax error detected: at \"" + prettyPrint(node) + "\". Main function should not contain a return statement.")
+          errors += ("Semantic error detected: at \"" + prettyPrint(node) + "\". Main function should not contain a return statement.")
           false
         } else {
           true

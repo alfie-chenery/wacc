@@ -28,9 +28,8 @@ object Main {
 
     if (errors.nonEmpty) {
       for (error <- errors) {
-        if (error.startsWith("Syntax error"))
-          println(error)
-          sys.exit(100)
+        if (error.startsWith("Syntax error")) sys.exit(100)
+        println(error)
       }
       errors.foreach(println(_))
       sys.exit(200)
@@ -51,7 +50,7 @@ object Main {
            |${c.toString}""".stripMargin
     }
     println(output)
-    fw.write(output) // todo: probably shouldn't write to the file at all... simple fix
+    fw.write(output)
     fw.close()
     if (failed) sys.exit(200) else sys.exit(0)
   }
