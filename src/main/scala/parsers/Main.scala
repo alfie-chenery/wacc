@@ -49,7 +49,6 @@ object Main {
         s"""Errors detected during compilation! Exit code 200 returned.
            |${c.toString}""".stripMargin
     }
-    println(output)
     fw.write(output)
     fw.close()
     if (failed) sys.exit(200) else sys.exit(0)

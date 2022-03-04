@@ -93,7 +93,7 @@ object CodeGen{
         ra.restore()
       case Decl(WInt, Ident(ident), rhs) =>
         val r = ra.next
-        traverseExpr(rhs, ra, code)
+        val ret = traverseExpr(rhs, ra, code)
         //if (ret != RetReg) code += LDR(r, ret, Base)
         currentShift -= 4
         val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, update = false)
@@ -101,7 +101,7 @@ object CodeGen{
         code += STR(r, location)
       case Decl(WBool, Ident(ident), rhs) =>
         val r = ra.next
-        traverseExpr(rhs, ra, code)
+        val ret = traverseExpr(rhs, ra, code)
         //if (ret != RetReg) code += MOV(r, ret, Base)
         currentShift -= 1
         val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, update = false)
@@ -482,7 +482,8 @@ object CodeGen{
         val sndReg = traverseExpr(snd, ra, code)
         code += LDR(RetReg, imm(typeSize(checkExprType(snd, snd, new ListBuffer[String]))), Base)
         code += BL("malloc", Base)
-        code += STRB(ra.next, regVal(RetReg))
+        // TODO this should be STRB for chars
+        code += STR(ra.next, regVal(RetReg))
         code += STR(RetReg, regShift(reg1, 4, update = false))
         reg1
       case Ident(x) =>
