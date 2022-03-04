@@ -226,11 +226,13 @@ object CodeGen{
 
       case Read(lhs: AstNode) =>
         val _type: Type = SemanticPass.checkExprType(lhs, node, new ListBuffer[String])
+        var nullRefPossible = false
         val t = _type match {
           case WChar => "p_read_char"
           case WInt => "p_read_int"
           case _ =>
-            throw RuntimeException(s"Incompatible type: ${_type.toString} with call to Read")
+            nullRefPossible = true
+            "p_read_int" // ????
         }
         if (!labels.contains(t)) {
           val read_msg = s"msg_$getDataMsgIndex"
@@ -239,6 +241,12 @@ object CodeGen{
               data(read_msg) = List(
                 DWord(4),
                 DAscii(" %c\\0")
+              )
+            case "p_read_int" if nullRefPossible =>
+              checkNullPointer()
+              data(read_msg) = List(
+                DWord(3),
+                DAscii("%d\\0")
               )
             case "p_read_int" =>
               data(read_msg) = List(
@@ -254,8 +262,14 @@ object CodeGen{
               BL("scanf", Base),
               POP(PC))
         }
-
+        if (nullRefPossible) {
+          code += LDR(ra.next, regVal(SP), Base)
+          code += MOV(RetReg, ra.next, Base)
+          code += BL("p_check_null_pointer", Base)
+          code += LDR(ra.next, regVal(ra.next), Base)
+        } else {
         code += ADD(ra.next, SP, imm(getReadOffset))
+        }
         code += MOV(RetReg, ra.next, Base)
         code += BL(t, Base)
 
