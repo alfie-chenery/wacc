@@ -244,7 +244,7 @@ object CodeGen{
               )
             case "p_read_int" if nullRefPossible =>
               checkNullPointer()
-              data(read_msg) = List(
+              data(s"msg_$getDataMsgIndex") = List(
                 DWord(3),
                 DAscii("%d\\0")
               )
