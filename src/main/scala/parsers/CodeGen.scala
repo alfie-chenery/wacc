@@ -159,6 +159,7 @@ object CodeGen{
         val r = ra.next
         code += MOV(RetReg, traverseExpr(expr, ra, code), Base)
         val free_msg: String = s"msg_$getDataMsgIndex"
+        // TODO This should probably call check null pointer
         data(free_msg) =
           List(DWord(50),
             DAscii("NullReferenceError: dereference a null reference\\n\\0"))
@@ -269,9 +270,6 @@ object CodeGen{
             code += MOV(RetReg, ra.next, Base)
             code += BL("p_print_string", Base)
 
-          case PairType(t1, t2) =>
-
-
           case WBool =>
             if (!labels.contains("p_print_bool")) {
               val bool_true_msg = s"msg_$getDataMsgIndex"
@@ -340,27 +338,9 @@ object CodeGen{
             }
           case PairType(_, _) =>
             val r = ra.next
-            code += LDR(r, regVal(SP), Base)
             code += MOV(RetReg, r, Base)
-            BL("p_print_reference", Base)
-            val p_msg = s"msg_$getDataMsgIndex"
-            data(p_msg) = List(
-              DWord(3),
-              DAscii("%p\\0")
-            )
-            val print_ref_msg = "p_print_reference"
-            if (!labels.contains(print_ref_msg)) {
-              labels(print_ref_msg) =
-                List(PUSH(LinkReg),
-                  MOV(reg(1), RetReg, Base),
-                  LDR(RetReg, label(p_msg), Base),
-                  ADD(RetReg, RetReg, imm(4)),
-                  BL("printf", Base),
-                  MOV(RetReg, imm(0), Base),
-                  BL("fflush", Base),
-                  POP(PC)
-                )
-            }
+            code += BL("p_print_reference", Base)
+            printReference()
 
           //TODO: implement all other print types
           /*
@@ -983,11 +963,11 @@ object CodeGen{
   def checkNullPointer(): Unit = {
     runtimeError()
     val null_msg: String = s"msg_$getDataMsgIndex"
-    data(null_msg) =
-      List(DWord(50),
-        DAscii("NullReferenceError: dereference a null reference\\n\\0"))
     val pair_check_null_pointer = "p_check_null_pointer"
     if (!labels.contains(pair_check_null_pointer)) {
+      data(null_msg) =
+        List(DWord(50),
+          DAscii("NullReferenceError: dereference a null reference\\n\\0"))
       labels(pair_check_null_pointer) =
         List(PUSH(LinkReg),
           CMP(RetReg, imm(0)),
