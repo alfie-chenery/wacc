@@ -94,7 +94,7 @@ object CodeGen{
       case Decl(WInt, Ident(ident), rhs) =>
         val r = ra.next
         val ret = traverseExpr(rhs, ra, code)
-        //if (ret != RetReg) code += LDR(r, ret, Base)
+        //if (!ret.isInstanceOf[reg]) code += LDR(r, ret, Base)
         currentShift -= 4
         val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, update = false)
         variableLocation += (ident -> location)
@@ -102,7 +102,7 @@ object CodeGen{
       case Decl(WBool, Ident(ident), rhs) =>
         val r = ra.next
         val ret = traverseExpr(rhs, ra, code)
-        //if (ret != RetReg) code += MOV(r, ret, Base)
+        //if (!ret.isInstanceOf[reg]) code += MOV(r, ret, Base)
         currentShift -= 1
         val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, update = false)
         variableLocation += (ident -> location)
@@ -461,12 +461,14 @@ object CodeGen{
         checkNullPointer()
         code += BL("p_check_null_pointer", Base)
         code += LDR(ret, regVal(ret), Base)
+        code += LDR(ret, regVal(ret), Base)
         ret
       case SndPair(expr) =>
         val ret = traverseExpr(expr, ra, code)
         code += MOV(RetReg, ret, Base)
         checkNullPointer()
         code += BL("p_check_null_pointer", Base)
+        code += LDR(ret, regShift(ret, 4, update = false), Base)
         code += LDR(ret, regShift(ret, 4, update = false), Base)
         ret
       case NewPair(fst, snd) =>

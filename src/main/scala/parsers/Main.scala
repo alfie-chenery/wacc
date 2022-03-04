@@ -41,15 +41,14 @@ object Main {
     val outputFilename = filename.split('.')(0) + ".s"
     val fw = new FileWriter(outputFilename)
     var failed = false
-    val output = try {
-      CodeGen.compile(renamedProgram)
+    try {
+      fw.write(CodeGen.compile(renamedProgram))
     } catch {
       case c: RuntimeException =>
         failed = true
-        s"""Errors detected during compilation! Exit code 200 returned.
-           |${c.toString}""".stripMargin
+        println(s"""Errors detected during compilation! Exit code 200 returned.
+           |${c.toString}""".stripMargin)
     }
-    fw.write(output)
     fw.close()
     if (failed) sys.exit(200) else sys.exit(0)
   }
