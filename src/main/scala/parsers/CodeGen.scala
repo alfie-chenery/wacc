@@ -36,6 +36,7 @@ object CodeGen{
   }
 
   def traverse(node: AstNode, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Unit = {
+    println(node)
     node match {
       case Program(funcs, stat) =>
         for (func <- funcs) {
@@ -78,30 +79,20 @@ object CodeGen{
         code += LTORG
 
       // <Stat>
-      case Decl(PairType(t1, t2), Ident(ident), NewPair(fst, snd)) =>
-        code += LDR(RetReg, imm(8), Base)
-        code += BL("malloc", Base)
-        code += MOV(ra.next, RetReg, Base)
-        val reg1 = ra.nextRm
-        val fstReg = traverseExpr(fst, ra, code)
-        code += LDR(RetReg, imm(typeSize(t1)), Base)
-        code += BL("malloc", Base)
-        code += STR(fstReg, regVal(RetReg))
-        code += STR(RetReg, regVal(reg1))
-        val sndReg = traverseExpr(snd, ra, code)
-        code += LDR(RetReg, imm(typeSize(t2)), Base)
-        code += BL("malloc", Base)
-        code += STRB(ra.next, regVal(RetReg))
-        code += STR(RetReg, regShift(reg1, 4, update = false))
-        code += STR(reg1, regVal(SP))
+      case Decl(PairType(t1, t2), Ident(ident), expr) =>
         // TODO this location probably needs to be changed
-        variableLocation += (ident -> regVal(SP))
+        currentShift -= 4
+        val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, update = false)
+        variableLocation += (ident -> location)
+        val reg1 = traverseExpr(expr, ra, code)
+        code += STR(reg1, location)
         ra.restore()
       case Decl(ArrayType(_type), Ident(ident), ArrayLiter(exprs)) =>
         val ret = traverseExpr(ArrayLiter(exprs), ra, code)
-        code += STR(ret, regVal(SP))
-        // TODO this location probably needs to be changed
-        variableLocation += (ident -> regVal(SP))
+        currentShift -= 4
+        val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, update = false)
+        variableLocation += (ident -> location)
+        code += STR(ret, location)
         ra.restore()
       case Decl(WInt, Ident(ident), rhs) =>
         val r = ra.next
@@ -499,10 +490,27 @@ object CodeGen{
         ra.restore()
         reg1
       case PairLiter => ???
+      // TODO implement these correctly
       case FstPair(expr) =>
         traverseExpr(expr, ra, code)
       case SndPair(expr) =>
         traverseExpr(expr, ra, code)
+      case NewPair(fst, snd) =>
+        code += LDR(RetReg, imm(8), Base)
+        code += BL("malloc", Base)
+        code += MOV(ra.next, RetReg, Base)
+        val reg1 = ra.nextRm
+        val fstReg = traverseExpr(fst, ra, code)
+        code += LDR(RetReg, imm(typeSize(checkExprType(fst, fst, new ListBuffer[String]))), Base)
+        code += BL("malloc", Base)
+        code += STR(fstReg, regVal(RetReg))
+        code += STR(RetReg, regVal(reg1))
+        val sndReg = traverseExpr(snd, ra, code)
+        code += LDR(RetReg, imm(typeSize(checkExprType(snd, snd, new ListBuffer[String]))), Base)
+        code += BL("malloc", Base)
+        code += STRB(ra.next, regVal(RetReg))
+        code += STR(RetReg, regShift(reg1, 4, update = false))
+        reg1
       case Ident(x) =>
         // TODO this will probably need to change when pairs and arrays are implemented
         if (typeSize(st(Ident(x))._2) == 4) code += LDR(ra.next, variableLocation(x), Base)
