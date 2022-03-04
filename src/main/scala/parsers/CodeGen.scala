@@ -32,18 +32,24 @@ object CodeGen{
   }
 
   /** value used to increase offset when reading multiple times */
-  var readCounter: Int = -1
+  var readCounter: Int = 0 //will be set at start of new scopes
   def getReadOffset: Int = {
-    readCounter += 1
-    4 * readCounter //4 bytes * number of reads so far
+    val result = 4 * readCounter //4 bytes * number of reads so far
+    readCounter -= 1
+    result
+
   }
 
   def traverse(node: AstNode, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Unit = {
+    println(node)
     node match {
       case Program(funcs, stat) =>
         for (func <- funcs) {
           traverse(func, ra, code)
         }
+
+        readCounter = readsInScope(stat)
+        println(readCounter)
 
         code += funcName("main")
         code += PUSH(LinkReg)
@@ -61,6 +67,8 @@ object CodeGen{
           for (_ <- 0 until assignments / 1024) code += ADD(SP, SP, imm(1024))
         }
 
+
+
         code += LDR(RetReg, imm(0), Base)
         code += POP(PC)
         code += LTORG
@@ -72,6 +80,7 @@ object CodeGen{
           variableLocation += (param.ident.ident -> regShift(SP, currentShift, update = false))
           currentShift += typeSize(param._type)
         }
+        readCounter = readsInScope(stat)
         code += funcName(name)
         code += PUSH(LinkReg)
         if (assignments > 0) code += SUB(SP, SP, imm(assignments))
@@ -79,6 +88,8 @@ object CodeGen{
         if (assignments > 0) code += ADD(SP, SP, imm(assignments))
         code += POP(PC)
         code += LTORG
+
+
 
       // <Stat>
       case Decl(PairType(t1, t2), Ident(ident), expr) =>
@@ -374,9 +385,11 @@ object CodeGen{
         val fun1 = nextBranchIndex
         val fun2 = nextBranchIndex
         code += B(fun1, EQ)
+        //readCounter = readsInScope(stat_true)
         traverse(stat_true, ra, code)
         code += B(fun2, Base)
         code += funcName(fun1)
+        //readCounter = readsInScope(stat_false)
         traverse(stat_false, ra, code)
         code += funcName(fun2)
 
@@ -386,8 +399,10 @@ object CodeGen{
         val bodyLabel = nextBranchIndex
         code += B(condLabel, Base)
         code += funcName(bodyLabel)
+        //readCounter = readsInScope(stat)
         traverse(stat, ra, code)
         code += funcName(condLabel)
+        //readCounter = readsInScope(cond)
         traverse(cond, ra, code)
         val reg = traverseExpr(cond, ra, code)
         code += CMP(reg, imm(1))
@@ -1131,6 +1146,23 @@ object CodeGen{
         }
     }
     size
+  }
+
+  def readsInScope(stats: AstNode): Int = {
+    var size = 0
+    stats match {
+//      case Program(_,stat) => readsInScope(stat)
+//      case Func(_,_, stat) => readsInScope(stat)
+//      case Read(_) => size += 1
+      case Combine(stats) =>
+        for (stat <- stats) {
+          stat match {
+            case Read(_) => size += 1
+            case _ =>
+          }
+        }
+    }
+    size - 1
   }
 
   def add(map: mutable.LinkedHashMap[String, String], key: String, value: String): Unit = {
