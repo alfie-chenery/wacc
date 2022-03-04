@@ -44,6 +44,13 @@ object SemanticPass {
         } else {
           st += (ident -> (rhs, _type))
         }
+      case Assign(lhs, PairLiter) =>
+        val t = checkType(lhs, errors)
+         t match {
+          case PairType(_,_) =>
+          case t =>
+            errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: " + prettyPrint(t) + ", actual: " + prettyPrint(PairLiter))
+        }
       case Assign(lhs, rhs) =>
         val t: Type = checkType(rhs, errors)
         val t1: Type = checkType(lhs, errors)
@@ -63,11 +70,14 @@ object SemanticPass {
       case Print(expr) => checkExprType(expr, node, errors)
       case Println(expr) => checkExprType(expr, node, errors)
       case Return(expr) =>
-        // TODO: should probably call checkReturns, but needs to know if in main or not... -- not necessary, checkReturns is called when a function is found
         val _type = checkExprType(expr, node, errors)
+        // TODO this shoould not always be checking for ints
+        /*
         if (!(_type == WInt)) {
           errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: Int, actual: " + prettyPrint(_type))
         }
+
+         */
       case Exit(expr) =>
         val _type = checkExprType(expr, node, errors)
         if (!(_type == WInt)) {
@@ -107,10 +117,7 @@ object SemanticPass {
       case IfElse(cond, stat_true, stat_false) => checkReturns(stat_true, errors, main) && checkReturns(stat_false, errors, main)
       case While(cond, stat) => checkReturns(stat, errors, main)
       case Scope(stat) => checkReturns(stat, errors, main)
-      case Combine(stats) =>
-        if (!checkReturns(stats.head, errors, main))
-          checkReturns(stats.last, errors, main)
-        else false
+      case Combine(stats) => checkReturns(stats.last, errors, main)
 
       //other stat types all return false as arent valid ways to end a function
       //other nodes which arent stat should not be passed into this function so all return false
