@@ -138,7 +138,10 @@ object CodeGen{
         val ret = traverseExpr(rhs, ra, code)
         ra.nextRm
         val fst = traverseExpr(FstPair(expr), ra, code)
-        code += STR(ret, regVal(fst))
+        code.remove(code.length-1)
+        // TODO probably factor out this check and not call checkExprType
+        if (typeSize(checkExprType(rhs, rhs, new ListBuffer[String])) == 4) code += STR(ret, regVal(fst))
+        else code += STRB(ret, regVal(fst))
         checkNullPointer()
         ra.restore()
 
@@ -146,7 +149,9 @@ object CodeGen{
         val ret = traverseExpr(rhs, ra, code)
         ra.nextRm
         val snd = traverseExpr(SndPair(expr), ra, code)
-        code += STR(ret, regVal(snd))
+        code.remove(code.length-1)
+        if (typeSize(checkExprType(rhs, rhs, new ListBuffer[String])) == 4) code += STR(ret, regVal(snd))
+        else code += STRB(ret, regVal(snd))
         checkNullPointer()
         ra.restore()
 
@@ -463,7 +468,9 @@ object CodeGen{
         checkNullPointer()
         code += BL("p_check_null_pointer", Base)
         code += LDR(ret, regVal(ret), Base)
-        code += LDR(ret, regVal(ret), Base)
+        val suffix = if (typeSize(checkExprType(expr, expr, new ListBuffer[String])) == 4) Base
+        else SB
+        code += LDR(ret, regVal(ret), suffix)
         ret
       case SndPair(expr) =>
         val ret = traverseExpr(expr, ra, code)
@@ -471,7 +478,9 @@ object CodeGen{
         checkNullPointer()
         code += BL("p_check_null_pointer", Base)
         code += LDR(ret, regShift(ret, 4, update = false), Base)
-        code += LDR(ret, regShift(ret, 4, update = false), Base)
+        val suffix = if (typeSize(checkExprType(expr, expr, new ListBuffer[String])) == 4) Base
+        else SB
+        code += LDR(ret, regVal(ret), suffix)
         ret
       case NewPair(fst, snd) =>
         code += LDR(RetReg, imm(8), Base)
