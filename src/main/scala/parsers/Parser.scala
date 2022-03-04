@@ -1,10 +1,12 @@
 package parsers
 
 import parsley.Parsley._
+import parsley.character.digit
 import parsley.combinator.{sepBy, sepBy1}
 import parsley.{Parsley, Result}
 
 import java.io.File
+import scala.:+
 import scala.language.implicitConversions
 
 object lexer {
@@ -29,8 +31,12 @@ object lexer {
 
   val lex = new Lexer(lang)
 
-  // TODO implement negatives values
-  private [parsers] val INT_LITER: Parsley[Int] = token(optional("+") ~> digit.foldLeft1(0)((x, d) => x * 10 + d.asDigit))
+  private [parsers] val NEG_INT_LITER : Parsley[Int] = token(("-") ~> digit)
+    .foldLeft1(0: Long)((x, d) => x * 10 - d.asDigit)
+    .filter(l => l >= Int.MinValue).map(_.toInt)
+  private [parsers] val INT_LITER: Parsley[Int] = NEG_INT_LITER <|> token(optional("+") ~> digit
+    .foldLeft1(0: Long)((x, d) => x * 10 + d.asDigit))
+    .filter(l => l <= Int.MaxValue).map(_.toInt)
   private [parsers] val BOOL_LITER: Parsley[Boolean] =
     (token("true") #> true) <|> (token("false") #> false)
   private [parsers] val ESC_CHAR: Parsley[String] = {
@@ -78,7 +84,7 @@ object Parser {
                SOps(NonAssoc)(NotEq <# attempt("!="), Eq <# attempt("==")) +:
                SOps(NonAssoc)(LessEq <# attempt("<="), Less <# "<",
                               GreaterEq <# attempt(">="), Greater <# ">") +:
-               SOps(InfixL)  (Minus <# "-", Plus <# "+") +:
+               SOps(InfixL)  (Minus <# "-" <~ notFollowedBy(digit), Plus <# "+") +:
                SOps(InfixL)  (Mod <# "%", Div <# "/", Mult <# "*") +:
                SOps(Prefix)  (Chr <# attempt("chr "), Len <# attempt("len "), Ord <# attempt("ord "), Not <# "!" , Negate <# "-") +:
                Atoms(`<expr-atoms>`))
@@ -126,16 +132,25 @@ object Parser {
 
   private [parsers] lazy val `<stat>`: Parsley[Stat] = Combine(sepBy1(`<stat-atoms>`, ';'))
 
+  private [parsers] lazy val `<terminate-atom>` =
+    Return("return" ~> `<expr>`) <|> Exit("exit" ~> `<expr>`) <|>
+      IfElse("if" ~> `<expr>`, "then" ~> `<terminate-stat>`, "else" ~> `<terminate-stat>` <~ "fi") <|>
+      While("while" ~> `<expr>`, "do" ~> `<terminate-stat>` <~ "done") <|>
+      Scope("begin" ~> `<terminate-stat>` <~ "end")
+
+  private [parsers] lazy val `<terminate-stat>` =
+    Combine(many(attempt(`<stat-atoms>` <~ ";")) <**> `<terminate-atom>`.map[List[StatAtom] => List[StatAtom]](s => _ :+ s))
+
   private [parsers] lazy val `<stat-atoms>`: Parsley[StatAtom] =
-    attempt(Assign(`<assign-lhs>`, '=' ~> `<assign-rhs>`))                            <|>
-      attempt(Decl(`<type>`, `<ident>`, '=' ~> `<assign-rhs>`))                       <|>
-      attempt(Skip <# "skip")                                                         <|>
-      attempt(Read("read" ~> `<assign-lhs>`))      <|> Free("free" ~> `<expr>`)         <|>
-      Return("return" ~> `<expr>`)        <|> Exit("exit" ~> `<expr>`)                  <|>
-      attempt(Print("print" ~> `<expr>`)) <|>Println("println" ~> `<expr>`)   <|>
-      IfElse("if" ~> `<expr>`, "then" ~> `<stat>`, "else" ~> `<stat>` <~ "fi") <|>
-      While("while" ~> `<expr>`, "do" ~> `<stat>` <~ "done")                            <|>
-      Scope("begin" ~> `<stat>` <~ "end")
+    attempt(Assign(`<assign-lhs>`, '=' ~> `<assign-rhs>`))                                         <|>
+      attempt(Decl(`<type>`, `<ident>`, '=' ~> `<assign-rhs>`))                                    <|>
+      attempt(Skip <# "skip")                                                                      <|>
+      attempt(Read("read" ~> `<assign-lhs>`))      <|> Free("free" ~> `<expr>`)                    <|>
+      Return("return" ~> `<expr>`)        <|> Exit("exit" ~> `<expr>`)                             <|>
+      attempt(Print("print" ~> `<expr>`)) <|>Println("println" ~> `<expr>`)                        <|>
+      IfElse("if" ~> `<expr>`, "then" ~> `<terminate-stat>`, "else" ~> `<terminate-stat>` <~ "fi") <|>
+      While("while" ~> `<expr>`, "do" ~> `<terminate-stat>` <~ "done")                             <|>
+      Scope("begin" ~> `<terminate-stat>` <~ "end")
 
   private [parsers] lazy val `<param>` = Param(`<type>`, `<ident>`)
 
