@@ -260,6 +260,11 @@ object CodeGen{
         code += BL(t, Base)
 
 
+      case Print(PairLiter) =>
+        val ret = traverseExpr(PairLiter, ra, code)
+        code += MOV(RetReg, ret, Base)
+        code += BL("p_print_reference", Base)
+        printReference()
       case Print(expr: AstNode) =>
         val ret = traverseExpr(expr, ra, code)
         // TODO change this so it doesn't match explicit types
@@ -440,7 +445,10 @@ object CodeGen{
         code += STR(ra.next, regVal(reg1))
         ra.restore()
         reg1
-      case PairLiter => ???
+      case PairLiter =>
+        code += LDR(ra.next, imm(0), Base)
+        ra.next
+
       // TODO implement these correctly
       case FstPair(expr) =>
         val ret = traverseExpr(expr, ra, code)
