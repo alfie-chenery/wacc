@@ -31,8 +31,8 @@ object lexer {
 
   val lex = new Lexer(lang)
 
-  private [parsers] val NEG_INT_LITER : Parsley[Int] = token(("-") ~> digit)
-    .foldLeft1(0: Long)((x, d) => x * 10 - d.asDigit)
+  private [parsers] val NEG_INT_LITER : Parsley[Int] = token(("-") ~> digit
+    .foldLeft1(0: Long)((x, d) => x * 10 - d.asDigit))
     .filter(l => l >= Int.MinValue).map(_.toInt)
   private [parsers] val INT_LITER: Parsley[Int] = NEG_INT_LITER <|> token(optional("+") ~> digit
     .foldLeft1(0: Long)((x, d) => x * 10 + d.asDigit))
@@ -88,7 +88,7 @@ object Parser {
                               GreaterEq <# attempt(">="), Greater <# ">") +:
                SOps(InfixL)  (Minus <# "-", Plus <# "+") +:
                SOps(InfixL)  (Mod <# "%", Div <# "/", Mult <# "*") +:
-               SOps(Prefix)  (Chr <# attempt("chr "), Len <# attempt("len "), Ord <# attempt("ord "), Not <# "!" , Negate <# "-") +:
+               SOps(Prefix)  (Chr <# attempt("chr "), Len <# attempt("len "), Ord <# attempt("ord "), Not <# "!" , Negate <# attempt("-" <~ notFollowedBy(digit))) +:
                Atoms(`<expr-atoms>`))
 
   // TODO refactor this to put ident at the top and reduce backtracking
