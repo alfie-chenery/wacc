@@ -132,7 +132,7 @@ object Parser {
 
   private [parsers] lazy val `<stat>`: Parsley[Stat] = Combine(sepBy1(`<stat-atoms>`, ';'))
 
-  private [parsers] lazy val `<terminate-atom>` =
+  private [parsers] lazy val `<terminate-atom>`: Parsley[StatAtom] =
     Return("return" ~> `<expr>`) <|> Exit("exit" ~> `<expr>`) <|>
       IfElse("if" ~> `<expr>`, "then" ~> `<terminate-stat>`, "else" ~> `<terminate-stat>` <~ "fi") <|>
       While("while" ~> `<expr>`, "do" ~> `<terminate-stat>` <~ "done") <|>
