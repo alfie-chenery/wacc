@@ -503,7 +503,9 @@ object CodeGen{
           // TODO this constants should probably changed based on the size of the things in the array
           code += BL("p_check_array_bounds", Base)
           code += ADD(arrLoc, arrLoc, imm(4))
-          code += ADD(arrLoc, arrLoc, lsl(ret, 2))
+          val _type = typeSize(checkExprType(ArrayElem(Ident(x), elems), ArrayElem(Ident(x), elems), new ListBuffer[String]))
+          val loc = if (_type == 4) lsl(ret, 2) else ret
+          code += ADD(arrLoc, arrLoc, loc)
         }
         ra.restore()
         regVal(arrLoc)
@@ -667,7 +669,6 @@ object CodeGen{
         code += BL("p_throw_overflow_error", VS)
         ra.restore()
         reg1
-
 
       case Mult(expr1, expr2) =>
         var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
