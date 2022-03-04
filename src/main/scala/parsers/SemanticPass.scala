@@ -17,9 +17,9 @@ object SemanticPass {
             case Func((_type, ident), _, _) => st += (ident -> (func, _type))
           }
         }
+        checkReturns(stat, errors, main = true)
         funcs.foreach(traverse(_, errors))
         traverse(stat, errors)
-        checkReturns(stat, errors, main = true)
 
       case Func((_, _), ParamList(params), stat) =>
         for (param <- params) {
@@ -50,11 +50,11 @@ object SemanticPass {
         if (t1 != t) {
           errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: " + prettyPrint(t1) + ", actual: " + prettyPrint(t))
         }
-//      case Read(lhs) =>
-//        val _type = checkType(lhs, errors)
-//        if (!(_type == WChar || _type == WInt)) {
-//          println("type error")
-//        }
+      case Read(lhs) =>
+        val _type = checkType(lhs, errors)
+        if (!(_type == WChar || _type == WInt)) {
+          errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: Int, Char, actual: " + prettyPrint(_type))
+        }
       case Free(expr) => // TODO come back to this
         val _type = checkExprType(expr, node, errors)
         if (!(_type.isInstanceOf[PairType] || _type.isInstanceOf[ArrayType])) {
@@ -62,7 +62,12 @@ object SemanticPass {
         }
       case Print(expr) => checkExprType(expr, node, errors)
       case Println(expr) => checkExprType(expr, node, errors)
-      case Return(expr) => // // TODO: should probably call checkReturns, but needs to know if in main or not... -- not necessary, checkReturns is called when a function is found
+      case Return(expr) =>
+        // TODO: should probably call checkReturns, but needs to know if in main or not... -- not necessary, checkReturns is called when a function is found
+        val _type = checkExprType(expr, node, errors)
+        if (!(_type == WInt)) {
+          errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: Int, actual: " + prettyPrint(_type))
+        }
       case Exit(expr) =>
         val _type = checkExprType(expr, node, errors)
         if (!(_type == WInt)) {
@@ -88,7 +93,7 @@ object SemanticPass {
   }
 
   def checkReturns(node: AstNode, errors: ListBuffer[String], main: Boolean): Boolean = {
-    //main flags whether we are checking the main function, in which case return shouldnt be accepted
+    //main flags whether we are checking the main function, in which case return shouldn't be accepted
     //TODO give more detailed error messages where the return should've been ie specific branch
     node match {
       case Return(expr) =>
@@ -102,7 +107,10 @@ object SemanticPass {
       case IfElse(cond, stat_true, stat_false) => checkReturns(stat_true, errors, main) && checkReturns(stat_false, errors, main)
       case While(cond, stat) => checkReturns(stat, errors, main)
       case Scope(stat) => checkReturns(stat, errors, main)
-      case Combine(stats) => checkReturns(stats.last, errors, main)
+      case Combine(stats) =>
+        if (!checkReturns(stats.head, errors, main))
+          checkReturns(stats.last, errors, main)
+        else false
 
       //other stat types all return false as arent valid ways to end a function
       //other nodes which arent stat should not be passed into this function so all return false
