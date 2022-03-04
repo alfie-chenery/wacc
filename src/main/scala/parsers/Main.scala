@@ -44,7 +44,7 @@ object Main {
     val output = try {
       CodeGen.compile(renamedProgram)
     } catch {
-      case c: SemanticError =>
+      case c: RuntimeException =>
         failed = true
         s"""Errors detected during compilation! Exit code 200 returned.
            |${c.toString}""".stripMargin
