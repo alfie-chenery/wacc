@@ -30,6 +30,7 @@ object RenamingPass {
         val renamedFuncs: ListBuffer[Func] = ListBuffer[Func]()
         for (func <- funcs) {
           func match {
+              //TODO change string passed into renameIdent to encode the parameter information of the func to allow overloading
             case Func((_, Ident(ident)), _, _) => renameIdent(ident+"$func", localScope, varsInScope, errors)
           }
         }
@@ -168,6 +169,10 @@ object RenamingPass {
 
       case Call(Ident(ident), ArgList(args)) =>
         // TODO check that ident is declared in this scope
+
+        //TODO use something like $func_int_char_int as identifier,
+        // then use argList to check the right function is being called
+
         if (!varsInScope.contains(ident+"$func")) {
           errors += s"function $ident not defined"
         }
