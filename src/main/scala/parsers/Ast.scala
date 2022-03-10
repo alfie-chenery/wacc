@@ -63,6 +63,29 @@ object Ast {
   case class ArrayElem(ident: Ident, expr: List[Expr]) extends Term with AssignLHS
   case class ParensExpr(expr: Expr) extends Term
 
+  sealed trait PreDefFunc extends Expr
+  sealed trait MathFunc extends PreDefFunc
+  case class Acos(x: Double) extends MathFunc
+  case class Asin(x: Double) extends MathFunc
+  case class Atan(x: Double) extends MathFunc
+  case class Atan2(x: Double, y: Double) extends MathFunc
+  case class Cos(x: Double) extends MathFunc
+  case class Cosh(x: Double) extends MathFunc
+  case class Sin(x: Double) extends MathFunc
+  case class Sinh(x: Double) extends MathFunc
+  case class Tanh(x: Double) extends MathFunc
+  case class Exp(x: Double) extends MathFunc
+  case class Frexp(x: Double, exp: Integer) extends MathFunc
+  case class Ldexp(x: Double, exp: Integer) extends MathFunc
+  case class Log(x: Double) extends MathFunc
+  case class Log10(x: Double) extends MathFunc
+  case class Modf(x: Double, i: Integer) extends MathFunc
+  case class Pow(x: Double, y: Double) extends MathFunc
+  case class Sqrt(x: Double) extends MathFunc
+  case class Ceil(x: Double) extends MathFunc
+  case class Fabs(x: Double) extends MathFunc
+  case class Floor(x: Double) extends MathFunc
+
   sealed trait Expr1 extends Expr
   case class Or(l_expr: Expr2, r_expr: Expr1) extends Expr1
   sealed trait Expr2 extends Expr1
@@ -96,10 +119,12 @@ object Ast {
     val parser: Parsley[T]
     final def <#(p: Parsley[_]): Parsley[T] = parser <* p
   }
+
   trait ParserBuilder1[T1, R] extends ParserBuilder[T1 => R] {
     def apply(x: T1): R
     val parser: Parsley[T1 => R] = pure(apply)
   }
+
   trait ParserBuilder2[T1, T2, R] extends ParserBuilder[(T1, T2) => R] {
     def apply(x: T1, y: T2): R
     val parser: Parsley[(T1, T2) => R] = pure(apply)
@@ -108,12 +133,15 @@ object Ast {
   object Program {
     def apply(funcs: Parsley[List[Func]], stat: Parsley[Stat]): Parsley[Program] = (funcs, stat).zipped(Program(_, _))
   }
+
   object Func{
     def apply(ident: Parsley[(Type, Ident)], params: Parsley[ParamList], stat: Parsley[Stat]) : Parsley[Func] = (ident, params, stat).zipped(Func(_,_,_))
   }
+
   object ParamList {
     def apply(params: Parsley[List[Param]]): Parsley[ParamList] = params.map(ParamList(_))
   }
+
   object Param{
     def apply(_type: Parsley[Type], ident: Parsley[Ident]) : Parsley[Param] = (_type, ident).zipped(Param(_,_))
   }
@@ -122,39 +150,50 @@ object Ast {
     def apply(_type: Parsley[Type], ident: Parsley[Ident], rhs: Parsley[AssignRHS]): Parsley[Decl]
     = (_type, ident, rhs).zipped(Decl(_, _, _))
   }
+
   object Assign {
     def apply(lhs: Parsley[AssignLHS], rhs: Parsley[AssignRHS]): Parsley[Assign]
     = (lhs, rhs).zipped(Assign(_, _))
   }
+
   object Read {
     def apply(lhs: Parsley[AssignLHS]): Parsley[Read] = lhs.map(Read(_))
   }
+
   object Free {
     def apply(expr: Parsley[Expr]): Parsley[Free] = expr.map(Free(_))
   }
+
   object Return {
     def apply(expr: Parsley[Expr]): Parsley[Return] = expr.map(Return(_))
   }
+
   object Exit {
     def apply(expr: Parsley[Expr]): Parsley[Exit] = expr.map(Exit(_))
   }
+
   object Print {
     def apply(expr: Parsley[Expr]): Parsley[Print] = expr.map(Print(_))
   }
+
   object Println {
     def apply(expr: Parsley[Expr]): Parsley[Println] = expr.map(Println(_))
   }
+
   object IfElse {
     def apply(cond: Parsley[Expr], then_stat: Parsley[Stat], else_stat: Parsley[Stat]): Parsley[IfElse]
     = (cond, then_stat, else_stat).zipped(IfElse(_, _, _))
   }
+
   object While {
     def apply(cond: Parsley[Expr], body: Parsley[Stat]): Parsley[While]
     = (cond, body).zipped(While(_, _))
   }
+
   object Scope {
     def apply(stat: Parsley[Stat]): Parsley[Scope] = stat.map(Scope(_))
   }
+
   object Combine {
     def apply(stats: Parsley[List[StatAtom]]): Parsley[Combine] = stats.map(Combine(_))
   }
@@ -162,6 +201,7 @@ object Ast {
   object NewPair {
     def apply(fst: Parsley[Expr], snd: Parsley[Expr]): Parsley[NewPair] = (fst, snd).zipped(NewPair(_,_))
   }
+
   object Call {
     def apply(ident: Parsley[Ident], argList: Parsley[ArgList]): Parsley[Call] = (ident, argList).zipped(Call(_,_))
   }
@@ -173,6 +213,7 @@ object Ast {
   object FstPair {
     def apply(fst: Parsley[Expr]): Parsley[FstPair] = fst.map(FstPair(_))
   }
+
   object SndPair {
     def apply(snd: Parsley[Expr]): Parsley[SndPair] = snd.map(SndPair(_))
   }
@@ -180,6 +221,7 @@ object Ast {
   object ArrayType{
     def apply(_type: Parsley[Type]) : Parsley[ArrayType] = _type.map(ArrayType(_))
   }
+
   object PairType {
     def apply(fst_type: Parsley[PairElemType], snd_type: Parsley[PairElemType]): Parsley[PairType] =
       (fst_type, snd_type).zipped(PairType(_,_))
@@ -189,25 +231,32 @@ object Ast {
     def apply(ident: Parsley[Ident], expr: Parsley[List[Expr]]): Parsley[ArrayElem] =
       (ident, expr).zipped(ArrayElem(_,_))
   }
+
   object ArrayLiter {
     def apply(exprs: Parsley[List[Expr]]): Parsley[ArrayLiter] =
       exprs.map(ArrayLiter(_))
   }
+
   object IntLiter {
     def apply(x: Parsley[Int]): Parsley[IntLiter] = x.map(IntLiter(_))
   }
+
   object BoolLiter {
     def apply(b: Parsley[Boolean]): Parsley[BoolLiter] = b.map(BoolLiter(_))
   }
+
   object CharLiter {
     def apply(c: Parsley[String]): Parsley[CharLiter] = c.map(CharLiter(_))
   }
+
   object StrLiter {
     def apply(s: Parsley[String]): Parsley[StrLiter] = s.map(StrLiter(_))
   }
+
   object Ident {
     def apply(ident: Parsley[String]): Parsley[Ident] = ident.map(Ident(_))
   }
+
   object ParensExpr {
     def apply(expr: Parsley[Expr]): Parsley[ParensExpr] = expr.map(ParensExpr(_))
   }
