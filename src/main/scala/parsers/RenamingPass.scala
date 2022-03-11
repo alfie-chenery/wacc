@@ -1,5 +1,8 @@
 package parsers
 
+import parsers.Ast.Ident
+import parsers.SemanticPass.checkExprType
+
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
@@ -24,46 +27,13 @@ object RenamingPass {
     Ident(localScope(ident))
   }
 
-  def renameFunc(function: Func): String = {
-    function match {
-      case Func((_type, Ident(ident)), ParamList(params), stat) =>
-        val sb = new StringBuilder()
-        sb.append(ident + "$" + getType(_type) + "Func")
-        for (param <- params){
-          param match {
-            case Param(_type, Ident(ident)) =>
-              sb.append("_" + getType(_type))
-            case _ =>
-          }
-        }
-        sb.toString()
-
-      case _ => ""
-    }
-  }
-
-  def getType(t: Type): String = {
-    t match {
-      case WInt => "int"
-      case WBool => "bool"
-      case WChar => "char"
-      case WString => "str"
-      case ArrayType(_type) => getType(_type) + "Array"
-      case PairType(fst_type: PairElemType, snd_type: PairElemType) =>
-        "p@" + getType(fst_type) + "-" + getType(snd_type) + "@"
-      //case PairElemType => getType()
-      case Pair => "pair?"
-    }
-  }
-
   private def rename(program: AstNode, localScope: mutable.Map[String, String], varsInScope: mutable.Map[String, String], errors: ListBuffer[String]): AstNode = {
     program match {
       case Program(funcs, stat) =>
         val renamedFuncs: ListBuffer[Func] = ListBuffer[Func]()
         for (func <- funcs) {
           func match {
-              //TODO change string passed into renameIdent to encode the parameter information of the func to allow overloading
-            case Func((_, Ident(ident)), _, _) => renameIdent(ident+"$func", localScope, varsInScope, errors)
+             case Func((_,_),_,_) => renameIdent(renameFunc(program), localScope, varsInScope, errors)
           }
         }
         funcs.foreach(renamedFuncs += rename(_, localScope, varsInScope, errors).asInstanceOf[Func])
@@ -79,7 +49,7 @@ object RenamingPass {
             case _ =>
           }
         }
-        Func((_type, Ident(varsInScope(ident+"$func"))), ParamList(renamedParams.toList),
+        Func((_type, Ident(varsInScope(renameFunc(program)))), ParamList(renamedParams.toList),
           rename(stat, newScope, varsInScope, errors).asInstanceOf[Stat])
 
       case Decl(_type, Ident(ident), rhs) =>
@@ -200,16 +170,19 @@ object RenamingPass {
           rename(snd, localScope, varsInScope, errors).asInstanceOf[Expr])
 
       case Call(Ident(ident), ArgList(args)) =>
+        //TODO find a way to work out the type of call. Ie is it being stored
+        // in a variable with known type. Without this we cant overload on
+        // return type. Ie currently int x(int) and char x(int) are the same
+        // function
+        val _type = null //calculate from call type
+        val renamedFunc: String = renameFuncCall(_type, ident, args)
 
-        //TODO use something like $func_int_char_int as identifier,
-        // then use argList to check the right function is being called
-
-        if (!varsInScope.contains(ident+"$func")) {
+        if (!varsInScope.contains(renamedFunc)) {
           errors += s"function $ident not defined"
         }
         val renamedArgs: ListBuffer[Expr] = ListBuffer()
         args.foreach(renamedArgs += rename(_, localScope, varsInScope, errors).asInstanceOf[Expr])
-        Call(Ident(varsInScope(ident+"$func")), ArgList(renamedArgs.toList))
+        Call(Ident(varsInScope(renamedFunc)), ArgList(renamedArgs.toList))
 
       case node: AstNode => node
     }
@@ -218,6 +191,55 @@ object RenamingPass {
     val variableRenaming: mutable.Map[String, String] = scala.collection.mutable.Map[String, String]()
     val localScope: mutable.Map[String, String] = scala.collection.mutable.Map[String, String]()
     rename(program, localScope, variableRenaming, errors).asInstanceOf[Program]
+  }
+
+
+  private def renameFunc(function: AstNode) : String = {
+    function match {
+      case Func((_type, Ident(ident)), ParamList(params), _) => renameFuncDecl(_type, ident, params)
+    }
+  }
+
+  private def renameFuncDecl(_type: Type, ident: String, params: List[Param]): String = {
+    val sb = new StringBuilder()
+    sb.append(ident + "$" +
+      //getType(_type) + //add in once call type is known
+      "Func")
+    for (param <- params){
+      param match {
+        case Param(_type, _) =>
+          sb.append("_" + getType(_type))
+        case _ =>
+      }
+    }
+    sb.toString()
+  }
+
+  private def renameFuncCall(_type: Type, ident: String, args: List[Expr]): String = {
+    val sb = new StringBuilder()
+    sb.append(ident + "$" +
+      //getType(_type) + //add in once call type is known
+      "Func")
+    for (arg <- args){
+      val t = checkExprType(arg, arg, new ListBuffer[String]()) //errors are handled in semantic pass so can be ignored here
+      sb.append("_" + getType(t))
+    }
+    sb.toString()
+  }
+
+  def getType(t: Type): String = {
+    t match {
+      case WInt => "int"
+      case WBool => "bool"
+      case WChar => "char"
+      case WString => "str"
+      case ArrayType(_type) => getType(_type) + "Array"
+      case PairType(fst_type: PairElemType, snd_type: PairElemType) =>
+        "p@" + getType(fst_type) + "-" + getType(snd_type) + "@"
+      //case PairElemType => getType()
+      case Pair => "pair?"
+      //case _ => ""
+    }
   }
 
 }
