@@ -24,6 +24,38 @@ object RenamingPass {
     Ident(localScope(ident))
   }
 
+  def renameFunc(function: Func): String = {
+    function match {
+      case Func((_type, Ident(ident)), ParamList(params), stat) =>
+        val sb = new StringBuilder()
+        sb.append(ident + "$" + getType(_type) + "Func")
+        for (param <- params){
+          param match {
+            case Param(_type, Ident(ident)) =>
+              sb.append("_" + getType(_type))
+            case _ =>
+          }
+        }
+        sb.toString()
+
+      case _ => ""
+    }
+  }
+
+  def getType(t: Type): String = {
+    t match {
+      case WInt => "int"
+      case WBool => "bool"
+      case WChar => "char"
+      case WString => "str"
+      case ArrayType(_type) => getType(_type) + "Array"
+      case PairType(fst_type: PairElemType, snd_type: PairElemType) =>
+        "p@" + getType(fst_type) + "-" + getType(snd_type) + "@"
+      //case PairElemType => getType()
+      case Pair => "pair?"
+    }
+  }
+
   private def rename(program: AstNode, localScope: mutable.Map[String, String], varsInScope: mutable.Map[String, String], errors: ListBuffer[String]): AstNode = {
     program match {
       case Program(funcs, stat) =>
@@ -168,7 +200,6 @@ object RenamingPass {
           rename(snd, localScope, varsInScope, errors).asInstanceOf[Expr])
 
       case Call(Ident(ident), ArgList(args)) =>
-        // TODO check that ident is declared in this scope
 
         //TODO use something like $func_int_char_int as identifier,
         // then use argList to check the right function is being called
