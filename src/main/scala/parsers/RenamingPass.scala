@@ -33,7 +33,7 @@ object RenamingPass {
         val renamedFuncs: ListBuffer[Func] = ListBuffer[Func]()
         for (func <- funcs) {
           func match {
-             case Func((_,_),_,_) => renameIdent(renameFunc(program), localScope, varsInScope, errors)
+             case Func((_,_),_,_) => renameIdent(renameFunc(func), localScope, varsInScope, errors)
           }
         }
         funcs.foreach(renamedFuncs += rename(_, localScope, varsInScope, errors).asInstanceOf[Func])
@@ -197,6 +197,9 @@ object RenamingPass {
   private def renameFunc(function: AstNode) : String = {
     function match {
       case Func((_type, Ident(ident)), ParamList(params), _) => renameFuncDecl(_type, ident, params)
+      case _ =>
+        println("OH we fucked it")
+        "its peak"
     }
   }
 
@@ -221,7 +224,7 @@ object RenamingPass {
       //getType(_type) + //add in once call type is known
       "Func")
     for (arg <- args){
-      val t = checkExprType(arg, arg, new ListBuffer[String]()) //errors are handled in semantic pass so can be ignored here
+      val t = checkExprType(arg, arg, ListBuffer()) //errors are handled in semantic pass so can be ignored here
       sb.append("_" + getType(t))
     }
     sb.toString()
@@ -238,7 +241,7 @@ object RenamingPass {
         "p@" + getType(fst_type) + "-" + getType(snd_type) + "@"
       //case PairElemType => getType()
       case Pair => "pair?"
-      //case _ => ""
+      case _ => "#oops#"
     }
   }
 

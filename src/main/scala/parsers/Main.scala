@@ -1,6 +1,6 @@
 package parsers
 
-import parsers.Parser.parse
+import parsers.Parser.{`<expr>`, parse}
 
 import java.io.{File, FileWriter}
 import scala.collection.mutable.ListBuffer
@@ -22,9 +22,15 @@ object Main {
         sys.exit(100)
       }
 
+      println("program")
+      println(program)
       val renamedProgram = RenamingPass.rename(program.get, errors)
+      println("renamed program")
+      println(renamedProgram)
 
       SemanticPass.traverse(renamedProgram, errors)
+      println("errors")
+      println(errors)
 
       if (errors.nonEmpty) {
         for (error <- errors) {
