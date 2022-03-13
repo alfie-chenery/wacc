@@ -63,29 +63,6 @@ object Ast {
   case class ArrayElem(ident: Ident, expr: List[Expr]) extends Term with AssignLHS
   case class ParensExpr(expr: Expr) extends Term
 
-  sealed trait PreDefFunc extends Expr
-  sealed trait MathFunc extends PreDefFunc
-  case class Acos(x: Double) extends MathFunc
-  case class Asin(x: Double) extends MathFunc
-  case class Atan(x: Double) extends MathFunc
-  case class Atan2(x: Double, y: Double) extends MathFunc
-  case class Cos(x: Double) extends MathFunc
-  case class Cosh(x: Double) extends MathFunc
-  case class Sin(x: Double) extends MathFunc
-  case class Sinh(x: Double) extends MathFunc
-  case class Tanh(x: Double) extends MathFunc
-  case class Exp(x: Double) extends MathFunc
-  case class Frexp(x: Double, exp: Integer) extends MathFunc
-  case class Ldexp(x: Double, exp: Integer) extends MathFunc
-  case class Log(x: Double) extends MathFunc
-  case class Log10(x: Double) extends MathFunc
-  case class Modf(x: Double, i: Integer) extends MathFunc
-  case class Pow(x: Double, y: Double) extends MathFunc
-  case class Sqrt(x: Double) extends MathFunc
-  case class Ceil(x: Double) extends MathFunc
-  case class Fabs(x: Double) extends MathFunc
-  case class Floor(x: Double) extends MathFunc
-
   sealed trait Expr1 extends Expr
   case class Or(l_expr: Expr2, r_expr: Expr1) extends Expr1
   sealed trait Expr2 extends Expr1

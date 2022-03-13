@@ -19,6 +19,9 @@ object CodeGen{
   val labels = new mutable.LinkedHashMap[String, List[Mnemonic]]
   val variableLocation = new mutable.LinkedHashMap[String, Register]
   var currentShift = 0
+  val mathFuncs = List("acos", "asin", "atan", "atan2", "cos", "cosh", "sin", "sinh",
+                        "tanh", "exp", "frexp", "ldexp", "log", "log10", "modf", "pow",
+                        "sqrt", "ceil", "fabs", "floor", "fmod")
 
   /** Returns the next available 'msg' index in data */
   def getDataMsgIndex: Int = {
@@ -86,8 +89,6 @@ object CodeGen{
         if (assignments > 0) code += ADD(SP, SP, imm(assignments))
         code += POP(PC)
         code += LTORG
-
-
 
       // <Stat>
       case Decl(PairType(t1, t2), Ident(ident), expr) =>
@@ -321,16 +322,7 @@ object CodeGen{
             code += MOV(RetReg, r, Base)
             code += BL("p_print_reference", Base)
 
-          //TODO: implement all other print types
-          /*
-          case ArrayElem(ident: Ident, expr: List[Expr]) => ???
-          case Ident(ident: String) => ???
-          case ParensExpr(expr: Expr) => ??? // is this actually a possibility or are these removed in the previous passes?
-           */
-
         }
-        //TODO: find all functions that are branched to and add (???)
-        //TODO: add global messages that can be added (???)
 
       case Println(expr) =>
         printLn()
@@ -381,6 +373,7 @@ object CodeGen{
         for (stat <- stats) {
           traverse(stat, ra, code)
         }
+
 
       case _ =>
       }
