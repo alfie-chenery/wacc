@@ -30,16 +30,22 @@ object RenamingPass {
   private def rename(program: AstNode, localScope: mutable.Map[String, String], varsInScope: mutable.Map[String, String], errors: ListBuffer[String]): AstNode = {
     program match {
       case Program(funcs, stat) =>
+        println("found program")
         val renamedFuncs: ListBuffer[Func] = ListBuffer[Func]()
         for (func <- funcs) {
+          println("inside for loop")
           func match {
-             case Func((_,_),_,_) => renameIdent(renameFunc(func), localScope, varsInScope, errors)
+             case Func((_type,ident),params,stat) =>
+               val renamedFunc = Func((_type, renameIdent(renameFunc(func), localScope, varsInScope, errors)),params,stat) //this just renames the ident of the func
+               renamedFuncs.append(rename(renamedFunc, localScope, varsInScope, errors).asInstanceOf[Func]) //this recursively renames the contents of the function
           }
         }
-        funcs.foreach(renamedFuncs += rename(_, localScope, varsInScope, errors).asInstanceOf[Func])
+        //funcs.foreach(renamedFuncs += rename(_, localScope, varsInScope, errors).asInstanceOf[Func])
+        println("about to return")
         Program(renamedFuncs.toList, rename(stat, localScope, varsInScope, errors).asInstanceOf[Stat])
 
       case Func((_type, Ident(ident)), ParamList(params), stat) =>
+        println("found function")
         val newScope = scala.collection.mutable.Map[String, String]()
         val renamedParams: ListBuffer[Param] = ListBuffer()
         for (param <- params) {
@@ -49,6 +55,7 @@ object RenamingPass {
             case _ =>
           }
         }
+        println(Ident(varsInScope(renameFunc(program))))
         Func((_type, Ident(varsInScope(renameFunc(program)))), ParamList(renamedParams.toList),
           rename(stat, newScope, varsInScope, errors).asInstanceOf[Stat])
 
@@ -198,8 +205,8 @@ object RenamingPass {
     function match {
       case Func((_type, Ident(ident)), ParamList(params), _) => renameFuncDecl(_type, ident, params)
       case _ =>
-        println("OH we fucked it")
-        "its peak"
+        println("THIS SHOULD NOT BE REACHABLE: LINE 203")
+        "!!!"
     }
   }
 
