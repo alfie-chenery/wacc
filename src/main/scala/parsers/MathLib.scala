@@ -259,4 +259,103 @@ class MathLib {
       )
     }
   }
+
+  def pow(a: Int, b: Int, ra: RegisterAllocator): Unit ={
+    if(!labels.contains("pow")){
+      printString()
+      runtimeError()
+      intOverflow()
+      val condLabel = nextBranchIndex
+      val bodyLabel = nextBranchIndex
+      val r = ra.next
+      labels("pow") = List(
+        PUSH(LinkReg),
+        SUB(SP, SP, imm(8)),
+        LDR(r, imm(1), Base),
+        STR(r, regShift(SP, 4, false)),
+        LDR(r, imm(0), Base),
+        STR(r, regVal(SP)),
+        B(condLabel, Base)
+      )
+      val r1 = ra.next
+      labels(condLabel) = List(
+        LDR(r, regVal(SP), Base),
+        LDR(r1, regShift(SP, 16, false), Base),
+        CMP(r, r1),
+        MOV(r, imm(1), LT),
+        MOV(r, imm(0), GE),
+        CMP(r, imm(1)),
+        B(bodyLabel, EQ),
+        LDR(r, regShift(SP, 4, false), Base),
+        MOV(RetReg, r, Base),
+        ADD(SP, SP, imm(8)),
+        POP(PC),
+        POP(PC),
+        LTORG
+      )
+      labels(bodyLabel) = List(
+        LDR(r, regShift(SP, 4, false), Base),
+        LDR(r1, regShift(SP, 12, false), Base),
+        SMULL(r, r1, r, r1),
+        CMP(r1, asr(r, 31)),
+        BL("p_throw_overflow_error", NE),
+        STR(r, regShift(SP, 4, false)),
+        LDR(r, regVal(SP), Base),
+        LDR(r1, imm(1), Base),
+        ADDS(r, r, r1),
+        BL("p_throw_overflow_error", VS),
+        STR(r, regVal(SP))
+      )
+    }
+  }
+
+  def fact(x: Int, ra: RegisterAllocator): Unit ={
+    printString()
+    runtimeError()
+    intOverflow()
+    val condLabel = nextBranchIndex
+    val bodyLabel = nextBranchIndex
+    if(!labels.contains("fact")){
+      val r = ra.next
+      labels("fact") = List(
+        PUSH(LinkReg),
+        SUB(SP, SP, imm(8)),
+        LDR(r, imm(1), Base),
+        STR(r, regShift(SP, 4, false)),
+        LDR(r, imm(1), Base),
+        STR(r, regVal(SP)),
+        B(condLabel, Base)
+      )
+      val r1 = ra.next
+      labels(condLabel) = List(
+        LDR(r, regVal(SP), Base),
+        LDR(r1, regShift(SP, 12, false), Base),
+        CMP(r, r1),
+        MOV(r, imm(1), LE),
+        MOV(r, imm(0), GT),
+        CMP(r, imm(1)),
+        B(bodyLabel, EQ),
+        LDR(r, regShift(SP, 4, false), Base),
+        MOV(RetReg, r, Base),
+        ADD(SP, SP, imm(8)),
+        POP(PC),
+        POP(PC),
+        LTORG
+      )
+      labels(bodyLabel) = List(
+        LDR(r, regShift(SP, 4, false), Base),
+        LDR(r1, regVal(SP), Base),
+        SMULL(r, r1, r, r1),
+        CMP(r1, asr(r, 31)),
+        BL("p_throw_overflow_error", NE),
+        STR(r, regShift(SP, 4, false)),
+        LDR(r, regVal(SP), Base),
+        LDR(r1, imm(1), Base),
+        ADDS(r, r, r1),
+        BL("p_throw_overflow_error", VS),
+        STR(r, regVal(SP))
+      )
+    }
+  }
+
 }
