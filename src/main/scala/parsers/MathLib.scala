@@ -13,7 +13,7 @@ class MathLib {
     "tanh", "exp", "frexp", "ldexp", "log", "log10", "modf", "pow",
     "sqrt", "ceil", "fabs", "floor", "fmod")
 
-  def asin(x: Int, ra: RegisterAllocator) {
+  def asin(ra: RegisterAllocator) {
     var r = ra.next
     val condLabel = nextBranchIndex
     val bodyLabel = nextBranchIndex
@@ -21,7 +21,8 @@ class MathLib {
     divByZeroError()
     runtimeError()
     printString()
-    //work out how to add fabs code
+    pow(ra)
+    fact(ra)
     if (!labels.contains("asin")) {
       labels("asin") = List(PUSH(LinkReg),
         SUB(SP, SP, imm(24)),
@@ -130,11 +131,13 @@ class MathLib {
     }
   }
 
-  def acos(x:Int, ra: RegisterAllocator): Unit ={
+  def acos(ra: RegisterAllocator): Unit ={
     divByZeroError()
     intOverflow()
     runtimeError()
     printString()
+    pow(ra)
+    fact(ra)
     val condLabel = nextBranchIndex
     val bodyLabel = nextBranchIndex
     if (!labels.contains("acos")){
@@ -218,12 +221,12 @@ class MathLib {
     }
   }
 
-  def atan(x: Int, ra:RegisterAllocator): Unit ={
+  def atan(ra:RegisterAllocator): Unit ={
     printString()
     runtimeError()
     divByZeroError()
-    acos(x, ra)
-    asin(x, ra)
+    acos(ra)
+    asin(ra)
     if(!labels.contains("atan")){
       val r = ra.next
       val r1 = ra.next
@@ -260,7 +263,7 @@ class MathLib {
     }
   }
 
-  def pow(a: Int, b: Int, ra: RegisterAllocator): Unit ={
+  def pow(ra: RegisterAllocator): Unit ={
     if(!labels.contains("pow")){
       printString()
       runtimeError()
@@ -309,7 +312,7 @@ class MathLib {
     }
   }
 
-  def fact(x: Int, ra: RegisterAllocator): Unit ={
+  def fact(ra: RegisterAllocator): Unit ={
     printString()
     runtimeError()
     intOverflow()
