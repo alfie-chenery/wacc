@@ -42,6 +42,7 @@ object CodeGen{
   }
 
   def traverse(node: AstNode, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Unit = {
+    // todo: refactor so that cases have their own separate functions
     node match {
       case Program(funcs, stat) =>
         for (func <- funcs) {
@@ -221,8 +222,8 @@ object CodeGen{
                   CMP(RetReg, imm(0)),
                   LDR(RetReg, label(neg_index_msg), LT),
                   BL("p_throw_runtime_error", LT),
-                  LDR(reg(1), reg(1), Base),
-                  CMP(RetReg, reg(1)),
+                  LDR(reg1, reg1, Base),
+                  CMP(RetReg, reg1),
                   LDR(RetReg, label(free_msg), CS),
                   BL("p_throw_runtime_error", CS),
                   POP(PC)
@@ -254,7 +255,7 @@ object CodeGen{
           }
           labels(t) =
             List(PUSH(LinkReg),
-              MOV(reg(1), RetReg, Base),
+              MOV(reg1, RetReg, Base),
               LDR(RetReg, label(read_msg), Base),
               ADD(RetReg, RetReg, imm(4)),
               BL("scanf", Base),
@@ -277,24 +278,24 @@ object CodeGen{
         SemanticPass.checkExprType(expr, expr, new ListBuffer[String]) match {
           case WString =>
             printString()
-            if (!ret.isInstanceOf[reg]) code += LDR(ra.next, ret, SB)
+            if (!ret.isInstanceOf[ScratchReg]) code += LDR(ra.next, ret, SB)
             code += MOV(RetReg, ra.next, Base)
             code += BL("p_print_string", Base)
 
           case WBool =>
             printBool()
-            if (!ret.isInstanceOf[reg]) code += LDR(ra.next, ret, SB)
+            if (!ret.isInstanceOf[ScratchReg]) code += LDR(ra.next, ret, SB)
             code += MOV(RetReg, ra.next, Base)
             code += BL("p_print_bool", Base)
 
           case WInt =>
             printInt()
-            if (!ret.isInstanceOf[reg]) code += LDR(ra.next, ret, SB)
+            if (!ret.isInstanceOf[ScratchReg]) code += LDR(ra.next, ret, SB)
             code += MOV(RetReg, ra.next, Base)
             code += BL("p_print_int", Base)
 
           case WChar =>
-            if (!ret.isInstanceOf[reg]) code += LDR(ra.next, ret, Base)
+            if (!ret.isInstanceOf[ScratchReg]) code += LDR(ra.next, ret, Base)
             code += MOV(RetReg, ra.next, Base)
             code += BL("putchar", Base)
 
@@ -308,7 +309,7 @@ object CodeGen{
             } else {
               //printing an array variable prints its address
               printReference()
-              if (!ret.isInstanceOf[reg]) code += LDR(ra.next, ret, SB)
+              if (!ret.isInstanceOf[ScratchReg]) code += LDR(ra.next, ret, SB)
               code += MOV(RetReg, ra.next, Base)
               code += BL("p_print_reference", Base)
             }
@@ -488,8 +489,8 @@ object CodeGen{
               CMP(RetReg, imm(0)),
               LDR(RetReg, label(negMessage), LT),
               BL("p_throw_runtime_error", LT),
-              LDR(reg(1), regVal(reg(1)), Base),
-              CMP(RetReg, reg(1)),
+              LDR(reg1, regVal(reg1), Base),
+              CMP(RetReg, reg1),
               LDR(RetReg, label(largeMessage), CS),
               BL("p_throw_runtime_error", CS),
               POP(PC)
@@ -499,7 +500,7 @@ object CodeGen{
           val ret = traverseExpr(elem, ra, code)
           code += LDR(arrLoc, regVal(arrLoc), Base)
           code += MOV(RetReg, ret, Base)
-          code += MOV(reg(1), arrLoc, Base)
+          code += MOV(reg1, arrLoc, Base)
           // TODO this constants should probably changed based on the size of the things in the array
           code += BL("p_check_array_bounds", Base)
           code += ADD(arrLoc, arrLoc, imm(4))
@@ -694,14 +695,14 @@ object CodeGen{
           res1 = ra.getAvailable(1)
           code += POP(res1)
           code += MOV(RetReg, res1, Base) // <-- todo?
-          code += MOV(reg(1), res2, Base)
+          code += MOV(reg1, res2, Base)
           divByZeroError()
           code += BL("p_check_divide_by_zero", Base)
           code += BL("__aeabi_idiv", Base)
           code += MOV(res1, RetReg, Base)
         } else { // needs separate ADD cases, since the res1 or res2 will be the lower register address depending on whether we're in a spill state
           code += MOV(RetReg, res1, Base)
-          code += MOV(reg(1), res2, Base)
+          code += MOV(reg1, res2, Base)
           divByZeroError()
           code += BL("p_check_divide_by_zero", Base)
           code += BL("__aeabi_idiv", Base)
@@ -717,25 +718,25 @@ object CodeGen{
           res1 = ra.getAvailable(1)
           code += POP(res1)
           code += MOV(RetReg, reg1, Base) // <-- todo?
-          code += MOV(reg(1), ra.next, Base)
+          code += MOV(reg1, ra.next, Base)
           divByZeroError()
           code += BL("p_check_divide_by_zero", Base)
           code += BL("__aeabi_idivmod", Base)
-          code += MOV(reg1, reg(1), Base)
+          code += MOV(reg1, reg1, Base)
         } else { // needs separate ADD cases, since the res1 or res2 will be the lower register address depending on whether we're in a spill state
           code += MOV(RetReg, res1, Base)
-          code += MOV(reg(1), res2, Base)
+          code += MOV(reg1, res2, Base)
           divByZeroError()
           code += BL("p_check_divide_by_zero", Base)
           code += BL("__aeabi_idivmod", Base)
-          code += MOV(res1, reg(1), Base)
+          code += MOV(res1, reg1, Base)
         }
         ra.restore()
         reg1
 
       case Negate(expr) =>
         val reg = traverseExpr(expr, ra, code)
-        if (!reg.isInstanceOf[reg]) code += LDR(reg, reg, Base)
+        if (!reg.isInstanceOf[ScratchReg]) code += LDR(reg, reg, Base)
         intOverflow()
         code += RSBS(reg, reg, imm(0))
         code += BL("p_throw_overflow_error", VS)
@@ -743,7 +744,7 @@ object CodeGen{
 
       case Not(expr) =>
         val reg = traverseExpr(expr, ra, code)
-        if (!reg.isInstanceOf[reg]) code += LDR(reg, reg, SB)
+        if (!reg.isInstanceOf[ScratchReg]) code += LDR(reg, reg, SB)
         code += EOR(reg, reg, imm(1))
         reg
 
@@ -767,13 +768,13 @@ object CodeGen{
     /** Function to reduce duplication in dealing with binary expressions */
     var res1 = traverseExpr(expr1, ra, code)
     val reg1 = if (spill) ra.next else ra.nextRm
-    if (!res1.isInstanceOf[reg]) {
+    if (!res1.isInstanceOf[ScratchReg]) {
       code += LDR(reg1, res1, SB)
       res1 = reg1
     }
     if (spill) code += PUSH(res1)
     var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
-    if (!res2.isInstanceOf[reg]) {
+    if (!res2.isInstanceOf[ScratchReg]) {
       code += LDR(ra.next, res2, SB)
       res2 = ra.next
     }
@@ -819,6 +820,13 @@ object CodeGen{
     val sb = new StringBuilder()
     val code: ListBuffer[Mnemonic] = ListBuffer()
     traverse(node, ra, code)
+    // todo: refactor compilation so that a file is created and written to (without a sb)
+    //  and the file is deleted if an error is detected
+
+    // todo: refactor so that optimizations can be performed on the intermediate representation?
+    //  perhaps registers are the only objects that need to be redefined, for now... (?)
+
+    val graphColouredCode: ListBuffer[Mnemonic] = GraphColouring.optimize(code)
 
     if (data.nonEmpty) {
       sb.append(".data\n\n")
@@ -835,7 +843,7 @@ object CodeGen{
     for (line <- code) {
       sb.append((if (!line.isInstanceOf[funcName]) "\t" else "") + line.toString + "\n")
     }
-    // todo: the formatting might fail once IfElse is implemented...
+    // todo: the formatting might fail once IfElse is implemented... (?)
     for((k,v) <- labels){
       sb.append("\n" + k + ":\n\t")
       for (line <- v) {

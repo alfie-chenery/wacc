@@ -12,3 +12,4 @@ src/test/scala/parsers/project
 *.s
 *.jar
 *~
+temp.txt

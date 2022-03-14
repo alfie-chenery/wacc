@@ -126,6 +126,12 @@ object Assembly {
   case object RetReg extends Register{
     override def toString: String = "r0"
   }
+  case object reg1 extends Register { // todo: check that it doesn't have a special name? / rename if necessary
+    override def toString: String = "r1" // should it be included in scratchRegisters or not?
+  }                                      // or maybe a seperate trait should be made for these, and
+  case object reg2 extends Register {    // both put under another trait with same scope as former 'reg'
+    override def toString: String = "r2" // todo: same as ^
+  }
   case object SP extends Register{
     override def toString: String = "sp"
   }
@@ -135,8 +141,30 @@ object Assembly {
   case object PC extends Register{
     override def toString: String = "pc"
   }
-  case class reg(num: Int) extends Register{
-    override def toString: String = "r" + num.toString
+  sealed trait ScratchReg extends Register
+  case object reg4 extends ScratchReg{
+    override def toString: String = "r4"
+  }
+  case object reg5 extends ScratchReg{
+    override def toString: String = "r5"
+  }
+  case object reg6 extends ScratchReg{
+    override def toString: String = "r6"
+  }
+  case object reg7 extends ScratchReg{
+    override def toString: String = "r7"
+  }
+  case object reg8 extends ScratchReg{
+    override def toString: String = "r8"
+  }
+  case object reg9 extends ScratchReg{
+    override def toString: String = "r9"
+  }
+  case object reg10 extends ScratchReg{
+    override def toString: String = "r10"
+  }
+  case object reg11 extends ScratchReg{
+    override def toString: String = "r11"
   }
 
   sealed trait Suffix extends Operand
