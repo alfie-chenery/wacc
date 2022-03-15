@@ -375,4 +375,100 @@ class MathLib {
     }
   }
 
+  def sqrt(ra:RegisterAllocator): Unit ={
+    if(!labels.contains("sqrt")){
+      printString()
+      runtimeError()
+      intOverflow()
+      divByZeroError()
+      val condLabel = nextBranchIndex
+      val bodyLabel = nextBranchIndex
+      val r = ra.next
+      val r1 = ra.next
+      labels("sqrt") = List(
+        PUSH(LinkReg),
+        SUB(SP, SP, imm(20)),
+        LDR(r,regShift(SP, 24, update = false), Base),
+        LDR(r1, imm(2), Base),
+        MOV(RetReg, r, Base),
+        MOV(reg(1), r1, Base),
+        BL("p_check_divide_by_zero", Base),
+        BL("__aeabi_idiv", Base),
+        MOV(r, RetReg, Base),
+        STR(r, regShift(SP, 16, update = false)),
+        LDR(r, regShift(SP, 16, update = false), Base),
+        STR(r, regShift(SP, 12, update = false)),
+        LDR(r, regShift(SP, 24, update = false), Base),
+        LDR(r1, regShift(SP, 12, update = false), Base),
+        MOV(RetReg, r, Base),
+        MOV(reg(1), r1, Base),
+        BL("p_check_divide_by_zero", Base),
+        BL("__aeabi_idiv", Base),
+        MOV(r, RetReg, Base),
+        STR(r, regShift(SP, 8, update = false)),
+        LDR(r, regShift(SP, 12,update = false), Base),
+        LDR(r1, regShift(SP, 8, update = false), Base),
+        ADDS(r, r, r1),
+        BL("p_throw_overflow_error", VS),
+        STR(r, regShift(SP, 4, update = false)),
+        LDR(r, regShift(SP, 4, update = false), Base),
+        LDR(r, imm(2), Base),
+        MOV(RetReg, r, Base),
+        MOV(reg(1), r1, Base),
+        BL("p_check_divide_by_zero", Base),
+        BL("__aeabi_idiv", Base),
+        MOV(r, RetReg, Base),
+        STR(r, regShift(SP, 16, update = false)),
+        LDR(r, regShift(SP, 12, update = false), Base),
+        LDR(r1, regShift(SP, 16, update = false), Base),
+        SUBS(r, r, r1),
+        BL("p_throw_overflow_error", VS),
+        STR(r, regVal(SP)),
+        B(condLabel, Base)
+      )
+      labels(condLabel) = List(
+        LDR(r, regVal(SP), Base),
+        LDR(r1, imm(0), Base),
+        CMP(r, r1),
+        MOV(r, imm(1), NE),
+        MOV(r, imm(0), EQ),
+        CMP(r, imm(1)),
+        B(bodyLabel, EQ),
+        LDR(r, regShift(SP, 16, update = false), Base),
+        MOV(RetReg, r, Base),
+        ADD(SP, SP, imm(20)),
+        POP(PC),
+        POP(PC),
+        LTORG
+      )
+      labels(bodyLabel) = List(
+        SUB(SP, SP, imm(8)),
+        LDR(r, regShift(SP, 24, update = false), Base),
+        STR(r, regShift(SP, 20, update = false)),
+        LDR(r, regShift(SP, 32, update = false), Base),
+        LDR(r1, regShift(SP, 20, update = false), Base),
+        MOV(RetReg, r, Base),
+        MOV(reg(1), r1, Base),
+        BL("p_check_divide_by_zero", Base),
+        BL("__aeabi_idiv", Base),
+        MOV(r, RetReg, Base),
+        STR(r, regShift(SP, 4, update = false)),
+        LDR(r, regShift(SP, 20, update = false), Base),
+        LDR(r1, regShift(SP, 4, update = false), Base),
+        ADDS(r, r, r1),
+        BL("p_throw_overthrow_error", VS),
+        STR(r, regVal(SP)),
+        LDR(r, regVal(SP), Base),
+        LDR(r1, imm(2), Base),
+        MOV(RetReg, r, Base),
+        MOV(reg(1), r1, Base),
+        BL("p_check_divide_by_zero", Base),
+        BL("__aeabi_idiv", Base),
+        MOV(r, RetReg, Base),
+        STR(r, regShift(SP, 24, update = false)),
+        ADD(SP, SP, imm(8))
+      )
+    }
+  }
+
 }
