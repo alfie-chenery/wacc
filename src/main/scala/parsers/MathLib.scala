@@ -7,7 +7,7 @@ import parsers.preDefinedFuncs._
 
 class MathLib {
 
-  //TODO: add references to branched functions
+  //TODO: remove duplication
 
   val mathFuncs = List("acos", "asin", "atan", "atan2", "cos", "cosh", "sin", "sinh",
     "tanh", "exp", "frexp", "ldexp", "log", "log10", "modf", "pow",
@@ -330,6 +330,47 @@ class MathLib {
         ADDS(r, r, r1),
         BL("p_throw_overflow_error", VS),
         STR(r, regVal(SP))
+      )
+    }
+  }
+
+  def fabs(ra: RegisterAllocator): Unit ={
+    if(!labels.contains("fabs")){
+      intOverflow()
+      runtimeError()
+      printString()
+      val cond1Label = nextBranchIndex
+      val cond2Label = nextBranchIndex
+      val r = ra.next
+      val r1 = ra.next
+      labels("fabs") = List(
+        PUSH(LinkReg),
+        LDR(r, regShift(SP, 4, false), Base),
+        LDR(r1, imm(0), Base),
+        CMP(r, r1),
+        MOV(r, imm(1), LT),
+        MOV(r, imm(0), GE),
+        CMP(r, imm(0)),
+        B(cond1Label, EQ),
+        LDR(r, regShift(SP, 4, false), Base),
+        LDR(r1, imm(-1), Base),
+        SMULL(r, r1, r, r1),
+        CMP(r1, asr(r, 31)),
+        BL("p_throw_overflow_error", NE),
+        STR(r, regShift(SP, 4, false)),
+        LDR(r, regShift(SP, 4, false), Base),
+        MOV(RetReg, r, Base),
+        POP(PC),
+        B(cond2Label, Base)
+      )
+      labels(cond1Label) = List(
+        LDR(r, regShift(SP, 4, false), Base),
+        MOV(RetReg, r, Base),
+        POP(PC)
+      )
+      labels(cond2Label)= List(
+        POP(PC),
+        LTORG
       )
     }
   }
