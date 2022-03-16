@@ -278,24 +278,24 @@ object CodeGen{
         SemanticPass.checkExprType(expr, expr, new ListBuffer[String]) match {
           case WString =>
             printString()
-            if (!ret.isInstanceOf[ScratchReg]) code += LDR(ra.next, ret, SB)
+            if (!ret.isInstanceOf[TempReg]) code += LDR(ra.next, ret, SB)
             code += MOV(RetReg, ra.next, Base)
             code += BL("p_print_string", Base)
 
           case WBool =>
             printBool()
-            if (!ret.isInstanceOf[ScratchReg]) code += LDR(ra.next, ret, SB)
+            if (!ret.isInstanceOf[TempReg]) code += LDR(ra.next, ret, SB)
             code += MOV(RetReg, ra.next, Base)
             code += BL("p_print_bool", Base)
 
           case WInt =>
             printInt()
-            if (!ret.isInstanceOf[ScratchReg]) code += LDR(ra.next, ret, SB)
+            if (!ret.isInstanceOf[TempReg]) code += LDR(ra.next, ret, SB)
             code += MOV(RetReg, ra.next, Base)
             code += BL("p_print_int", Base)
 
           case WChar =>
-            if (!ret.isInstanceOf[ScratchReg]) code += LDR(ra.next, ret, Base)
+            if (!ret.isInstanceOf[TempReg]) code += LDR(ra.next, ret, Base)
             code += MOV(RetReg, ra.next, Base)
             code += BL("putchar", Base)
 
@@ -309,7 +309,7 @@ object CodeGen{
             } else {
               //printing an array variable prints its address
               printReference()
-              if (!ret.isInstanceOf[ScratchReg]) code += LDR(ra.next, ret, SB)
+              if (!ret.isInstanceOf[TempReg]) code += LDR(ra.next, ret, SB)
               code += MOV(RetReg, ra.next, Base)
               code += BL("p_print_reference", Base)
             }
@@ -736,7 +736,7 @@ object CodeGen{
 
       case Negate(expr) =>
         val reg = traverseExpr(expr, ra, code)
-        if (!reg.isInstanceOf[ScratchReg]) code += LDR(reg, reg, Base)
+        if (!reg.isInstanceOf[TempReg]) code += LDR(reg, reg, Base)
         intOverflow()
         code += RSBS(reg, reg, imm(0))
         code += BL("p_throw_overflow_error", VS)
@@ -744,7 +744,7 @@ object CodeGen{
 
       case Not(expr) =>
         val reg = traverseExpr(expr, ra, code)
-        if (!reg.isInstanceOf[ScratchReg]) code += LDR(reg, reg, SB)
+        if (!reg.isInstanceOf[TempReg]) code += LDR(reg, reg, SB)
         code += EOR(reg, reg, imm(1))
         reg
 
@@ -768,13 +768,13 @@ object CodeGen{
     /** Function to reduce duplication in dealing with binary expressions */
     var res1 = traverseExpr(expr1, ra, code)
     val reg1 = if (spill) ra.next else ra.nextRm
-    if (!res1.isInstanceOf[ScratchReg]) {
+    if (!res1.isInstanceOf[TempReg]) {
       code += LDR(reg1, res1, SB)
       res1 = reg1
     }
     if (spill) code += PUSH(res1)
     var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
-    if (!res2.isInstanceOf[ScratchReg]) {
+    if (!res2.isInstanceOf[TempReg]) {
       code += LDR(ra.next, res2, SB)
       res2 = ra.next
     }
@@ -826,10 +826,11 @@ object CodeGen{
     // todo: refactor so that optimizations can be performed on the intermediate representation?
     //  perhaps registers are the only objects that need to be redefined, for now... (?)
 
-    val graphColouredCode: ListBuffer[Mnemonic] = GraphColouring.optimize(code)
+    GraphColouring.buildCFG(code)
+//    val graphColouredCode: ListBuffer[Mnemonic] = GraphColouring.buildCFG(code)
 
     if (data.nonEmpty) {
-      sb.append(".data\n\n")
+      sb.append(".data\n\n") // why are these not added as mnemonic labels for consistency?
       for ((k, body) <- data) {
         sb.append("\n" + k + ":\n\t")
         for (line <- body) {

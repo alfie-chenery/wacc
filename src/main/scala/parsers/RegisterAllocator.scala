@@ -7,7 +7,7 @@ import parsers.Assembly._
 //companion object to store global values needed by all RegisterAllocators
 object RegisterAllocator{
   //unreserved registers we have access to use in our code generator
-  val allRegisters = List(reg4, reg5, reg6, reg7, reg8, reg9, reg10, reg11)
+  val allRegisters = List(tReg4, tReg5, tReg6, tReg7, tReg8, tReg9, tReg10, tReg11)
 }
 
 class RegisterAllocator(private var availableRegisters: ListBuffer[Register]) {
