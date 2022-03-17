@@ -55,8 +55,9 @@ object RenamingPass {
             case _ =>
           }
         }
-        println(Ident(varsInScope(renameFunc(program))))
-        Func((_type, Ident(varsInScope(renameFunc(program)))), ParamList(renamedParams.toList),
+        println("about to return function")
+
+        Func((_type, Ident(ident)), ParamList(renamedParams.toList),
           rename(stat, newScope, varsInScope, errors).asInstanceOf[Stat])
 
       case Decl(_type, Ident(ident), rhs) =>
