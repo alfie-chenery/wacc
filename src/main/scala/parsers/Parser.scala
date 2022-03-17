@@ -43,12 +43,10 @@ object lexer {
     '\\' ~> (('0' #> "\\u0000") <|> ('b' #> "\\b") <|> ('t' #> "\\t") <|> ('n' #> "\\n") <|>
       ('f' #> "\\f") <|> ('r' #> "\\r") <|> ('\"' #> "\\\"") <|> ('\'' #> "\\\'") <|> ('\\' #> "\\\\"))
   }
-  private [parsers] val CHAR: Parsley[String] = ESC_CHAR <|> noneOf('\\', '\"', '\'').map(_.toString)
+  private [parsers] val CHAR: Parsley[String] = ESC_CHAR <|> noneOf('\\', '\'', '\"').map(_.toString)
   private [parsers] val CHAR_LITER: Parsley[String] = token('\'' ~> CHAR <~ '\'')
   private [parsers] val STR_LITER: Parsley[String] = token('\"' ~> manyUntil(CHAR, '\"').map(_.mkString))
   private [parsers] val PAIR_LITER: Parsley[String] = token("null")
-
-  val unacceptable = Set("\"", "\'", "\\")
 
   private def token[A](p: =>Parsley[A]): Parsley[A] = lex.lexeme(attempt(p))
   def fully[A](p: =>Parsley[A]): Parsley[A] = lex.whiteSpace ~> p <~ eof

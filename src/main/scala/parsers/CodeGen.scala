@@ -52,7 +52,6 @@ object CodeGen{
         }
 
         readCounter = readsInScope(stat)
-        println(readCounter)
 
         code += funcName("main")
         code += PUSH(LinkReg)
@@ -106,16 +105,14 @@ object CodeGen{
         ra.restore()
       case Decl(Number, Ident(ident), rhs) =>
         val r = ra.next
-        val ret = traverseExpr(rhs, ra, code)
-        //if (!ret.isInstanceOf[reg]) code += LDR(r, ret, Base)
+        traverseExpr(rhs, ra, code)
         currentShift -= 4
         val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, update = false)
         variableLocation += (ident -> location)
         code += STR(r, location)
       case Decl(WBool, Ident(ident), rhs) =>
         val r = ra.next
-        val ret = traverseExpr(rhs, ra, code)
-        //if (!ret.isInstanceOf[reg]) code += MOV(r, ret, Base)
+        traverseExpr(rhs, ra, code)
         currentShift -= 1
         val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, update = false)
         variableLocation += (ident -> location)
@@ -344,11 +341,9 @@ object CodeGen{
         val fun1 = nextBranchIndex
         val fun2 = nextBranchIndex
         code += B(fun1, EQ)
-        //readCounter = readsInScope(stat_true)
         traverse(stat_true, ra, code)
         code += B(fun2, Base)
         code += funcName(fun1)
-        //readCounter = readsInScope(stat_false)
         traverse(stat_false, ra, code)
         code += funcName(fun2)
 
@@ -358,10 +353,8 @@ object CodeGen{
         val bodyLabel = nextBranchIndex
         code += B(condLabel, Base)
         code += funcName(bodyLabel)
-        //readCounter = readsInScope(stat)
         traverse(stat, ra, code)
         code += funcName(condLabel)
-        //readCounter = readsInScope(cond)
         traverse(cond, ra, code)
         val reg = traverseExpr(cond, ra, code)
         code += CMP(reg, imm(1))
@@ -503,7 +496,9 @@ object CodeGen{
           // TODO this constants should probably changed based on the size of the things in the array
           code += BL("p_check_array_bounds", Base)
           code += ADD(arrLoc, arrLoc, imm(4))
-          code += ADD(arrLoc, arrLoc, lsl(ret, 2))
+          val _type = typeSize(checkExprType(ArrayElem(Ident(x), elems), ArrayElem(Ident(x), elems), new ListBuffer[String]))
+          val loc = if (_type == 4) lsl(ret, 2) else ret
+          code += ADD(arrLoc, arrLoc, loc)
         }
         ra.restore()
         regVal(arrLoc)
@@ -523,18 +518,8 @@ object CodeGen{
         RetReg
 
       case And(expr1, expr2) =>
-        var res1 = traverseExpr(expr1, ra, code)
-        val reg1 = if (spill) ra.next else ra.nextRm
-        if (!res1.isInstanceOf[reg]) {
-          code += LDR(reg1, res1, SB)
-          res1 = reg1
-        }
-        if (spill) code += PUSH(res1)
-        var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
-        if (!res2.isInstanceOf[reg]) {
-          code += LDR(ra.next, res2, SB)
-          res2 = ra.next
-        }
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+
         if (spill) {
           res1 = ra.getAvailable(1)
           code += POP(res1)
@@ -547,18 +532,8 @@ object CodeGen{
 
       // TODO factor out repeated code
       case Or(expr1, expr2) =>
-        var res1 = traverseExpr(expr1, ra, code)
-        val reg1 = if (spill) ra.next else ra.nextRm
-        if (!res1.isInstanceOf[reg]) {
-          code += LDR(reg1, res1, SB)
-          res1 = reg1
-        }
-        if (spill) code += PUSH(res1)
-        var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
-        if (!res2.isInstanceOf[reg]) {
-          code += LDR(ra.next, res2, SB)
-          res2 = ra.next
-        }
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+
         if (spill) {
           res1 = ra.getAvailable(1)
           code += POP(res1)
@@ -571,18 +546,8 @@ object CodeGen{
 
         // TODO check if reg1 should be moved with LDR or LDRSB
       case Greater(expr1, expr2) =>
-        var res1 = traverseExpr(expr1, ra, code)
-        val reg1 = if (spill) ra.next else ra.nextRm
-        if (!res1.isInstanceOf[reg]) {
-          code += LDR(reg1, res1, SB)
-          res1 = reg1
-        }
-        if (spill) code += PUSH(res1)
-        var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
-        if (!res2.isInstanceOf[reg]) {
-          code += LDR(ra.next, res2, SB)
-          res2 = ra.next
-        }
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+
         if (spill) {
           res1 = ra.getAvailable(1)
           code += POP(res1)
@@ -595,18 +560,8 @@ object CodeGen{
 
 
       case GreaterEq(expr1, expr2) =>
-        var res1 = traverseExpr(expr1, ra, code)
-        val reg1 = if (spill) ra.next else ra.nextRm
-        if (!res1.isInstanceOf[reg]) {
-          code += LDR(reg1, res1, SB)
-          res1 = reg1
-        }
-        if (spill) code += PUSH(res1)
-        var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
-        if (!res2.isInstanceOf[reg]) {
-          code += LDR(ra.next, res2, SB)
-          res2 = ra.next
-        }
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+
         if (spill) {
           res1 = ra.getAvailable(1)
           code += POP(res1)
@@ -618,18 +573,8 @@ object CodeGen{
         reg1
 
       case Less(expr1, expr2) =>
-        var res1 = traverseExpr(expr1, ra, code)
-        val reg1 = if (spill) ra.next else ra.nextRm
-        if (!res1.isInstanceOf[reg]) {
-          code += LDR(reg1, res1, SB)
-          res1 = reg1
-        }
-        if (spill) code += PUSH(res1)
-        var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
-        if (!res2.isInstanceOf[reg]) {
-          code += LDR(ra.next, res2, SB)
-          res2 = ra.next
-        }
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+
         if (spill) {
           res1 = ra.getAvailable(1)
           code += POP(res1)
@@ -641,18 +586,8 @@ object CodeGen{
         reg1
 
       case LessEq(expr1, expr2) =>
-        var res1 = traverseExpr(expr1, ra, code)
-        val reg1 = if (spill) ra.next else ra.nextRm
-        if (!res1.isInstanceOf[reg]) {
-          code += LDR(reg1, res1, SB)
-          res1 = reg1
-        }
-        if (spill) code += PUSH(res1)
-        var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
-        if (!res2.isInstanceOf[reg]) {
-          code += LDR(ra.next, res2, SB)
-          res2 = ra.next
-        }
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+
         if (spill) {
           res1 = ra.getAvailable(1)
           code += POP(res1)
@@ -664,18 +599,8 @@ object CodeGen{
         reg1
 
       case Eq(expr1, expr2) =>
-        var res1 = traverseExpr(expr1, ra, code)
-        val reg1 = if (spill) ra.next else ra.nextRm
-        if (!res1.isInstanceOf[reg]) {
-          code += LDR(reg1, res1, SB)
-          res1 = reg1
-        }
-        if (spill) code += PUSH(res1)
-        var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
-        if (!res2.isInstanceOf[reg]) {
-          code += LDR(ra.next, res2, SB)
-          res2 = ra.next
-        }
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+
         if (spill) {
           res1 = ra.getAvailable(1)
           code += POP(res1)
@@ -687,18 +612,8 @@ object CodeGen{
         reg1
 
       case NotEq(expr1, expr2) =>
-        var res1 = traverseExpr(expr1, ra, code)
-        val reg1 = if (spill) ra.next else ra.nextRm
-        if (!res1.isInstanceOf[reg]) {
-          code += LDR(reg1, res1, SB)
-          res1 = reg1
-        }
-        if (spill) code += PUSH(res1)
-        var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
-        if (!res2.isInstanceOf[reg]) {
-          code += LDR(ra.next, res2, SB)
-          res2 = ra.next
-        }
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+
         if (spill) {
           res1 = ra.getAvailable(1)
           code += POP(res1)
@@ -719,18 +634,8 @@ object CodeGen{
        * the stack and the register freed for use when computing expr2.
        */
       case Plus(expr1, expr2) =>
-        var res1 = traverseExpr(expr1, ra, code)
-        val reg1 = if (spill) ra.next else ra.nextRm
-        if (!res1.isInstanceOf[reg]) {
-          code += LDR(reg1, res1, SB)
-          res1 = reg1
-        }
-        if (spill) code += PUSH(res1) // now that res1 is on the stack, its old reg is free to be overwritten
-        var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
-        if (!res2.isInstanceOf[reg]) {
-          code += LDR(ra.next, res2, SB)
-          res2 = ra.next // res2 now contains the result of expr 2
-        }
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+
         if (spill) {
           res1 = ra.getAvailable(1)
           code += POP(res1)
@@ -744,18 +649,8 @@ object CodeGen{
         reg1
 
       case Minus(expr1, expr2) =>
-        var res1 = traverseExpr(expr1, ra, code)
-        val reg1 = if (spill) ra.next else ra.nextRm
-        if (!res1.isInstanceOf[reg]) {
-          code += LDR(reg1, res1, SB)
-          res1 = reg1
-        }
-        if (spill) code += PUSH(res1) // now that res1 is on the stack, its old reg is free to be overwritten
-        var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
-        if (!res2.isInstanceOf[reg]) {
-          code += LDR(ra.next, res2, SB)
-          res2 = ra.next // res2 now contains the result of expr 2
-        }
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+
         if (spill) {
           res1 = ra.getAvailable(1)
           code += POP(res1)
@@ -769,24 +664,9 @@ object CodeGen{
         reg1
 
       case Mult(expr1, expr2) =>
-        println(expr1)
-        println(ra.getAvailable)
-        var res1 = traverseExpr(expr1, ra, code)
-        println(ra.getAvailable)
-        println("\n")
-        val reg1 = if (spill) ra.next else ra.nextRm
-        if (!res1.isInstanceOf[reg]) {
-          code += LDR(reg1, res1, SB)
-          res1 = reg1
-        }
-        if (spill) code += PUSH(res1) // now that res1 is on the stack, its old reg is free to be overwritten
-        var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
-        if (!res2.isInstanceOf[reg]) {
-          code += LDR(ra.next, res2, SB)
-          res2 = ra.next // res2 now contains the result of expr 2
-        }
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+
         if (spill) {
-          println("got to spill case")
           res1 = ra.getAvailable(1)
           code += POP(res1)
           code += SMULL(res1, res2, res1, res2)
@@ -801,20 +681,9 @@ object CodeGen{
         reg1
 
       case Div(expr1, expr2) =>
-        var res1 = traverseExpr(expr1, ra, code)
-        val reg1 = if (spill) ra.next else ra.nextRm
-        if (!res1.isInstanceOf[reg]) {
-          code += LDR(reg1, res1, SB)
-          res1 = reg1
-        }
-        if (spill) code += PUSH(res1) // now that res1 is on the stack, its old reg is free to be overwritten
-        var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
-        if (!res2.isInstanceOf[reg]) {
-          code += LDR(ra.next, res2, SB)
-          res2 = ra.next // res2 now contains the result of expr 2
-        }
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+
         if (spill) {
-          println("got to spill case")
           res1 = ra.getAvailable(1)
           code += POP(res1)
           code += MOV(RetReg, res1, Base) // <-- todo?
@@ -835,20 +704,9 @@ object CodeGen{
         reg1
 
       case Mod(expr1, expr2) =>
-        var res1 = traverseExpr(expr1, ra, code)
-        val reg1 = if (spill) ra.next else ra.nextRm
-        if (!res1.isInstanceOf[reg]) {
-          code += LDR(reg1, res1, SB)
-          res1 = reg1
-        }
-        if (spill) code += PUSH(res1) // now that res1 is on the stack, its old reg is free to be overwritten
-        var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
-        if (!res2.isInstanceOf[reg]) {
-          code += LDR(ra.next, res2, SB)
-          res2 = ra.next // res2 now contains the result of expr 2
-        }
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+
         if (spill) {
-          println("got to spill case")
           res1 = ra.getAvailable(1)
           code += POP(res1)
           code += MOV(RetReg, reg1, Base) // <-- todo?
@@ -898,15 +756,24 @@ object CodeGen{
     }
   }
 
+  def traverseBinExpr(expr1: Expr, expr2: Expr, ra: RegisterAllocator, code: ListBuffer[Mnemonic], spill: Boolean): (Register,Register,Register) = {
+    /** Function to reduce duplication in dealing with binary expressions */
+    var res1 = traverseExpr(expr1, ra, code)
+    val reg1 = if (spill) ra.next else ra.nextRm
+    if (!res1.isInstanceOf[reg]) {
+      code += LDR(reg1, res1, SB)
+      res1 = reg1
+    }
+    if (spill) code += PUSH(res1)
+    var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
+    if (!res2.isInstanceOf[reg]) {
+      code += LDR(ra.next, res2, SB)
+      res2 = ra.next
+    }
 
-
-  def traverseBinaryExpr(expr1: Expr, expr2: Expr, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Unit = {
-    val res1 = traverseExpr(expr1, ra, code)
-    val reg1 = ra.nextRm
-    if (!res1.isInstanceOf[reg]) code += LDR(reg1, res1, SB)
-    val res2 = traverseExpr(expr2, ra, code)
-    if (!res2.isInstanceOf[reg]) code += LDR(ra.next, res2, SB)
+    (reg1, res1, res2)
   }
+
 
   def phonyCaseCompare(code: ListBuffer[Mnemonic], suffix1: Suffix, reg1: Register, reg2: Register): Unit = {
     /**
