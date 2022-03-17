@@ -1,6 +1,6 @@
 package parsers
 
-import parsers.Assembly.{ADD, ADDS, AND, B, BL, CMP, DAscii, DWord, EOR, LDR, LTORG, MOV, MULTS, Mnemonic, ORR, POP, PUSH, RSBS, Register, SMULL, STR, STRB, SUB, SUBS, funcName}
+import parsers.Assembly.{ADD, ADDS, AND, B, BL, CMP, DAscii, DWord, EOR, LDR, LTORG, MOV, MULTS, Mnemonic, ORR, POP, PUSH, RSBS, Register, SMULL, STR, STRB, SUB, SUBS, TempReg, funcName}
 
 import scala.collection.immutable.HashSet
 import scala.collection.mutable
@@ -8,40 +8,102 @@ import scala.collection.mutable.ListBuffer
 
 object GraphColouring {
   /**
-   * @param code : compiled mnemonic IR assembly with temporary registers
-   * @return compiled assembly with allocated registers
+   * @param code : compiled mnemonic IR assembly with temporary TempRegs
+   * @return compiled assembly with allocated TempRegs
    */
-//  def optimize(code: ListBuffer[Mnemonic]): ListBuffer[Mnemonic] = {
-//    ???
-//  }
-
-  //  val nodes: mutable.Set[CFGNode] = new mutable.HashSet[CFGNode]
 
   val nodes: ListBuffer[CFGNode] = new ListBuffer[CFGNode]()
   val stCFG: mutable.HashMap[String, Int] = new mutable.HashMap[String, Int]()
-  //    val nodes: mutable.LinkedHashMap[Int, CFGNode] = new mutable.LinkedHashMap[Int, CFGNode]()
 
 //  def buildCFG(code: ListBuffer[Mnemonic]): ListBuffer[CFGNode] = {
   def buildCFG(code: ListBuffer[Mnemonic]): Unit = {
+
+    // generates node skeletons
     var i = 0
-    for (m <- code) { // refactor to be functional?
-      m match {
+    for (n <- code) { // refactor to be functional?
+      n match {
         case LTORG =>
         case DWord(_) =>
         case DAscii(_) =>
         case funcName(label) =>
           stCFG(label) = i
-          nodes.append(new CFGNode(i, m, m.uses, m.defs, new mutable.HashSet[Int]))
+          nodes.append(new CFGNode(i, n, new mutable.HashSet[TempReg], new mutable.HashSet[TempReg], new mutable.HashSet[Int]))
           i+=1
         case _ =>
-          nodes.append(new CFGNode(i, m, m.uses, m.defs, new mutable.HashSet[Int]))
+          nodes.append(new CFGNode(i, n, new mutable.HashSet[TempReg], new mutable.HashSet[TempReg], new mutable.HashSet[Int]))
           i+=1
       }
     }
+
+    // assign defs and uses for each node
+    for (n <- nodes) {
+      n.instruction match {
+        case funcName(name) =>
+        case LTORG =>
+        case DWord(size) =>
+        case DAscii(string) =>
+        case LDR(r, o2, suffix) =>
+          n.defs = mutable.HashSet(r).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+          n.uses = mutable.HashSet(o2).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+        case STR(rd, rn) =>
+          n.uses = mutable.HashSet(rd, rn).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+        case PUSH(r) =>
+          n.uses = mutable.HashSet(r).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+        case POP(r) =>
+          n.defs = mutable.HashSet(r).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+        case SUB(o1, o2, o3) =>
+          // can be rewritten as a match?
+          n.defs = mutable.HashSet(o1).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+          n.uses = mutable.HashSet(o2, o3).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+        case ADD(o1, o2, o3) =>
+          n.defs = mutable.HashSet(o1).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+          n.uses = mutable.HashSet(o2, o3).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+        case MOV(rd, o2, suffix) =>
+          n.defs = mutable.HashSet(rd).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+          n.uses = mutable.HashSet(o2).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+        case BL(label, suffix) =>
+        case CMP(r, o2) =>
+          n.uses = mutable.HashSet(r, o2).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+        case STRB(rd, rn) =>
+          n.uses = mutable.HashSet(rd, rn).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+        case AND(rd, rn, rm) =>
+          n.defs = mutable.HashSet(rd).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+          n.uses = mutable.HashSet(rn, rm).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+        case ORR(rd, rn, rm) =>
+          n.defs = mutable.HashSet(rd).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+          n.uses = mutable.HashSet(rn, rm).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+        case ADDS(rd, rn, rm) =>
+          n.defs = mutable.HashSet(rd).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+          n.uses = mutable.HashSet(rn, rm).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+
+        case SUBS(rd, rn, rm) =>
+          n.defs = mutable.HashSet(rd).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+          n.uses = mutable.HashSet(rn, rm).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+
+        case MULTS(rd, rn, rm) =>
+          n.defs = mutable.HashSet(rd).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+          n.uses = mutable.HashSet(rn, rm).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+
+        case SMULL(rdLo, rdHi, rm, rs) =>
+          n.defs = mutable.HashSet(rdLo, rdHi).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+          n.uses = mutable.HashSet(rm, rs).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+
+        case EOR(rd, o2, o3) =>
+          n.defs = mutable.HashSet(rd).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+          n.uses = mutable.HashSet(o2, o3).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+
+        case RSBS(rd, o2, o3) =>
+          n.defs = mutable.HashSet(rd).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+          n.uses = mutable.HashSet(o2, o3).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+
+        case B(label, suffix) =>
+      }
+    }
+
     // MID: now 'nodes' should be populated (in order) with every instruction in the .text section.
     //  We should then be able to start at the beginning of code and follow the flow of execution
 
-    succGenerator(0)
+    succGenerator()
 
     // MID: all nodes should now have appropriate succ values (+uses, defs)
     //  next, we can begin our analysis.
@@ -52,26 +114,25 @@ object GraphColouring {
       println(List(n.id, n.instruction, n.uses, n.defs, n.succs))
     }
 
-    println("got here 1")
     // maps from node (instr.) index to set of livein/liveout regs
-    val liveIn: mutable.HashMap[Int, mutable.Set[Register]] = new mutable.HashMap[Int, mutable.Set[Register]]()
-    val liveOut: mutable.HashMap[Int, mutable.Set[Register]] = new mutable.HashMap[Int, mutable.Set[Register]]()
+    val liveIn: mutable.HashMap[Int, mutable.Set[TempReg]] = new mutable.HashMap[Int, mutable.Set[TempReg]]()
+    val liveOut: mutable.HashMap[Int, mutable.Set[TempReg]] = new mutable.HashMap[Int, mutable.Set[TempReg]]()
 
     for (n <- nodes) {
-      liveIn(n.id) = mutable.Set[Register]()
-      liveOut(n.id) = mutable.Set[Register]()
+      liveIn(n.id) = mutable.Set[TempReg]()
+      liveOut(n.id) = mutable.Set[TempReg]()
     }
 
-    var prevLiveIn: mutable.HashMap[Int, mutable.Set[Register]] = mutable.HashMap()
-    var prevLiveOut: mutable.HashMap[Int, mutable.Set[Register]] = mutable.HashMap()
+    var prevLiveIn: mutable.HashMap[Int, mutable.Set[TempReg]] = mutable.HashMap()
+    var prevLiveOut: mutable.HashMap[Int, mutable.Set[TempReg]] = mutable.HashMap()
 
     do {
       prevLiveIn = liveIn
       prevLiveOut = liveOut
       println(nodes.reverse)
       for (n <- nodes.reverse) {
-        liveIn(n.id) = n.uses.union(liveOut(n.id).diff(n.defs)) // todo: check
-        liveOut(n.id) = n.succs.foldLeft(mutable.Set[Register]())((a: mutable.Set[Register], i: Int) => liveIn(i).union(a))
+        liveIn(n.id) = n.uses.union(liveOut(n.id).diff(n.defs))
+        liveOut(n.id) = n.succs.foldLeft(mutable.Set[TempReg]())((a: mutable.Set[TempReg], i: Int) => liveIn(i).union(a))
       }
     } while (prevLiveIn != liveIn && prevLiveOut != liveOut)
 
@@ -80,40 +141,36 @@ object GraphColouring {
 
   }
 
-  def succGenerator(i: Int): Unit = {
-    nodes(i)
-    nodes(i).succs = (
-      nodes(i).instruction match {
-//      case Assembly.funcName(name) => ???
-//      case Assembly.LTORG => ???
-//      case Assembly.DWord(size) => ???
-//      case Assembly.DAscii(string) => ???
-        case LDR(_, _, _) | STR(_, _) | PUSH(_) | POP(_) | SUB(_, _, _) |
-             ADD(_, _, _) | MOV(_, _, _) | CMP(_, _) | STRB(_, _) |
-             AND(_, _, _) | ORR(_, _, _) | ADDS(_, _, _) | SUBS(_, _, _) |
-             MULTS(_, _, _) | SMULL(_, _, _, _) | EOR(_, _, _) |
-             RSBS(_, _, _) | funcName(_) =>
-          if (i+1<nodes.size) mutable.HashSet(i+1) else mutable.HashSet() // should I be considering the error functions? maybe later? // funcName?
-        case B(label, _) =>
-          if (stCFG.contains(label)) mutable.HashSet(i+1, stCFG(label)) else mutable.HashSet(i+1) // if label not found, means function is external and it is fine for regs to be overwritten
-        case BL(label, _) =>
-          if (stCFG.contains(label)) mutable.HashSet(i+1, stCFG(label)) else mutable.HashSet(i+1)
-        case _ => mutable.HashSet() // catches EOF
-      })
-    for (s <- nodes(i).succs) {
-      println(s"going to: " + s)
-      succGenerator(s)
+  def succGenerator(): Unit = {
+    // program control flow analysis begins at the first line of code (0) in main
+    // A queue is used instead of recursion to prevent stack overflow on branch-heavy programs
+    val q: mutable.Queue[Int] = mutable.Queue(0)
+    while (q.nonEmpty) {
+      val i = q.dequeue()
+      nodes(i).succs =
+        nodes(i).instruction match {
+          case LDR(_, _, _) | STR(_, _) | PUSH(_) | POP(_) | SUB(_, _, _) |
+               ADD(_, _, _) | MOV(_, _, _) | CMP(_, _) | STRB(_, _) |
+               AND(_, _, _) | ORR(_, _, _) | ADDS(_, _, _) | SUBS(_, _, _) |
+               MULTS(_, _, _) | SMULL(_, _, _, _) | EOR(_, _, _) |
+               RSBS(_, _, _) | funcName(_) =>
+            if (i+1<nodes.size) mutable.HashSet(i+1) else mutable.HashSet() // should I be considering the error functions? maybe later? // funcName?
+          case B(label, _) =>
+            // if label not found, means function is external and it is fine for regs to be overwritten
+            if (stCFG.contains(label)) mutable.HashSet(i+1, stCFG(label)) else mutable.HashSet(i+1)
+          case BL(label, _) =>
+            if (stCFG.contains(label)) mutable.HashSet(i+1, stCFG(label)) else mutable.HashSet(i+1)
+          case _ => mutable.HashSet() // catches EOF, data, etc.
+        }
+      // enqueues only the current node's successors that have not yet been visited
+      nodes(i).succs.filter(nodes(_).succs.isEmpty).foreach(q.enqueue)
     }
   }
-
-
-  //  def buildCFG(code: ListBuffer[Mnemonic]): ListBuffer[CFGNode] = {
-  //    val out = new ListBuffer[CFGNode]
-  //    for ((m, i) <- code.zipWithIndex) { // refactor to be functional?
-  //      out += new CFGNode(i, m, m.uses, m.defs, succs(m))
-  //    }
-  //  }
 }
 
-class CFGNode(val id: Int, val instruction: Mnemonic, var uses: mutable.Set[Register], var defs: mutable.Set[Register], var succs: mutable.Set[Int])
+class CFGNode(val id: Int,
+              val instruction: Mnemonic,
+              var uses: mutable.Set[TempReg],
+              var defs: mutable.Set[TempReg],
+              var succs: mutable.Set[Int])
 
