@@ -29,23 +29,18 @@ object RenamingPass {
   private def rename(program: AstNode, localScope: mutable.Map[String, String], varsInScope: mutable.Map[String, (String,Type)], errors: ListBuffer[String]): AstNode = {
     program match {
       case Program(funcs, stat) =>
-        println("found program")
         val renamedFuncs: ListBuffer[Func] = ListBuffer[Func]()
         for (func <- funcs) {
-          println("inside for loop")
           func match {
              case Func((_type,ident),params,stat) =>
-               println(func)
                val renamedFunc = Func((_type, renameIdent(renameFunc(func), _type, localScope, varsInScope, errors)),params,stat) //this just renames the ident of the func
                renamedFuncs.append(rename(renamedFunc, localScope, varsInScope, errors).asInstanceOf[Func]) //this recursively renames the contents of the function
           }
         }
         //funcs.foreach(renamedFuncs += rename(_, localScope, varsInScope, errors).asInstanceOf[Func])
-        println("about to return")
         Program(renamedFuncs.toList, rename(stat, localScope, varsInScope, errors).asInstanceOf[Stat])
 
       case Func((_type, Ident(ident)), ParamList(params), stat) =>
-        println("found function")
         val newScope = scala.collection.mutable.Map[String, String]()
         val renamedParams: ListBuffer[Param] = ListBuffer()
         for (param <- params) {
@@ -55,10 +50,6 @@ object RenamingPass {
             case _ =>
           }
         }
-        println("about to return function")
-        println(ident)
-        println(varsInScope)
-
         Func((_type, Ident(ident)), ParamList(renamedParams.toList),
           rename(stat, newScope, varsInScope, errors).asInstanceOf[Stat])
 
@@ -180,15 +171,12 @@ object RenamingPass {
           rename(snd, localScope, varsInScope, errors).asInstanceOf[Expr])
 
       case Call(Ident(ident), ArgList(args)) =>
-        println("found call")
         //TODO find a way to work out the type of call. Ie is it being stored
         // in a variable with known type. Without this we cant overload on
         // return type. Ie currently int x(int) and char x(int) are the same
         // function
         val _type = WInt //calculate from call type
-        println(ident)
         val renamedFunc: String = renameFuncCall(_type, ident, args, varsInScope, errors)
-        println(renamedFunc)
 
         if (!varsInScope.contains(renamedFunc)) {
           errors += s"function $ident not defined"
@@ -210,9 +198,7 @@ object RenamingPass {
   private def renameFunc(function: AstNode) : String = {
     function match {
       case Func((_type, Ident(ident)), ParamList(params), _) => renameFuncDecl(_type, ident, params)
-      case _ =>
-        println("THIS SHOULD NOT BE REACHABLE: LINE 214")
-        "!!!"
+      case _ => null //should not be reachable
     }
   }
 
@@ -237,7 +223,6 @@ object RenamingPass {
       //getType(_type) + //add in once call type is known
       "Func")
     for (arg <- args){
-      println("arg: " + arg)
       val t: Type = arg match {
         case Ident(ident) =>
           if (!varsInScope.contains(ident)) {
@@ -246,10 +231,8 @@ object RenamingPass {
           }else {
             varsInScope(ident)._2
           }
-        case _ => checkExprType(arg, arg, errors) //errors are handled in semantic pass so can be ignored here
+        case _ => checkExprType(arg, arg, errors)
       }
-
-      println("# " + t + " #")
 
       sb.append("_" + getType(t))
     }
@@ -267,7 +250,7 @@ object RenamingPass {
         "p@" + getType(fst_type) + "-" + getType(snd_type) + "@"
       //case PairElemType => getType()
       case Pair => "pair?"
-      case _ => "#oops#"
+      case _ => "!ERROR!" //should not be reachable
     }
   }
 
