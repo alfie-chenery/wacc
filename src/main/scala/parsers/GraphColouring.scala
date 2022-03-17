@@ -1,12 +1,13 @@
 package parsers
 
-import parsers.Assembly.{ADD, ADDS, AND, B, BL, CMP, DAscii, DWord, EOR, LDR, LTORG, MOV, MULTS, Mnemonic, ORR, POP, PUSH, RSBS, Register, SMULL, STR, STRB, SUB, SUBS, TempReg, funcName}
+import parsers.Assembly.{ADD, ADDS, AND, B, BL, CMP, DAscii, DWord, EOR, LDR, LTORG, MOV, MULTS, Mnemonic, ORR, POP, PUSH, RSBS, Register, SMULL, STR, STRB, SUB, SUBS, ScratchReg, TempReg, asr, funcName, lsl, regShift, regVal}
 
-import scala.collection.immutable.HashSet
+import scala.collection.immutable.{HashSet, ListMap}
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
 object GraphColouring {
+  // todo: refactor into separate control flow intermediate representation pass
   /**
    * @param code : compiled mnemonic IR assembly with temporary TempRegs
    * @return compiled assembly with allocated TempRegs
@@ -15,7 +16,22 @@ object GraphColouring {
   val nodes: ListBuffer[CFGNode] = new ListBuffer[CFGNode]()
   val stCFG: mutable.HashMap[String, Int] = new mutable.HashMap[String, Int]()
 
-//  def buildCFG(code: ListBuffer[Mnemonic]): ListBuffer[CFGNode] = {
+  def graphColouring(interferes: mutable.Map[TempReg, mutable.Set[TempReg]]): mutable.Map[TempReg, ScratchReg] = {
+    // Uses a greedy approximation algorithm that runs in linear time
+    val tempAllocation: mutable.Map[TempReg, ScratchReg] = mutable.HashMap()
+    val available: List[ScratchReg] = RegisterAllocator.allScratchRegisters
+    for ((tempReg, adj) <- ListMap(interferes.toSeq.sortBy(_._2.size):_*)) { // uses sorted tempRegs by degree
+      var i: Int = 0
+      while (adj.exists(a => if (tempAllocation.contains(a)) tempAllocation(a) == available(i) else false)) {
+        i += 1
+      }
+      tempAllocation(tempReg) = available(i)
+      // todo: spillage..?
+    }
+    tempAllocation
+  }
+
+  //  def buildCFG(code: ListBuffer[Mnemonic]): ListBuffer[CFGNode] = {
   def buildCFG(code: ListBuffer[Mnemonic]): Unit = {
 
     // generates node skeletons
@@ -28,75 +44,72 @@ object GraphColouring {
         case funcName(label) =>
           stCFG(label) = i
           nodes.append(new CFGNode(i, n, new mutable.HashSet[TempReg], new mutable.HashSet[TempReg], new mutable.HashSet[Int]))
-          i+=1
+          i += 1
         case _ =>
           nodes.append(new CFGNode(i, n, new mutable.HashSet[TempReg], new mutable.HashSet[TempReg], new mutable.HashSet[Int]))
-          i+=1
+          i += 1
       }
     }
 
+    def tempReg(s: mutable.HashSet[Any]): mutable.HashSet[TempReg] = s.map {
+      case regVal(r) => r
+      case regShift(r, _, _) => r
+      case asr(r, _) => r
+      case lsl(r, _) => r
+      case r => r
+    }.filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+
+    // todo: refactor into separate function?
     // assign defs and uses for each node
     for (n <- nodes) {
       n.instruction match {
-        case funcName(name) =>
-        case LTORG =>
-        case DWord(size) =>
-        case DAscii(string) =>
-        case LDR(r, o2, suffix) =>
-          n.defs = mutable.HashSet(r).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
-          n.uses = mutable.HashSet(o2).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+        case LDR(r, o2, _) =>
+          n.defs = tempReg(mutable.HashSet(r))
+          n.uses = tempReg(mutable.HashSet(o2))
         case STR(rd, rn) =>
-          n.uses = mutable.HashSet(rd, rn).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+          n.uses = tempReg(mutable.HashSet(rd, rn))
         case PUSH(r) =>
-          n.uses = mutable.HashSet(r).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+          n.uses = tempReg(mutable.HashSet(r))
         case POP(r) =>
-          n.defs = mutable.HashSet(r).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+          n.defs = tempReg(mutable.HashSet(r))
         case SUB(o1, o2, o3) =>
-          // can be rewritten as a match?
-          n.defs = mutable.HashSet(o1).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
-          n.uses = mutable.HashSet(o2, o3).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+          n.defs = tempReg(mutable.HashSet(o1))
+          n.uses = tempReg(mutable.HashSet(o2, o3))
         case ADD(o1, o2, o3) =>
-          n.defs = mutable.HashSet(o1).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
-          n.uses = mutable.HashSet(o2, o3).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
-        case MOV(rd, o2, suffix) =>
-          n.defs = mutable.HashSet(rd).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
-          n.uses = mutable.HashSet(o2).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
-        case BL(label, suffix) =>
+          n.defs = tempReg(mutable.HashSet(o1))
+          n.uses = tempReg(mutable.HashSet(o2, o3))
+        case MOV(rd, o2, _) =>
+          n.defs = tempReg(mutable.HashSet(rd))
+          n.uses = tempReg(mutable.HashSet(o2))
         case CMP(r, o2) =>
-          n.uses = mutable.HashSet(r, o2).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+          n.uses = tempReg(mutable.HashSet(r, o2))
         case STRB(rd, rn) =>
-          n.uses = mutable.HashSet(rd, rn).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+          n.uses = tempReg(mutable.HashSet(rd, rn))
         case AND(rd, rn, rm) =>
-          n.defs = mutable.HashSet(rd).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
-          n.uses = mutable.HashSet(rn, rm).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+          n.defs = tempReg(mutable.HashSet(rd))
+          n.uses = tempReg(mutable.HashSet(rn, rm))
         case ORR(rd, rn, rm) =>
-          n.defs = mutable.HashSet(rd).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
-          n.uses = mutable.HashSet(rn, rm).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+          n.defs = tempReg(mutable.HashSet(rd))
+          n.uses = tempReg(mutable.HashSet(rn, rm))
         case ADDS(rd, rn, rm) =>
-          n.defs = mutable.HashSet(rd).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
-          n.uses = mutable.HashSet(rn, rm).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
-
+          n.defs = tempReg(mutable.HashSet(rd))
+          n.uses = tempReg(mutable.HashSet(rn, rm))
         case SUBS(rd, rn, rm) =>
-          n.defs = mutable.HashSet(rd).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
-          n.uses = mutable.HashSet(rn, rm).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
-
+          n.defs = tempReg(mutable.HashSet(rd))
+          n.uses = tempReg(mutable.HashSet(rn, rm))
         case MULTS(rd, rn, rm) =>
-          n.defs = mutable.HashSet(rd).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
-          n.uses = mutable.HashSet(rn, rm).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
-
+          n.defs = tempReg(mutable.HashSet(rd))
+          n.uses = tempReg(mutable.HashSet(rn, rm))
         case SMULL(rdLo, rdHi, rm, rs) =>
-          n.defs = mutable.HashSet(rdLo, rdHi).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
-          n.uses = mutable.HashSet(rm, rs).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
-
+          n.defs = tempReg(mutable.HashSet(rdLo, rdHi))
+          n.uses = tempReg(mutable.HashSet(rm, rs))
         case EOR(rd, o2, o3) =>
-          n.defs = mutable.HashSet(rd).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
-          n.uses = mutable.HashSet(o2, o3).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
-
+          n.defs = tempReg(mutable.HashSet(rd))
+          n.uses = tempReg(mutable.HashSet(o2, o3))
         case RSBS(rd, o2, o3) =>
-          n.defs = mutable.HashSet(rd).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
-          n.uses = mutable.HashSet(o2, o3).filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
-
-        case B(label, suffix) =>
+          n.defs = tempReg(mutable.HashSet(rd))
+          n.uses = tempReg(mutable.HashSet(o2, o3))
+        case _ =>
       }
     }
 
@@ -113,6 +126,8 @@ object GraphColouring {
     for (n <- nodes) {
       println(List(n.id, n.instruction, n.uses, n.defs, n.succs))
     }
+
+    // todo: Refactor into its own function?
 
     // maps from node (instr.) index to set of livein/liveout regs
     val liveIn: mutable.HashMap[Int, mutable.Set[TempReg]] = new mutable.HashMap[Int, mutable.Set[TempReg]]()
@@ -136,8 +151,26 @@ object GraphColouring {
       }
     } while (prevLiveIn != liveIn && prevLiveOut != liveOut)
 
+    println("liveIn:")
     println(liveIn)
+    println("liveOut:")
     println(liveOut)
+
+    // Interference analysis:
+    val interferes: mutable.Map[TempReg, mutable.Set[TempReg]] = mutable.HashMap[TempReg, mutable.Set[TempReg]]()
+    for (t <- RegisterAllocator.allTempRegisters) {
+      for (n <- nodes) {
+        if (liveOut(n.id).contains(t)) {
+          interferes(t) = liveOut(n.id)
+        }
+      }
+    }
+
+    println("interferes:")
+    println(interferes)
+    val tempAllocation: mutable.Map[TempReg, ScratchReg] = graphColouring(interferes)
+    println("tempAllocation:")
+    println(tempAllocation)
 
   }
 
@@ -154,12 +187,12 @@ object GraphColouring {
                AND(_, _, _) | ORR(_, _, _) | ADDS(_, _, _) | SUBS(_, _, _) |
                MULTS(_, _, _) | SMULL(_, _, _, _) | EOR(_, _, _) |
                RSBS(_, _, _) | funcName(_) =>
-            if (i+1<nodes.size) mutable.HashSet(i+1) else mutable.HashSet() // should I be considering the error functions? maybe later? // funcName?
+            if (i + 1 < nodes.size) mutable.HashSet(i + 1) else mutable.HashSet() // should I be considering the error functions? maybe later? // funcName?
           case B(label, _) =>
             // if label not found, means function is external and it is fine for regs to be overwritten
-            if (stCFG.contains(label)) mutable.HashSet(i+1, stCFG(label)) else mutable.HashSet(i+1)
+            if (stCFG.contains(label)) mutable.HashSet(i + 1, stCFG(label)) else mutable.HashSet(i + 1)
           case BL(label, _) =>
-            if (stCFG.contains(label)) mutable.HashSet(i+1, stCFG(label)) else mutable.HashSet(i+1)
+            if (stCFG.contains(label)) mutable.HashSet(i + 1, stCFG(label)) else mutable.HashSet(i + 1)
           case _ => mutable.HashSet() // catches EOF, data, etc.
         }
       // enqueues only the current node's successors that have not yet been visited
