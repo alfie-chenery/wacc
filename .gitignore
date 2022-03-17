@@ -13,3 +13,5 @@ src/test/scala/parsers/project
 *.jar
 *~
 temp.txt
+.DS_Store
+*/.DS_Store

@@ -826,7 +826,9 @@ object CodeGen{
     // todo: refactor so that optimizations can be performed on the intermediate representation?
     //  perhaps registers are the only objects that need to be redefined, for now... (?)
 
-    GraphColouring.buildCFG(code)
+    val cfg = ControlFlowGraph.buildCFG(code)
+
+    val regMapping: mutable.Map[TempReg, ScratchReg] = LiveAnalysis.liveVariableAnalysis(cfg)
 //    val graphColouredCode: ListBuffer[Mnemonic] = GraphColouring.buildCFG(code)
 
     if (data.nonEmpty) {
