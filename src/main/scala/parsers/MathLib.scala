@@ -9,11 +9,10 @@ class MathLib {
 
   //TODO: remove duplication
 
-  val mathFuncs = List("acos", "asin", "atan", "atan2", "cos", "cosh", "sin", "sinh",
-    "tanh", "exp", "frexp", "ldexp", "log", "log10", "modf", "pow",
+  val mathFuncs = List("cos", "sin", "exp", "frexp", "ldexp", "log", "log10", "modf", "pow",
     "sqrt", "ceil", "fabs", "floor", "fmod")
 
-  def asin(ra: RegisterAllocator): Unit = {
+  def sin(ra: RegisterAllocator): Unit = {
     var r = ra.next
     val condLabel = nextBranchIndex
     val bodyLabel = nextBranchIndex
@@ -23,9 +22,9 @@ class MathLib {
     printString()
     pow(ra)
     fact(ra)
-    if (!labels.contains("asin")){
+    if (!labels.contains("sin")){
       val r = ra.next
-      labels("asin") = List(
+      labels("sin") = List(
         PUSH(LinkReg),
         SUB(SP, SP, imm(12)),
         LDR(r, regShift(SP, 16, update = false), Base),
@@ -104,7 +103,7 @@ class MathLib {
     }
   }
 
-  def acos(ra: RegisterAllocator): Unit ={
+  def cos(ra: RegisterAllocator): Unit ={
     divByZeroError()
     intOverflow()
     runtimeError()
@@ -113,9 +112,9 @@ class MathLib {
     fact(ra)
     val condLabel = nextBranchIndex
     val bodyLabel = nextBranchIndex
-    if (!labels.contains("acos")){
+    if (!labels.contains("cos")){
       val r = ra.next
-      labels("acos") = List(
+      labels("cos") = List(
         PUSH(LinkReg),
         SUB(SP, SP, imm(12)),
         LDR(r, imm(1), Base),
@@ -198,12 +197,12 @@ class MathLib {
     printString()
     runtimeError()
     divByZeroError()
-    acos(ra)
-    asin(ra)
-    if(!labels.contains("atan")){
+    cos(ra)
+    sin(ra)
+    if(!labels.contains("tan")){
       val r = ra.next
       val r1 = ra.next
-      labels("atan") = List(
+      labels("tan") = List(
         PUSH(LinkReg),
         SUB(SP, SP, imm(12)),
         LDR(r, regShift(SP, 16, update = false), Base),

@@ -44,7 +44,9 @@ object Ast {
   sealed trait Type extends AstNode
   sealed trait TypeAtom extends Type
   sealed trait BaseType extends TypeAtom with PairElemType
-  case object WInt extends BaseType with ParserBuilder[BaseType]{val parser: Parsley[WInt.type] = pure(WInt)}
+  sealed trait Number extends BaseType
+  case object WInt extends Number with ParserBuilder[BaseType]{val parser: Parsley[WInt.type] = pure(WInt)}
+  case object WDouble extends Number with ParserBuilder[BaseType]{val parser: Parsley[WDouble.type] = pure(WDouble)}
   case object WBool extends BaseType with ParserBuilder[BaseType]{val parser: Parsley[WBool.type] = pure(WBool)}
   case object WChar extends BaseType with ParserBuilder[BaseType]{val parser: Parsley[WChar.type] = pure(WChar)}
   case object WString extends BaseType with ParserBuilder[BaseType]{val parser: Parsley[WString.type] = pure(WString)}
@@ -55,6 +57,7 @@ object Ast {
 
   sealed trait Expr extends AssignRHS
   case class IntLiter(x: Int) extends Term
+  case class DoubleLiter(x: Double) extends Term
   case class BoolLiter(b: Boolean) extends Term
   case class CharLiter(c: String) extends Term //charLiter stores a string to allow us to deal with escape characters easier
   case class StrLiter(s: String) extends Term

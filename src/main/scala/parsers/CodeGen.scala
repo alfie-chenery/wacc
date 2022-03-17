@@ -104,7 +104,7 @@ object CodeGen{
         variableLocation += (ident -> regVal(SP))
         code += STR(ret, regVal(SP))
         ra.restore()
-      case Decl(WInt, Ident(ident), rhs) =>
+      case Decl(Number, Ident(ident), rhs) =>
         val r = ra.next
         val ret = traverseExpr(rhs, ra, code)
         //if (!ret.isInstanceOf[reg]) code += LDR(r, ret, Base)
