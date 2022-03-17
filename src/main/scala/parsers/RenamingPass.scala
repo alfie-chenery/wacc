@@ -7,27 +7,26 @@ import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
 object RenamingPass {
-
   import parsers.Ast._
 
-  def renameIdent(ident: String, localScope: mutable.Map[String,String], varsInScope: mutable.Map[String, String], errors: ListBuffer[String]): Ident = {
+  def renameIdent(ident: String, _type: Type, localScope: mutable.Map[String,String], varsInScope: mutable.Map[String, (String,Type)], errors: ListBuffer[String]): Ident = {
     if (localScope.contains(ident)) {
       errors += "identifier $ident already declared in the current scope"
     }
     var renamedIdent = ""
     if(varsInScope.contains(ident)) {
-      val splitString = varsInScope(ident).split('$')
+      val splitString = varsInScope(ident)._1.split('$')
       val nextIdentInt = splitString(splitString.length-1).toInt+1
       renamedIdent = ident+"$"+s"$nextIdentInt"
     } else {
       renamedIdent = ident + "$0"
     }
-    varsInScope += (ident -> renamedIdent)
+    varsInScope += (ident -> (renamedIdent, _type))
     localScope += (ident -> renamedIdent)
     Ident(localScope(ident))
   }
 
-  private def rename(program: AstNode, localScope: mutable.Map[String, String], varsInScope: mutable.Map[String, String], errors: ListBuffer[String]): AstNode = {
+  private def rename(program: AstNode, localScope: mutable.Map[String, String], varsInScope: mutable.Map[String, (String,Type)], errors: ListBuffer[String]): AstNode = {
     program match {
       case Program(funcs, stat) =>
         println("found program")
@@ -36,7 +35,8 @@ object RenamingPass {
           println("inside for loop")
           func match {
              case Func((_type,ident),params,stat) =>
-               val renamedFunc = Func((_type, renameIdent(renameFunc(func), localScope, varsInScope, errors)),params,stat) //this just renames the ident of the func
+               println(func)
+               val renamedFunc = Func((_type, renameIdent(renameFunc(func), _type, localScope, varsInScope, errors)),params,stat) //this just renames the ident of the func
                renamedFuncs.append(rename(renamedFunc, localScope, varsInScope, errors).asInstanceOf[Func]) //this recursively renames the contents of the function
           }
         }
@@ -51,11 +51,13 @@ object RenamingPass {
         for (param <- params) {
           param match {
             case Param(_type, Ident(ident)) =>
-              renamedParams += Param(_type, renameIdent(ident, newScope, varsInScope, errors))
+              renamedParams += Param(_type, renameIdent(ident, _type, newScope, varsInScope, errors))
             case _ =>
           }
         }
         println("about to return function")
+        println(ident)
+        println(varsInScope)
 
         Func((_type, Ident(ident)), ParamList(renamedParams.toList),
           rename(stat, newScope, varsInScope, errors).asInstanceOf[Stat])
@@ -63,7 +65,7 @@ object RenamingPass {
       case Decl(_type, Ident(ident), rhs) =>
         // TODO lookup variable to see if it's declared in current scope, if not, add it
         val renamedRhs = rename(rhs, localScope, varsInScope, errors).asInstanceOf[AssignRHS]
-        Decl(_type, renameIdent(ident, localScope, varsInScope, errors), renamedRhs)
+        Decl(_type, renameIdent(ident, _type, localScope, varsInScope, errors), renamedRhs)
 
       case Assign(lhs, rhs) =>
         Assign(rename(lhs, localScope, varsInScope, errors).asInstanceOf[AssignLHS],
@@ -75,7 +77,7 @@ object RenamingPass {
           errors += s"variable $ident not declared"
           null
         }else {
-          Ident(varsInScope(ident))
+          Ident(varsInScope(ident)._1)
         }
 
       case ParensExpr(expr) => ParensExpr(rename(expr, localScope, varsInScope, errors).asInstanceOf[Expr])
@@ -178,25 +180,28 @@ object RenamingPass {
           rename(snd, localScope, varsInScope, errors).asInstanceOf[Expr])
 
       case Call(Ident(ident), ArgList(args)) =>
+        println("found call")
         //TODO find a way to work out the type of call. Ie is it being stored
         // in a variable with known type. Without this we cant overload on
         // return type. Ie currently int x(int) and char x(int) are the same
         // function
-        val _type = null //calculate from call type
+        val _type = WInt //calculate from call type
+        println(ident)
         val renamedFunc: String = renameFuncCall(_type, ident, args)
+        println(renamedFunc)
 
         if (!varsInScope.contains(renamedFunc)) {
           errors += s"function $ident not defined"
         }
         val renamedArgs: ListBuffer[Expr] = ListBuffer()
         args.foreach(renamedArgs += rename(_, localScope, varsInScope, errors).asInstanceOf[Expr])
-        Call(Ident(varsInScope(renamedFunc)), ArgList(renamedArgs.toList))
+        Call(Ident(varsInScope(renamedFunc)._1), ArgList(renamedArgs.toList))
 
       case node: AstNode => node
     }
   }
   def rename(program: Program, errors: ListBuffer[String]): Program = {
-    val variableRenaming: mutable.Map[String, String] = scala.collection.mutable.Map[String, String]()
+    val variableRenaming: mutable.Map[String, (String,Type)] = scala.collection.mutable.Map[String, (String,Type)]()
     val localScope: mutable.Map[String, String] = scala.collection.mutable.Map[String, String]()
     rename(program, localScope, variableRenaming, errors).asInstanceOf[Program]
   }
@@ -232,7 +237,12 @@ object RenamingPass {
       //getType(_type) + //add in once call type is known
       "Func")
     for (arg <- args){
+      println("arg: " + arg)
+
       val t = checkExprType(arg, arg, ListBuffer()) //errors are handled in semantic pass so can be ignored here
+
+      println("# " + t + " #")
+
       sb.append("_" + getType(t))
     }
     sb.toString()
