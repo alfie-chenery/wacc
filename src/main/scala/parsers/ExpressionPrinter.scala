@@ -35,6 +35,7 @@ object ExpressionPrinter {
       case FstPair(fst) => "fst " + prettyPrint(fst)
       case SndPair(snd) => "snd " + prettyPrint(snd)
       case WInt => "int"
+      case WFloat => "float"
       case WBool => "bool"
       case WChar => "char"
       case WString => "string"

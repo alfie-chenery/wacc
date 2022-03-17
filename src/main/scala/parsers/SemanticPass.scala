@@ -209,13 +209,21 @@ object SemanticPass {
     }
   }
 
+  def toFloat(ints: (Int, Int)): Float ={
+    val fst: Int = ints._1
+    val snd: Int = ints._2
+    val div = scala.math.pow(10, snd.toString.length)
+    val fraction = snd / div
+    (fst + fraction.toFloat)
+  }
+
   def checkExprType(expr: AstNode, node:AstNode, errors: ListBuffer[String]): Type = {
     expr match {
       case IntLiter(_) => WInt
       case BoolLiter(_) => WBool
       case CharLiter(_) => WChar
       case StrLiter(_) => WString
-      // TODO check this
+      case FloatLiter(_) => WFloat
       case PairLiter => null
       case ident:Ident =>
         if(st.contains(ident)){
@@ -250,28 +258,28 @@ object SemanticPass {
       case Greater(x, y) =>
         val x_type = checkExprType(x, node, errors)
         val y_type = checkExprType(y, node, errors)
-        if (!((x_type == WInt && y_type == WInt) || (x_type == WChar && y_type == WChar))) {
+        if (!((x_type == WInt && y_type == WInt) || (x_type == WChar && y_type == WChar) || (x_type == WFloat && y_type == WFloat))) {
           errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: int and int OR char and char, actual: " + prettyPrint(x_type) + " and " + prettyPrint(y_type))
         }
         WBool
       case GreaterEq(x, y) =>
         val x_type = checkExprType(x, node, errors)
         val y_type = checkExprType(y, node, errors)
-        if (!((x_type == WInt && y_type == WInt) || (x_type == WChar && y_type == WChar))) {
+        if (!((x_type == WInt && y_type == WInt) || (x_type == WChar && y_type == WChar) || (x_type == WFloat && y_type == WFloat))) {
           errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: int and int OR char and char, actual: " + prettyPrint(x_type) + " and " + prettyPrint(y_type))
         }
         WBool
       case Less(x, y) =>
         val x_type = checkExprType(x, node, errors)
         val y_type = checkExprType(y, node, errors)
-        if (!((x_type == WInt && y_type == WInt) || (x_type == WChar && y_type == WChar))) {
+        if (!((x_type == WInt && y_type == WInt) || (x_type == WChar && y_type == WChar) || (x_type == WFloat && y_type == WFloat))) {
           errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: int and int OR char and char, actual: " + prettyPrint(x_type) + " and " + prettyPrint(y_type))
         }
         WBool
       case LessEq(x, y) =>
         val x_type = checkExprType(x, node, errors)
         val y_type = checkExprType(y, node, errors)
-        if (!((x_type == WInt && y_type == WInt) || (x_type == WChar && y_type == WChar))) {
+        if (!((x_type == WInt && y_type == WInt) || (x_type == WChar && y_type == WChar) || (x_type == WFloat && y_type == WFloat))) {
           errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: int and int OR char and char, actual: " + prettyPrint(x_type) + " and " + prettyPrint(y_type))
         }
         WBool
@@ -292,7 +300,7 @@ object SemanticPass {
       case intBinary(x, y) =>
         val t: Type = checkExprType(x, node, errors)
         val t1: Type = checkExprType(y, node, errors)
-        if(!(t == WInt && t1 == WInt)){
+        if(!((t == WInt && t1 == WInt) || (t == WFloat && t1 == WFloat))){
           errors += ("Semantic error detected: Incompatible type at " + prettyPrint(node) + ". Expected: int and int, actual: " + prettyPrint(t) + " and " + prettyPrint(t1))
         }
         WInt

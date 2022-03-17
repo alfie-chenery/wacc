@@ -2,7 +2,7 @@ package parsers
 
 import parsley.Parsley._
 import parsley.character.{digit, noneOf, satisfy}
-import parsley.combinator.{sepBy, sepBy1}
+import parsley.combinator.{many, sepBy, sepBy1}
 import parsley.{Parsley, Result}
 
 import java.io.File
@@ -37,12 +37,16 @@ object lexer {
   private [parsers] val INT_LITER: Parsley[Int] = NEG_INT_LITER <|> token(optional("+") ~> digit
     .foldLeft1(0: Long)((x, d) => x * 10 + d.asDigit))
     .filter(l => l <= Int.MaxValue).map(_.toInt)
+  private [parsers] val FLOAT_START: Parsley[Int] = INT_LITER <~ token('.')
+  private [parsers] val FLOAT_END: Parsley[Int] = (token('.') ~> INT_LITER)
+  private [parsers] val FLOAT_LITER: Parsley[(Int, Int)] = FLOAT_START <~> FLOAT_END
   private [parsers] val BOOL_LITER: Parsley[Boolean] =
     (token("true") #> true) <|> (token("false") #> false)
   private [parsers] val ESC_CHAR: Parsley[String] = {
     '\\' ~> (('0' #> "\\u0000") <|> ('b' #> "\\b") <|> ('t' #> "\\t") <|> ('n' #> "\\n") <|>
       ('f' #> "\\f") <|> ('r' #> "\\r") <|> ('\"' #> "\\\"") <|> ('\'' #> "\\\'") <|> ('\\' #> "\\\\"))
   }
+
   private [parsers] val CHAR: Parsley[String] = ESC_CHAR <|> noneOf('\\', '\'', '\"').map(_.toString)
   private [parsers] val CHAR_LITER: Parsley[String] = token('\'' ~> CHAR <~ '\'')
   private [parsers] val STR_LITER: Parsley[String] = token('\"' ~> manyUntil(CHAR, '\"').map(_.mkString))
@@ -108,7 +112,7 @@ object Parser {
     chain.postfix1(`<type-atoms>`, '[' ~> ']' #> ((_type: Type) => ArrayType(_type)))
 
   private [parsers] lazy val `<base-type>`: Parsley[BaseType] =
-    (WInt <# "int") <|> (WBool <# "bool") <|> (WChar <# "char") <|> (WString <# "string")
+    (WInt <# "int") <|> (WBool <# "bool") <|> (WChar <# "char") <|> (WString <# "string") <|> (WFloat <# "float")
 
   private [parsers] lazy val `<type>`: Parsley[Type] = `<array-type>`
   private [parsers] lazy val `<type-atoms>`: Parsley[TypeAtom] = `<base-type>` <|> `<pair-type>`

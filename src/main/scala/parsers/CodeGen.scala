@@ -1,17 +1,16 @@
 package parsers
 
-import parsers.SemanticPass.{checkExprType, checkType, st}
+import parsers.SemanticPass.{checkExprType, st}
 import parsers.preDefinedFuncs._
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
 object CodeGen{
-  /**
-   * Code Generation pass
-   */
-   import parsers.Ast._
-   import parsers.Assembly._
+
+  import parsers.Assembly._
+  import parsers.Ast._
+  import parsers.MathLib._
 
   // each of these maps represent a section of the output code that can be appended to
   // linkedHashMaps, since data and labels should follow a specific order
@@ -19,9 +18,8 @@ object CodeGen{
   val labels = new mutable.LinkedHashMap[String, List[Mnemonic]]
   val variableLocation = new mutable.LinkedHashMap[String, Register]
   var currentShift = 0
-  val mathFuncs = List("acos", "asin", "atan", "atan2", "cos", "cosh", "sin", "sinh",
-                        "tanh", "exp", "frexp", "ldexp", "log", "log10", "modf", "pow",
-                        "sqrt", "ceil", "fabs", "floor", "fmod")
+
+  val mathFuncs = List("sin", "cos", "tan", "pow", "fact", "fabs")
 
   /** Returns the next available 'msg' index in data */
   def getDataMsgIndex: Int = {
@@ -90,7 +88,7 @@ object CodeGen{
         code += LTORG
 
       // <Stat>
-      case Decl(PairType(t1, t2), Ident(ident), expr) =>
+      case Decl(PairType(_, _), Ident(ident), expr) =>
         // TODO this location probably needs to be changed
         currentShift -= 4
         val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, update = false)
@@ -98,7 +96,7 @@ object CodeGen{
         val reg1 = traverseExpr(expr, ra, code)
         code += STR(reg1, location)
         ra.restore()
-      case Decl(ArrayType(_type), Ident(ident), ArrayLiter(exprs)) =>
+      case Decl(ArrayType(_), Ident(ident), ArrayLiter(exprs)) =>
         val ret = traverseExpr(ArrayLiter(exprs), ra, code)
         variableLocation += (ident -> regVal(SP))
         code += STR(ret, regVal(SP))
@@ -163,7 +161,6 @@ object CodeGen{
         ra.restore()
 
       case Free(expr) =>
-        val r = ra.next
         code += MOV(RetReg, traverseExpr(expr, ra, code), Base)
         val free_msg: String = s"msg_$getDataMsgIndex"
         // TODO This should probably call check null pointer
@@ -384,19 +381,19 @@ object CodeGen{
         ra.next
       case CharLiter(c) =>
         // todo: is this the correct solution or does it only solve one case?
-        val _c = if (c=="\\u0000") imm(0) else immc(c)
+        val _c = if (c == "\\u0000") imm(0) else immc(c)
         code += MOV(ra.next, _c, Base)
         ra.next
       case StrLiter(s) =>
         val int_msg = s"msg_$getDataMsgIndex"
-        data(int_msg) = List(DWord(s.replace("\\","").length), DAscii(s))
+        data(int_msg) = List(DWord(s.replace("\\", "").length), DAscii(s))
         code += LDR(ra.next, label(int_msg), Base)
         ra.next
       case ArrayLiter(exprs) =>
         val _type = checkExprType(exprs.head, exprs.head, new ListBuffer[String])
         code += LDR(RetReg, imm(exprs.length * typeSize(_type) + 4), Base)
         code += BL("malloc", Base)
-        val reg1 =ra.nextRm
+        val reg1 = ra.nextRm
         code += MOV(reg1, RetReg, Base)
         var location = 4
         for (expr <- exprs) {
@@ -443,7 +440,7 @@ object CodeGen{
         code += BL("malloc", Base)
         code += STR(fstReg, regVal(RetReg))
         code += STR(RetReg, regVal(reg1))
-        val sndReg = traverseExpr(snd, ra, code)
+        traverseExpr(snd, ra, code)
         code += LDR(RetReg, imm(typeSize(checkExprType(snd, snd, new ListBuffer[String]))), Base)
         code += BL("malloc", Base)
         // TODO this should be STRB for chars
@@ -504,17 +501,28 @@ object CodeGen{
         regVal(arrLoc)
       case ParensExpr(expr) => traverseExpr(expr, ra, code)
       case Call(Ident(name), ArgList(args)) =>
-        var totalSize = 0
-        for (arg <- args) {
-          val size = typeSize(checkExprType(arg, arg, new ListBuffer[String]))
-          totalSize += size
-          val reg = traverseExpr(arg, ra, code)
-          if (size == 4) code += STR(reg, regShift(SP, -size, update = true))
-          else code += STRB(reg, regShift(SP, -size, update = true))
+        if (!mathFuncs.contains(name)) {
+          var totalSize = 0
+          for (arg <- args) {
+            val size = typeSize(checkExprType(arg, arg, new ListBuffer[String]))
+            totalSize += size
+            val reg = traverseExpr(arg, ra, code)
+            if (size == 4) code += STR(reg, regShift(SP, -size, update = true))
+            else code += STRB(reg, regShift(SP, -size, update = true))
+          }
+          code += BL(name, Base)
+          if (totalSize > 0) code += ADD(SP, SP, imm(totalSize))
+          code += MOV(ra.next, RetReg, Base)
+        }else{
+          name match {
+            case "sin" => sin(ra)
+            case "cos" => cos(ra)
+            case "tan" => tan(ra)
+            case "pow" => pow(ra)
+            case "fact" => fact(ra)
+            case "fabs" => fabs(ra)
+          }
         }
-        code += BL(name, Base)
-        if (totalSize > 0) code += ADD(SP, SP, imm(totalSize))
-        code += MOV(ra.next, RetReg, Base)
         RetReg
 
       case And(expr1, expr2) =>
@@ -634,14 +642,16 @@ object CodeGen{
        * the stack and the register freed for use when computing expr2.
        */
       case Plus(expr1, expr2) =>
+        checkExprType(expr1, node, new ListBuffer[String])
+        checkExprType(expr2, node, new ListBuffer[String])
         var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
-
+        ra.next
         if (spill) {
           res1 = ra.getAvailable(1)
           code += POP(res1)
-          code += ADDS(res2, res1, res2)
+          code += FADDS(res2, res1, res2)
         } else { // needs separate ADD cases, since the res1 or res2 will be the lower register address depending on whether we're in a spill state
-          code += ADDS(res1, res1, res2)
+          code += FADDS(res1, res1, res2)
         }
         intOverflow()
         code += BL("p_throw_overflow_error", VS)
@@ -783,11 +793,7 @@ object CodeGen{
      * The main case in traverse should ensure reg1 and reg2 store the correct
      * values before calling this function
      *
-     *@param suffix1  : The suffix of the positive branch of the compare.
-     *                For example, when pattern matching a Greater than comparison, suffix1 should be GT
-     *                Since this function should only be called in comparison cases, for suffix1 in {Base,CS,SB,VS}
-     *                the output is undefined
-     */
+     * */
     var suffix2: Suffix = null
     suffix1 match {
       case GT => suffix2 = LE
@@ -842,6 +848,7 @@ object CodeGen{
   def typeSize(_type: Type): Int = {
     _type match {
       case WInt => 4
+      case WFloat => 4
       case WBool => 1
       case WChar => 1
       case WString => 4

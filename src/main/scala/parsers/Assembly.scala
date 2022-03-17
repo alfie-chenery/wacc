@@ -53,6 +53,9 @@ object Assembly {
   case class ADD(o1: Operand, o2: Operand, o3: Operand) extends Mnemonic {
     override def toString: String = "ADD " + o1.toString + ", " + o2.toString + ", " + o3.toString
   }
+  case class FADDS(rd: Register, rn: Register, rm: Register) extends Mnemonic{
+    override def toString: String = "FADDS" + rd.toString + ", " + rn.toString + ", " + rn.toString
+  }
   case class MOV(rd: Register, o2: Operand, suffix: Suffix) extends Mnemonic {
     override def toString: String = "MOV" + suffix.toString + " " + rd.toString + ", " + o2.toString
   }
@@ -94,6 +97,9 @@ object Assembly {
   }
   case class B(label: String, suffix: Suffix) extends Mnemonic {
     override def toString: String = "B" + suffix.toString + " " + label
+  }
+  case class FUITO(r: Register, i: imm) extends Mnemonic {
+    override def toString: String = "FUITO" + r.toString + ", " + i.toString
   }
 
   sealed trait Operand

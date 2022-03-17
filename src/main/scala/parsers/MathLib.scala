@@ -5,12 +5,7 @@ import parsers.Assembly._
 import parsers.RegisterAllocator._
 import parsers.preDefinedFuncs._
 
-class MathLib {
-
-  //TODO: remove duplication
-
-  val mathFuncs = List("cos", "sin", "exp", "frexp", "ldexp", "log", "log10", "modf", "pow",
-    "sqrt", "ceil", "fabs", "floor", "fmod")
+object MathLib {
 
   def sin(ra: RegisterAllocator): Unit = {
     var r = ra.next
@@ -193,7 +188,7 @@ class MathLib {
     }
   }
 
-  def atan(ra:RegisterAllocator): Unit ={
+  def tan(ra:RegisterAllocator): Unit ={
     printString()
     runtimeError()
     divByZeroError()
