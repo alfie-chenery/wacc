@@ -1,47 +1,47 @@
 package parsers
 
-import parsers.Assembly.{ADD, ADDS, AND, B, BL, CMP, DAscii, DWord, EOR, LDR, LTORG, MOV, MULTS, Mnemonic, ORR, POP, PUSH, RSBS, SMULL, STR, STRB, SUB, SUBS, TempReg, asr, funcName, lsl, regShift, regVal}
-//import parsers.LiveAnalysis.{nodes, stCFG}
+import parsers.Assembly._
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
-object ControlFlowGraph {
+case class CFGNode(val id: Int,
+              var instruction: Mnemonic,
+              var succs: mutable.Set[Int]) {
+  override def toString: String = s"CFGNode($id, $instruction, $succs)"
+}
+
+class ControlFlowGraph(val code: ListBuffer[Mnemonic]) {
 
   val nodes: ListBuffer[CFGNode] = new ListBuffer[CFGNode]()
+
   private val stCFG: mutable.HashMap[String, Int] = new mutable.HashMap[String, Int]()
 
-  class CFGNode(val id: Int,
-                val instruction: Mnemonic,
-                var succs: mutable.Set[Int])
 
-  def buildCFG(code: ListBuffer[Mnemonic]): ListBuffer[CFGNode] = {
+//  def buildCFG(code: ListBuffer[Mnemonic]): ListBuffer[CFGNode] = {
 
-    // generates node skeletons
-    var i = 0
-    for (n <- code) { // refactor to be functional?
-      n match {
-        case LTORG =>
-        case DWord(_) =>
-        case DAscii(_) =>
-        case funcName(label) =>
-          stCFG(label) = i
-          nodes.append(new CFGNode(i, n, new mutable.HashSet[Int]))
-          i += 1
-        case _ =>
-          nodes.append(new CFGNode(i, n, new mutable.HashSet[Int]))
-          i += 1
-      }
+  // generates node skeletons
+  code.zipWithIndex.foreach{ case (n, i) =>
+    n match {
+      case funcName(label) =>
+        stCFG(label) = i
+      case _ =>
     }
+    nodes.append(new CFGNode(i, n, new mutable.HashSet[Int]))
+  }
 
-    // MID: now 'nodes' should be populated (in order) with every instruction in the .text section.
-    //  We should then be able to start at the beginning of code and follow the flow of execution
+  // MID: now 'nodes' should be populated (in order) with every instruction in the .text section.
+  //  We should then be able to start at the beginning of code and follow the flow of execution
 
-    succGenerator(nodes)
+  succGenerator(nodes)
 
-    // MID: all nodes should now have appropriate succ values
+  // MID: all nodes should now have appropriate succ values
 
-    nodes
+
+  override def toString: String = toAssembly.toString()
+
+  def toAssembly: ListBuffer[Mnemonic] = {
+    nodes.map(c => c.instruction)
   }
 
   def succGenerator(nodes: ListBuffer[CFGNode]): Unit = {
@@ -69,4 +69,5 @@ object ControlFlowGraph {
       nodes(i).succs.filter(nodes(_).succs.isEmpty).foreach(q.enqueue)
     }
   }
+
 }

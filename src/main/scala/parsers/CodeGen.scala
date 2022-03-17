@@ -1,6 +1,6 @@
 package parsers
 
-import parsers.SemanticPass.{checkExprType, checkType, st}
+import parsers.SemanticPass.{checkExprType, st}
 import parsers.preDefinedFuncs._
 
 import scala.collection.mutable
@@ -10,8 +10,8 @@ object CodeGen{
   /**
    * Code Generation pass
    */
-   import parsers.Ast._
    import parsers.Assembly._
+   import parsers.Ast._
 
   // each of these maps represent a section of the output code that can be appended to
   // linkedHashMaps, since data and labels should follow a specific order
@@ -818,7 +818,7 @@ object CodeGen{
 
   def compile(node: AstNode, ra: RegisterAllocator = new RegisterAllocator()): String = {
     val sb = new StringBuilder()
-    val code: ListBuffer[Mnemonic] = ListBuffer()
+    var code: ListBuffer[Mnemonic] = ListBuffer()
     traverse(node, ra, code)
     // todo: refactor compilation so that a file is created and written to (without a sb)
     //  and the file is deleted if an error is detected
@@ -826,13 +826,17 @@ object CodeGen{
     // todo: refactor so that optimizations can be performed on the intermediate representation?
     //  perhaps registers are the only objects that need to be redefined, for now... (?)
 
-    val cfg = ControlFlowGraph.buildCFG(code)
+    // CFG optimisations operate only on main program, not data or helper functions
+    val cfg = new ControlFlowGraph(code)
+//    println(s"Original CFG: $cfg")
+    // replaces all TempRegs with ScratchRegs in the code according to regMapping
+    LiveAnalysis.liveVariableAnalysis(cfg)
+//    println(s"CFG after live variable analysis: $cfg")
 
-    val regMapping: mutable.Map[TempReg, ScratchReg] = LiveAnalysis.liveVariableAnalysis(cfg)
-//    val graphColouredCode: ListBuffer[Mnemonic] = GraphColouring.buildCFG(code)
+    code = cfg.toAssembly
 
     if (data.nonEmpty) {
-      sb.append(".data\n\n") // why are these not added as mnemonic labels for consistency?
+      sb.append(".data\n\n") // todo: could these not be added as mnemonic labels for consistency?
       for ((k, body) <- data) {
         sb.append("\n" + k + ":\n\t")
         for (line <- body) {
