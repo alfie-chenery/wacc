@@ -187,7 +187,7 @@ object RenamingPass {
         // function
         val _type = WInt //calculate from call type
         println(ident)
-        val renamedFunc: String = renameFuncCall(_type, ident, args)
+        val renamedFunc: String = renameFuncCall(_type, ident, args, varsInScope, errors)
         println(renamedFunc)
 
         if (!varsInScope.contains(renamedFunc)) {
@@ -211,7 +211,7 @@ object RenamingPass {
     function match {
       case Func((_type, Ident(ident)), ParamList(params), _) => renameFuncDecl(_type, ident, params)
       case _ =>
-        println("THIS SHOULD NOT BE REACHABLE: LINE 203")
+        println("THIS SHOULD NOT BE REACHABLE: LINE 214")
         "!!!"
     }
   }
@@ -231,15 +231,23 @@ object RenamingPass {
     sb.toString()
   }
 
-  private def renameFuncCall(_type: Type, ident: String, args: List[Expr]): String = {
+  private def renameFuncCall(_type: Type, ident: String, args: List[Expr], varsInScope: mutable.Map[String, (String,Type)], errors: ListBuffer[String]): String = {
     val sb = new StringBuilder()
     sb.append(ident + "$" +
       //getType(_type) + //add in once call type is known
       "Func")
     for (arg <- args){
       println("arg: " + arg)
-
-      val t = checkExprType(arg, arg, ListBuffer()) //errors are handled in semantic pass so can be ignored here
+      val t: Type = arg match {
+        case Ident(ident) =>
+          if (!varsInScope.contains(ident)) {
+            errors += s"variable $ident not declared"
+            return null
+          }else {
+            varsInScope(ident)._2
+          }
+        case _ => checkExprType(arg, arg, errors) //errors are handled in semantic pass so can be ignored here
+      }
 
       println("# " + t + " #")
 
