@@ -19,7 +19,7 @@ object MathLib {
     runtimeError()
     printString()
     //todo: correct expr pass
-    pow(ra, va, expr, code)
+    //pow(ra, va, expr, code)
     fact(ra, va, expr, code)
     if (!labels.contains("sin")){
       val r = traverseExpr(expr, ra, va, code)
@@ -108,7 +108,7 @@ object MathLib {
     runtimeError()
     printString()
     //todo: correct expr pass
-    pow(ra, va, expr, code)
+    //pow(ra, va, expr, code)
     fact(ra, va, expr, code)
     val condLabel = nextBranchIndex
     val bodyLabel = nextBranchIndex

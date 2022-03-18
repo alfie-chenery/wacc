@@ -516,12 +516,12 @@ object CodeGen{
         }else{
           name match {
             case "sin" => sin(ra, va, args.head, code)
-            case "cos" => cos(ra)
-            case "tan" => tan(ra)
-            case "pow" => pow(ra)
-            case "fact" => fact(ra)
-            case "fabs" => fabs(ra)
-            case "sqrt" => sqrt(ra)
+            case "cos" => cos(ra, va, args.head, code)
+            case "tan" => tan(ra, va, args.head, code)
+            case "pow" => pow(ra, va, args.head, args(2), code)
+            case "fact" => fact(ra, va, args.head, code)
+            case "fabs" => fabs(ra, va, args.head, code)
+            case "sqrt" => sqrt(ra, va, args.head, code)
           }
         }
         RetReg
