@@ -1,6 +1,6 @@
 package parsers
 
-import parsers.SemanticPass.{checkExprType, checkType, st}
+import parsers.SemanticPass.{checkExprType, st}
 import parsers.preDefinedFuncs._
 
 import scala.collection.mutable
@@ -10,8 +10,8 @@ object CodeGen{
   /**
    * Code Generation pass
    */
-   import parsers.Ast._
    import parsers.Assembly._
+   import parsers.Ast._
 
   // each of these maps represent a section of the output code that can be appended to
   // linkedHashMaps, since data and labels should follow a specific order
@@ -42,6 +42,7 @@ object CodeGen{
   }
 
   def traverse(node: AstNode, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Unit = {
+    // todo: refactor so that cases have their own separate functions
     node match {
       case Program(funcs, stat) =>
         for (func <- funcs) {
@@ -94,8 +95,8 @@ object CodeGen{
         currentShift -= 4
         val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, update = false)
         variableLocation += (ident -> location)
-        val reg1 = traverseExpr(expr, ra, code)
-        code += STR(reg1, location)
+        val r1 = traverseExpr(expr, ra, code)
+        code += STR(r1, location)
         ra.restore()
       case Decl(ArrayType(_type), Ident(ident), ArrayLiter(exprs)) =>
         val ret = traverseExpr(ArrayLiter(exprs), ra, code)
@@ -221,8 +222,8 @@ object CodeGen{
                   CMP(RetReg, imm(0)),
                   LDR(RetReg, label(neg_index_msg), LT),
                   BL("p_throw_runtime_error", LT),
-                  LDR(reg(1), reg(1), Base),
-                  CMP(RetReg, reg(1)),
+                  LDR(reg1, reg1, Base),
+                  CMP(RetReg, reg1),
                   LDR(RetReg, label(free_msg), CS),
                   BL("p_throw_runtime_error", CS),
                   POP(PC)
@@ -254,7 +255,7 @@ object CodeGen{
           }
           labels(t) =
             List(PUSH(LinkReg),
-              MOV(reg(1), RetReg, Base),
+              MOV(reg1, RetReg, Base),
               LDR(RetReg, label(read_msg), Base),
               ADD(RetReg, RetReg, imm(4)),
               BL("scanf", Base),
@@ -277,24 +278,24 @@ object CodeGen{
         SemanticPass.checkExprType(expr, expr, new ListBuffer[String]) match {
           case WString =>
             printString()
-            if (!ret.isInstanceOf[reg]) code += LDR(ra.next, ret, SB)
+            if (!ret.isInstanceOf[TempReg]) code += LDR(ra.next, ret, SB)
             code += MOV(RetReg, ra.next, Base)
             code += BL("p_print_string", Base)
 
           case WBool =>
             printBool()
-            if (!ret.isInstanceOf[reg]) code += LDR(ra.next, ret, SB)
+            if (!ret.isInstanceOf[TempReg]) code += LDR(ra.next, ret, SB)
             code += MOV(RetReg, ra.next, Base)
             code += BL("p_print_bool", Base)
 
           case WInt =>
             printInt()
-            if (!ret.isInstanceOf[reg]) code += LDR(ra.next, ret, SB)
+            if (!ret.isInstanceOf[TempReg]) code += LDR(ra.next, ret, SB)
             code += MOV(RetReg, ra.next, Base)
             code += BL("p_print_int", Base)
 
           case WChar =>
-            if (!ret.isInstanceOf[reg]) code += LDR(ra.next, ret, Base)
+            if (!ret.isInstanceOf[TempReg]) code += LDR(ra.next, ret, Base)
             code += MOV(RetReg, ra.next, Base)
             code += BL("putchar", Base)
 
@@ -308,7 +309,7 @@ object CodeGen{
             } else {
               //printing an array variable prints its address
               printReference()
-              if (!ret.isInstanceOf[reg]) code += LDR(ra.next, ret, SB)
+              if (!ret.isInstanceOf[TempReg]) code += LDR(ra.next, ret, SB)
               code += MOV(RetReg, ra.next, Base)
               code += BL("p_print_reference", Base)
             }
@@ -403,18 +404,18 @@ object CodeGen{
         val _type = checkExprType(exprs.head, exprs.head, new ListBuffer[String])
         code += LDR(RetReg, imm(exprs.length * typeSize(_type) + 4), Base)
         code += BL("malloc", Base)
-        val reg1 =ra.nextRm
-        code += MOV(reg1, RetReg, Base)
+        val r1 = ra.nextRm
+        code += MOV(r1, RetReg, Base)
         var location = 4
         for (expr <- exprs) {
           val ret = traverseExpr(expr, ra, code)
-          code += STR(ret, regShift(reg1, location, update = false))
+          code += STR(ret, regShift(r1, location, update = false))
           location += typeSize(_type)
         }
         code += LDR(ra.next, imm(exprs.size), Base)
-        code += STR(ra.next, regVal(reg1))
+        code += STR(ra.next, regVal(r1))
         ra.restore()
-        reg1
+        r1
       case PairLiter =>
         code += LDR(ra.next, imm(0), Base)
         ra.next
@@ -444,19 +445,19 @@ object CodeGen{
         code += LDR(RetReg, imm(8), Base)
         code += BL("malloc", Base)
         code += MOV(ra.next, RetReg, Base)
-        val reg1 = ra.nextRm
+        val r1 = ra.nextRm
         val fstReg = traverseExpr(fst, ra, code)
         code += LDR(RetReg, imm(typeSize(checkExprType(fst, fst, new ListBuffer[String]))), Base)
         code += BL("malloc", Base)
         code += STR(fstReg, regVal(RetReg))
-        code += STR(RetReg, regVal(reg1))
+        code += STR(RetReg, regVal(r1))
         val sndReg = traverseExpr(snd, ra, code)
         code += LDR(RetReg, imm(typeSize(checkExprType(snd, snd, new ListBuffer[String]))), Base)
         code += BL("malloc", Base)
         // TODO this should be STRB for chars
         code += STR(ra.next, regVal(RetReg))
-        code += STR(RetReg, regShift(reg1, 4, update = false))
-        reg1
+        code += STR(RetReg, regShift(r1, 4, update = false))
+        r1
       case Ident(x) =>
         // TODO this will probably need to change when pairs and arrays are implemented
         if (typeSize(st(Ident(x))._2) == 4) code += LDR(ra.next, variableLocation(x), Base)
@@ -488,8 +489,8 @@ object CodeGen{
               CMP(RetReg, imm(0)),
               LDR(RetReg, label(negMessage), LT),
               BL("p_throw_runtime_error", LT),
-              LDR(reg(1), regVal(reg(1)), Base),
-              CMP(RetReg, reg(1)),
+              LDR(reg1, regVal(reg1), Base),
+              CMP(RetReg, reg1),
               LDR(RetReg, label(largeMessage), CS),
               BL("p_throw_runtime_error", CS),
               POP(PC)
@@ -499,7 +500,7 @@ object CodeGen{
           val ret = traverseExpr(elem, ra, code)
           code += LDR(arrLoc, regVal(arrLoc), Base)
           code += MOV(RetReg, ret, Base)
-          code += MOV(reg(1), arrLoc, Base)
+          code += MOV(reg1, arrLoc, Base)
           // TODO this constants should probably changed based on the size of the things in the array
           code += BL("p_check_array_bounds", Base)
           code += ADD(arrLoc, arrLoc, imm(4))
@@ -525,7 +526,7 @@ object CodeGen{
         RetReg
 
       case And(expr1, expr2) =>
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
@@ -535,11 +536,11 @@ object CodeGen{
           code += AND(res1, res1, res2)
         }
         ra.restore()
-        reg1
+        r1
 
       // TODO factor out repeated code
       case Or(expr1, expr2) =>
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
@@ -549,87 +550,87 @@ object CodeGen{
           code += ORR(res1, res1, res2)
         }
         ra.restore()
-        reg1
+        r1
 
-        // TODO check if reg1 should be moved with LDR or LDRSB
+        // TODO check if r1 should be moved with LDR or LDRSB
       case Greater(expr1, expr2) =>
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
           code += POP(res1)
           phonyCaseCompare(code, GT, res1, res2)
         } else {
-          phonyCaseCompare(code, GT, reg1, ra.next)
+          phonyCaseCompare(code, GT, r1, ra.next)
         }
         ra.restore()
-        reg1
+        r1
 
 
       case GreaterEq(expr1, expr2) =>
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
           code += POP(res1)
           phonyCaseCompare(code, GE, res1, res2)
         } else {
-          phonyCaseCompare(code, GE, reg1, ra.next)
+          phonyCaseCompare(code, GE, r1, ra.next)
         }
         ra.restore()
-        reg1
+        r1
 
       case Less(expr1, expr2) =>
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
           code += POP(res1)
           phonyCaseCompare(code, LT, res1, res2)
         } else {
-          phonyCaseCompare(code, LT, reg1, ra.next)
+          phonyCaseCompare(code, LT, r1, ra.next)
         }
         ra.restore()
-        reg1
+        r1
 
       case LessEq(expr1, expr2) =>
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
           code += POP(res1)
           phonyCaseCompare(code, LE, res1, res2)
         } else {
-          phonyCaseCompare(code, LE, reg1, ra.next)
+          phonyCaseCompare(code, LE, r1, ra.next)
         }
         ra.restore()
-        reg1
+        r1
 
       case Eq(expr1, expr2) =>
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
           code += POP(res1)
           phonyCaseCompare(code, EQ, res1, res2)
         } else {
-          phonyCaseCompare(code, EQ, reg1, res2)
+          phonyCaseCompare(code, EQ, r1, res2)
         }
         ra.restore()
-        reg1
+        r1
 
       case NotEq(expr1, expr2) =>
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
           code += POP(res1)
           phonyCaseCompare(code, NE, res1, res2)
         } else {
-          phonyCaseCompare(code, NE, reg1, ra.next)
+          phonyCaseCompare(code, NE, r1, ra.next)
         }
         ra.restore()
-        reg1
+        r1
 
 
       /**
@@ -641,7 +642,7 @@ object CodeGen{
        * the stack and the register freed for use when computing expr2.
        */
       case Plus(expr1, expr2) =>
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
@@ -653,10 +654,10 @@ object CodeGen{
         intOverflow()
         code += BL("p_throw_overflow_error", VS)
         ra.restore()
-        reg1
+        r1
 
       case Minus(expr1, expr2) =>
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
@@ -668,10 +669,10 @@ object CodeGen{
         intOverflow()
         code += BL("p_throw_overflow_error", VS)
         ra.restore()
-        reg1
+        r1
 
       case Mult(expr1, expr2) =>
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
@@ -685,57 +686,57 @@ object CodeGen{
         intOverflow()
         code += BL("p_throw_overflow_error", NE)
         ra.restore()
-        reg1
+        r1
 
       case Div(expr1, expr2) =>
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
           code += POP(res1)
           code += MOV(RetReg, res1, Base) // <-- todo?
-          code += MOV(reg(1), res2, Base)
+          code += MOV(reg1, res2, Base)
           divByZeroError()
           code += BL("p_check_divide_by_zero", Base)
           code += BL("__aeabi_idiv", Base)
           code += MOV(res1, RetReg, Base)
         } else { // needs separate ADD cases, since the res1 or res2 will be the lower register address depending on whether we're in a spill state
           code += MOV(RetReg, res1, Base)
-          code += MOV(reg(1), res2, Base)
+          code += MOV(reg1, res2, Base)
           divByZeroError()
           code += BL("p_check_divide_by_zero", Base)
           code += BL("__aeabi_idiv", Base)
           code += MOV(res1, RetReg, Base)
         }
         ra.restore()
-        reg1
+        r1
 
       case Mod(expr1, expr2) =>
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
           code += POP(res1)
-          code += MOV(RetReg, reg1, Base) // <-- todo?
-          code += MOV(reg(1), ra.next, Base)
+          code += MOV(RetReg, r1, Base) // <-- todo?
+          code += MOV(reg1, ra.next, Base)
           divByZeroError()
           code += BL("p_check_divide_by_zero", Base)
           code += BL("__aeabi_idivmod", Base)
-          code += MOV(reg1, reg(1), Base)
+          code += MOV(r1, reg1, Base)
         } else { // needs separate ADD cases, since the res1 or res2 will be the lower register address depending on whether we're in a spill state
           code += MOV(RetReg, res1, Base)
-          code += MOV(reg(1), res2, Base)
+          code += MOV(reg1, res2, Base)
           divByZeroError()
           code += BL("p_check_divide_by_zero", Base)
           code += BL("__aeabi_idivmod", Base)
-          code += MOV(res1, reg(1), Base)
+          code += MOV(res1, reg1, Base)
         }
         ra.restore()
-        reg1
+        r1
 
       case Negate(expr) =>
         val reg = traverseExpr(expr, ra, code)
-        if (!reg.isInstanceOf[reg]) code += LDR(reg, reg, Base)
+        if (!reg.isInstanceOf[TempReg]) code += LDR(reg, reg, Base)
         intOverflow()
         code += RSBS(reg, reg, imm(0))
         code += BL("p_throw_overflow_error", VS)
@@ -743,7 +744,7 @@ object CodeGen{
 
       case Not(expr) =>
         val reg = traverseExpr(expr, ra, code)
-        if (!reg.isInstanceOf[reg]) code += LDR(reg, reg, SB)
+        if (!reg.isInstanceOf[TempReg]) code += LDR(reg, reg, SB)
         code += EOR(reg, reg, imm(1))
         reg
 
@@ -766,28 +767,28 @@ object CodeGen{
   def traverseBinExpr(expr1: Expr, expr2: Expr, ra: RegisterAllocator, code: ListBuffer[Mnemonic], spill: Boolean): (Register,Register,Register) = {
     /** Function to reduce duplication in dealing with binary expressions */
     var res1 = traverseExpr(expr1, ra, code)
-    val reg1 = if (spill) ra.next else ra.nextRm
-    if (!res1.isInstanceOf[reg]) {
-      code += LDR(reg1, res1, SB)
-      res1 = reg1
+    val r1 = if (spill) ra.next else ra.nextRm
+    if (!res1.isInstanceOf[TempReg]) {
+      code += LDR(r1, res1, SB)
+      res1 = r1
     }
     if (spill) code += PUSH(res1)
     var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
-    if (!res2.isInstanceOf[reg]) {
+    if (!res2.isInstanceOf[TempReg]) {
       code += LDR(ra.next, res2, SB)
       res2 = ra.next
     }
 
-    (reg1, res1, res2)
+    (r1, res1, res2)
   }
 
 
-  def phonyCaseCompare(code: ListBuffer[Mnemonic], suffix1: Suffix, reg1: Register, reg2: Register): Unit = {
+  def phonyCaseCompare(code: ListBuffer[Mnemonic], suffix1: Suffix, r1: Register, r2: Register): Unit = {
     /**
      * Function to factor out repeated code for comparison expressions
      * Can be seen as a case containing all comparison cases as sub cases,
      * But this isn't reflected in the current AST implementation hence phony
-     * The main case in traverse should ensure reg1 and reg2 store the correct
+     * The main case in traverse should ensure r1 and r2 store the correct
      * values before calling this function
      *
      *@param suffix1  : The suffix of the positive branch of the compare.
@@ -810,18 +811,32 @@ object CodeGen{
         suffix2 = Base
     }
 
-    code += CMP(reg1, reg2)
-    code += MOV(reg1, imm(1), suffix1)
-    code += MOV(reg1, imm(0), suffix2)
+    code += CMP(r1, r2)
+    code += MOV(r1, imm(1), suffix1)
+    code += MOV(r1, imm(0), suffix2)
   }
 
   def compile(node: AstNode, ra: RegisterAllocator = new RegisterAllocator()): String = {
     val sb = new StringBuilder()
-    val code: ListBuffer[Mnemonic] = ListBuffer()
+    var code: ListBuffer[Mnemonic] = ListBuffer()
     traverse(node, ra, code)
+    // todo: refactor compilation so that a file is created and written to (without a sb)
+    //  and the file is deleted if an error is detected
+
+    // todo: refactor so that optimizations can be performed on the intermediate representation?
+    //  perhaps registers are the only objects that need to be redefined, for now... (?)
+
+    // CFG optimisations operate only on main program, not data or helper functions
+    val cfg = new ControlFlowGraph(code)
+//    println(s"Original CFG: $cfg")
+    // replaces all TempRegs with ScratchRegs in the code according to regMapping
+    LiveAnalysis.liveVariableAnalysis(cfg)
+//    println(s"CFG after live variable analysis: $cfg")
+
+    code = cfg.toAssembly
 
     if (data.nonEmpty) {
-      sb.append(".data\n\n")
+      sb.append(".data\n\n") // todo: could these not be added as mnemonic labels for consistency?
       for ((k, body) <- data) {
         sb.append("\n" + k + ":\n\t")
         for (line <- body) {
@@ -835,7 +850,7 @@ object CodeGen{
     for (line <- code) {
       sb.append((if (!line.isInstanceOf[funcName]) "\t" else "") + line.toString + "\n")
     }
-    // todo: the formatting might fail once IfElse is implemented...
+    // todo: the formatting might fail once IfElse is implemented... (?)
     for((k,v) <- labels){
       sb.append("\n" + k + ":\n\t")
       for (line <- v) {

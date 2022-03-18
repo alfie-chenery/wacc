@@ -1,5 +1,7 @@
 package parsers
 
+import scala.collection.mutable
+
 // TODO remove use of nullOp
 object Assembly {
 
@@ -35,6 +37,11 @@ object Assembly {
       "LDR" + suffix.toString + " " + r.toString + ", " + o2String
     }
   }
+  case class STR(rd: Register, rn: Register) extends Mnemonic {
+    override def toString: String = {
+      "STR " + rd.toString + ", " + rn.toString
+    }
+  }
   case class PUSH(r: Register) extends Mnemonic {
     override def toString: String = "PUSH {" + r.toString + "}"
   }
@@ -45,11 +52,6 @@ object Assembly {
     override def toString: String = "SUB " + o1.toString + ", " + o2.toString + ", " + o3.toString
   }
 
-  case class STR(rd: Register, rn: Register) extends Mnemonic {
-    override def toString: String = {
-      "STR " + rd.toString + ", " + rn.toString
-    }
-  }
   case class ADD(o1: Operand, o2: Operand, o3: Operand) extends Mnemonic {
     override def toString: String = "ADD " + o1.toString + ", " + o2.toString + ", " + o3.toString
   }
@@ -126,6 +128,12 @@ object Assembly {
   case object RetReg extends Register{
     override def toString: String = "r0"
   }
+  case object reg1 extends Register { // todo: check that it doesn't have a special name? / rename if necessary
+    override def toString: String = "r1" // should it be included in scratchRegisters or not?
+  }                                      // or maybe a separate trait should be made for these, and
+  case object reg2 extends Register {    // both put under another trait with same scope as former 'reg'
+    override def toString: String = "r2" // todo: same as ^
+  }
   case object SP extends Register{
     override def toString: String = "sp"
   }
@@ -135,8 +143,63 @@ object Assembly {
   case object PC extends Register{
     override def toString: String = "pc"
   }
-  case class reg(num: Int) extends Register{
-    override def toString: String = "r" + num.toString
+  sealed trait TempReg extends Register // to be used as temporary registers before reg allocation
+  case object tReg4 extends TempReg{
+    override def toString: String = "r4"
+//    override def toString: String = "t4"
+  }
+  case object tReg5 extends TempReg{
+    override def toString: String = "r5"
+//    override def toString: String = "t5"
+  }
+  case object tReg6 extends TempReg{
+    override def toString: String = "r6"
+//    override def toString: String = "t6"
+  }
+  case object tReg7 extends TempReg{
+    override def toString: String = "r7"
+//    override def toString: String = "t7"
+  }
+  case object tReg8 extends TempReg{
+    override def toString: String = "r8"
+//    override def toString: String = "t8"
+  }
+  case object tReg9 extends TempReg{
+    override def toString: String = "r9"
+//    override def toString: String = "t9"
+  }
+  case object tReg10 extends TempReg{
+    override def toString: String = "r10"
+//    override def toString: String = "t10"
+  }
+  case object tReg11 extends TempReg{
+    override def toString: String = "r11"
+//    override def toString: String = "t11"
+  }
+  sealed trait ScratchReg extends Register
+  case object reg4 extends ScratchReg{
+    override def toString: String = "r4"
+  }
+  case object reg5 extends ScratchReg{
+    override def toString: String = "r5"
+  }
+  case object reg6 extends ScratchReg{
+    override def toString: String = "r6"
+  }
+  case object reg7 extends ScratchReg{
+    override def toString: String = "r7"
+  }
+  case object reg8 extends ScratchReg{
+    override def toString: String = "r8"
+  }
+  case object reg9 extends ScratchReg{
+    override def toString: String = "r9"
+  }
+  case object reg10 extends ScratchReg{
+    override def toString: String = "r10"
+  }
+  case object reg11 extends ScratchReg{
+    override def toString: String = "r11"
   }
 
   sealed trait Suffix extends Operand
