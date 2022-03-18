@@ -4,4 +4,4 @@ compiler.jar: $(directory)*.scala
 	sbt assembly
 
 clean:
-	rm -rf *.jar
+	rm -rf *.jar *.s

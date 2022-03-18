@@ -33,8 +33,8 @@ object preDefinedFuncs {
       )
       labels("p_print_string") =
         List(PUSH(LinkReg),
-          LDR(reg(1), regVal(RetReg), Base),
-          ADD(reg(2), RetReg, imm(4)),
+          LDR(reg1, regVal(RetReg), Base),
+          ADD(reg2, RetReg, imm(4)),
           LDR(RetReg, label(str_format_msg), Base),
           ADD(RetReg, RetReg, imm(4)),
           BL("printf", Base),
@@ -78,7 +78,7 @@ object preDefinedFuncs {
 
       labels("p_print_int") =
         List(PUSH(LinkReg),
-          MOV(reg(1), RetReg, Base),
+          MOV(reg1, RetReg, Base),
           LDR(RetReg, label(int_msg), Base),
           ADD(RetReg, RetReg, imm(4)),
           BL("printf", Base),
@@ -115,7 +115,7 @@ object preDefinedFuncs {
       )
       labels("p_print_reference") =
         List(PUSH(LinkReg),
-          MOV(reg(1), RetReg, Base),
+          MOV(reg1, RetReg, Base),
           LDR(RetReg, label(ptr_format_msg), Base),
           ADD(RetReg, RetReg, imm(4)), //value of 4 is not dependent on array's type
           BL("printf", Base),
@@ -134,7 +134,7 @@ object preDefinedFuncs {
           DAscii("DivideByZeroError: divide or modulo by zero\\n\\0"))
       labels("p_check_divide_by_zero")=
         List(PUSH(LinkReg),
-          CMP(reg(1), imm(0)),
+          CMP(reg1, imm(0)),
           LDR(RetReg, label(int_msg), EQ),
           BL("p_throw_runtime_error", EQ),
           POP(PC))
