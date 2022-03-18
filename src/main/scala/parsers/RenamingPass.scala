@@ -1,39 +1,43 @@
 package parsers
 
+import parsers.Ast.Ident
+import parsers.SemanticPass.checkExprType
+
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
 object RenamingPass {
-
   import parsers.Ast._
 
-  def renameIdent(ident: String, localScope: mutable.Map[String,String], varsInScope: mutable.Map[String, String], errors: ListBuffer[String]): Ident = {
+  def renameIdent(ident: String, _type: Type, localScope: mutable.Map[String,String], varsInScope: mutable.Map[String, (String,Type)], errors: ListBuffer[String]): Ident = {
     if (localScope.contains(ident)) {
       errors += "identifier $ident already declared in the current scope"
     }
     var renamedIdent = ""
     if(varsInScope.contains(ident)) {
-      val splitString = varsInScope(ident).split('$')
+      val splitString = varsInScope(ident)._1.split('$')
       val nextIdentInt = splitString(splitString.length-1).toInt+1
       renamedIdent = ident+"$"+s"$nextIdentInt"
     } else {
       renamedIdent = ident + "$0"
     }
-    varsInScope += (ident -> renamedIdent)
+    varsInScope += (ident -> (renamedIdent, _type))
     localScope += (ident -> renamedIdent)
     Ident(localScope(ident))
   }
 
-  private def rename(program: AstNode, localScope: mutable.Map[String, String], varsInScope: mutable.Map[String, String], errors: ListBuffer[String]): AstNode = {
+  private def rename(program: AstNode, localScope: mutable.Map[String, String], varsInScope: mutable.Map[String, (String,Type)], errors: ListBuffer[String]): AstNode = {
     program match {
       case Program(funcs, stat) =>
         val renamedFuncs: ListBuffer[Func] = ListBuffer[Func]()
         for (func <- funcs) {
           func match {
-            case Func((_, Ident(ident)), _, _) => renameIdent(ident+"$func", localScope, varsInScope, errors)
+             case Func((_type,ident),params,stat) =>
+               val renamedFunc = Func((_type, renameIdent(renameFunc(func), _type, localScope, varsInScope, errors)),params,stat) //this just renames the ident of the func
+               renamedFuncs.append(rename(renamedFunc, localScope, varsInScope, errors).asInstanceOf[Func]) //this recursively renames the contents of the function
           }
         }
-        funcs.foreach(renamedFuncs += rename(_, localScope, varsInScope, errors).asInstanceOf[Func])
+        //funcs.foreach(renamedFuncs += rename(_, localScope, varsInScope, errors).asInstanceOf[Func])
         Program(renamedFuncs.toList, rename(stat, localScope, varsInScope, errors).asInstanceOf[Stat])
 
       case Func((_type, Ident(ident)), ParamList(params), stat) =>
@@ -42,17 +46,17 @@ object RenamingPass {
         for (param <- params) {
           param match {
             case Param(_type, Ident(ident)) =>
-              renamedParams += Param(_type, renameIdent(ident, newScope, varsInScope, errors))
+              renamedParams += Param(_type, renameIdent(ident, _type, newScope, varsInScope, errors))
             case _ =>
           }
         }
-        Func((_type, Ident(varsInScope(ident+"$func"))), ParamList(renamedParams.toList),
+        Func((_type, Ident(ident)), ParamList(renamedParams.toList),
           rename(stat, newScope, varsInScope, errors).asInstanceOf[Stat])
 
       case Decl(_type, Ident(ident), rhs) =>
         // TODO lookup variable to see if it's declared in current scope, if not, add it
         val renamedRhs = rename(rhs, localScope, varsInScope, errors).asInstanceOf[AssignRHS]
-        Decl(_type, renameIdent(ident, localScope, varsInScope, errors), renamedRhs)
+        Decl(_type, renameIdent(ident, _type, localScope, varsInScope, errors), renamedRhs)
 
       case Assign(lhs, rhs) =>
         Assign(rename(lhs, localScope, varsInScope, errors).asInstanceOf[AssignLHS],
@@ -64,7 +68,7 @@ object RenamingPass {
           errors += s"variable $ident not declared"
           null
         }else {
-          Ident(varsInScope(ident))
+          Ident(varsInScope(ident)._1)
         }
 
       case ParensExpr(expr) => ParensExpr(rename(expr, localScope, varsInScope, errors).asInstanceOf[Expr])
@@ -167,21 +171,87 @@ object RenamingPass {
           rename(snd, localScope, varsInScope, errors).asInstanceOf[Expr])
 
       case Call(Ident(ident), ArgList(args)) =>
-        // TODO check that ident is declared in this scope
-        if (!varsInScope.contains(ident+"$func")) {
-          errors += s"function $ident not defined"
+        val _type = WInt //placeholder not actually used - calculate from call type
+        val renamedFunc: String = renameFuncCall(_type, ident, args, varsInScope, errors)
+
+        if (!varsInScope.contains(renamedFunc)) {
+          errors += s"function $ident ($renamedFunc) not defined"
+          null
+        } else {
+          val renamedArgs: ListBuffer[Expr] = ListBuffer()
+          args.foreach(renamedArgs += rename(_, localScope, varsInScope, errors).asInstanceOf[Expr])
+          Call(Ident(varsInScope(renamedFunc)._1), ArgList(renamedArgs.toList))
         }
-        val renamedArgs: ListBuffer[Expr] = ListBuffer()
-        args.foreach(renamedArgs += rename(_, localScope, varsInScope, errors).asInstanceOf[Expr])
-        Call(Ident(varsInScope(ident+"$func")), ArgList(renamedArgs.toList))
 
       case node: AstNode => node
     }
   }
   def rename(program: Program, errors: ListBuffer[String]): Program = {
-    val variableRenaming: mutable.Map[String, String] = scala.collection.mutable.Map[String, String]()
+    val variableRenaming: mutable.Map[String, (String,Type)] = scala.collection.mutable.Map[String, (String,Type)]()
     val localScope: mutable.Map[String, String] = scala.collection.mutable.Map[String, String]()
     rename(program, localScope, variableRenaming, errors).asInstanceOf[Program]
+  }
+
+
+  private def renameFunc(function: AstNode) : String = {
+    function match {
+      case Func((_type, Ident(ident)), ParamList(params), _) => renameFuncDecl(_type, ident, params)
+      case _ => null //should not be reachable
+    }
+  }
+
+  private def renameFuncDecl(_type: Type, ident: String, params: List[Param]): String = {
+    val sb = new StringBuilder()
+    sb.append(ident + "$" +
+      //getType(_type) + //add in once call type is known
+      "Func")
+    for (param <- params){
+      param match {
+        case Param(_type, _) =>
+          sb.append("_" + getType(_type))
+        case _ =>
+      }
+    }
+    sb.toString()
+  }
+
+  private def renameFuncCall(_type: Type, ident: String, args: List[Expr], varsInScope: mutable.Map[String, (String,Type)], errors: ListBuffer[String]): String = {
+    val sb = new StringBuilder()
+    sb.append(ident + "$" +
+      //getType(_type) + //add in once call type is known
+      "Func")
+    for (arg <- args){
+      val t: Type = arg match {
+        case Ident(ident) =>
+          if (!varsInScope.contains(ident)) {
+            errors += s"variable $ident not declared"
+            return null
+          }else {
+            varsInScope(ident)._2
+          }
+        case _ => checkExprType(arg, arg, new ListBuffer[String])
+        //errors with type checking are caught in semantic pass. If we track errors found here it can incorrectly
+        // find semantic errors as a result of not everything being renamed yet
+      }
+
+      sb.append("_" + getType(t))
+    }
+    sb.toString()
+  }
+
+  def getType(t: Type): String = {
+    t match {
+      case WInt => "int"
+      case WBool => "bool"
+      case WChar => "char"
+      case WString => "str"
+      case ArrayType(_type) => getType(_type) + "Array"
+      case PairType(fst_type: PairElemType, snd_type: PairElemType) =>
+        "p@" + getType(fst_type) + "-" + getType(snd_type) + "@"
+      //case PairElemType => getType()
+      case Pair => "pair?"
+      case _ => "!ERROR!" //should not be reachable
+    }
   }
 
 }

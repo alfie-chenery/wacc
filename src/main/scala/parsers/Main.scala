@@ -1,13 +1,13 @@
 package parsers
 
-import parsers.Parser.parse
+import parsers.Parser.{`<expr>`, parse}
 
 import java.io.{File, FileWriter}
 import scala.collection.mutable.ListBuffer
 
 object Main {
   def main(args: Array[String]): Unit = {
-    try {
+//    try {
       if (args.length == 0 || !args(0).endsWith(".wacc")) {
         println("Please pass a .wacc file to be parsed")
         sys.exit()
@@ -51,8 +51,8 @@ object Main {
       }
       fw.close()
       if (failed) sys.exit(200) else sys.exit(0)
-    } catch {
-      case e: Exception =>
-    }
+//    } catch {
+//      case e: Exception =>
+//    }
   }
 }
