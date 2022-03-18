@@ -1,0 +1,27 @@
+# program with many instances of an overloaded function
+
+# Output:
+# 42
+
+# Program:
+
+begin
+  int f(int x, int y) is
+    return x
+  end
+
+  int f(int x, char y) is
+    return x
+  end
+
+  int f(char x, int y) is
+    return ord x
+  end
+
+  int f(char x, char y) is
+    return ord x
+  end
+
+  int x = call f(42, 'a');
+  println x
+end

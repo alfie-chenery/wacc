@@ -1,0 +1,21 @@
+# program with two instances of an overloaded function
+
+# Output:
+# 3
+# 3
+
+# Program:
+
+begin
+  int f(int x) is
+    return x
+  end
+  int f(char x) is
+    return ord x
+  end
+
+  int y = call f(3);
+  println y;
+  int z = call f('c');
+  println z
+end
