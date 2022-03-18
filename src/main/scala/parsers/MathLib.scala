@@ -4,21 +4,25 @@ import parsers.CodeGen._
 import parsers.Assembly._
 import parsers.RegisterAllocator._
 import parsers.preDefinedFuncs._
+import parsers.Ast._
+import parsers.SemanticPass.checkExprType
+
+import scala.collection.mutable.ListBuffer
 
 object MathLib {
 
-  def sin(ra: RegisterAllocator): Unit = {
-    var r = ra.next
+  def sin(ra: RegisterAllocator, va: VfpAllocator, expr: Expr, code: ListBuffer[Mnemonic]): Unit = {
     val condLabel = nextBranchIndex
     val bodyLabel = nextBranchIndex
     intOverflow()
     divByZeroError()
     runtimeError()
     printString()
-    pow(ra)
-    fact(ra)
+    //todo: correct expr pass
+    pow(ra, va, expr, code)
+    fact(ra, va, expr, code)
     if (!labels.contains("sin")){
-      val r = ra.next
+      val r = traverseExpr(expr, ra, va, code)
       labels("sin") = List(
         PUSH(LinkReg),
         SUB(SP, SP, imm(12)),
@@ -98,17 +102,18 @@ object MathLib {
     }
   }
 
-  def cos(ra: RegisterAllocator): Unit ={
+  def cos(ra: RegisterAllocator, va: VfpAllocator, expr: Expr, code: ListBuffer[Mnemonic]): Unit ={
     divByZeroError()
     intOverflow()
     runtimeError()
     printString()
-    pow(ra)
-    fact(ra)
+    //todo: correct expr pass
+    pow(ra, va, expr, code)
+    fact(ra, va, expr, code)
     val condLabel = nextBranchIndex
     val bodyLabel = nextBranchIndex
     if (!labels.contains("cos")){
-      val r = ra.next
+      val r = traverseExpr(expr, ra, va, code)
       labels("cos") = List(
         PUSH(LinkReg),
         SUB(SP, SP, imm(12)),
@@ -188,14 +193,15 @@ object MathLib {
     }
   }
 
-  def tan(ra:RegisterAllocator): Unit ={
+  def tan(ra: RegisterAllocator, va: VfpAllocator, expr: Expr, code: ListBuffer[Mnemonic]): Unit ={
     printString()
     runtimeError()
     divByZeroError()
-    cos(ra)
-    sin(ra)
+    //todo: correct expr pass
+    cos(ra, va, expr, code)
+    sin(ra, va, expr, code)
     if(!labels.contains("tan")){
-      val r = ra.next
+      val r = traverseExpr(expr, ra, va, code)
       val r1 = ra.next
       labels("tan") = List(
         PUSH(LinkReg),
@@ -230,7 +236,7 @@ object MathLib {
     }
   }
 
-  def pow(ra: RegisterAllocator): Unit ={
+  def pow(ra: RegisterAllocator, va: VfpAllocator, expr1: Expr, expr2: Expr,  code: ListBuffer[Mnemonic]): Unit ={
     if(!labels.contains("pow")){
       printString()
       runtimeError()
@@ -238,55 +244,76 @@ object MathLib {
       val condLabel = nextBranchIndex
       val bodyLabel = nextBranchIndex
       val r = ra.next
-      labels("pow") = List(
-        PUSH(LinkReg),
-        SUB(SP, SP, imm(8)),
-        LDR(r, imm(1), Base),
-        STR(r, regShift(SP, 4, update = false)),
-        LDR(r, imm(0), Base),
-        STR(r, regVal(SP)),
-        B(condLabel, Base)
-      )
-      val r1 = ra.next
-      labels(condLabel) = List(
-        LDR(r, regVal(SP), Base),
-        LDR(r1, regShift(SP, 16, update = false), Base),
-        CMP(r, r1),
-        MOV(r, imm(1), LT),
-        MOV(r, imm(0), GE),
-        CMP(r, imm(1)),
-        B(bodyLabel, EQ),
-        LDR(r, regShift(SP, 4, update = false), Base),
-        MOV(RetReg, r, Base),
-        ADD(SP, SP, imm(8)),
-        POP(PC),
-        POP(PC),
-        LTORG
-      )
-      labels(bodyLabel) = List(
-        LDR(r, regShift(SP, 4, update = false), Base),
-        LDR(r1, regShift(SP, 12, update = false), Base),
-        SMULL(r, r1, r, r1),
-        CMP(r1, asr(r, 31)),
-        BL("p_throw_overflow_error", NE),
-        STR(r, regShift(SP, 4, update = false)),
-        LDR(r, regVal(SP), Base),
-        LDR(r1, imm(1), Base),
-        ADDS(r, r, r1),
-        BL("p_throw_overflow_error", VS),
-        STR(r, regVal(SP))
-      )
+      val r1 = traverseExpr(expr1, ra, va, code)
+
+      val funcCode = new ListBuffer[Mnemonic]()
+      funcCode += PUSH(LinkReg)
+      funcCode += SUB(SP, SP, imm(8))
+      LDR(r, imm(1), Base)
+      STR(r, regShift(SP, 4, update = false))
+      LDR(r, imm(0), Base)
+      STR(r, regVal(SP))
+      B(condLabel, Base)
+
+      val t = checkExprType(expr1, expr1, new ListBuffer[String])
+      funcCode += funcName(bodyLabel)
+      funcCode += LDR(r, regShift(SP, 4, update = false), Base)
+      funcCode += LDR(r1, regShift(SP, 12, update = false), Base)
+
+      if (t == WInt) {
+        funcCode += SMULL(r, r1, r, r1)
+        funcCode += CMP(r1, asr(r, 31))
+        funcCode += BL("p_throw_overflow_error", NE)
+        funcCode += STR(r, regShift(SP, 4, update = false))
+        funcCode += LDR(r, regVal(SP), Base)
+        funcCode += LDR(r1, imm(1), Base)
+        funcCode += ADDS(r, r, r1)
+        funcCode += BL("p_throw_overflow_error", VS)
+        funcCode += STR(r, regVal(SP))
+        funcCode += funcName(bodyLabel)
+      }else{
+        val v = va.next
+        val v1 = va.next
+        funcCode += FMSR(v, r)
+        funcCode += FMSR(v1, r1)
+        funcCode += FMUL(v, v1, v)
+        funcCode += FCMP(v1, asr(v, 31))
+        funcCode += FMRS(r1, v1)
+        funcCode += FMRS(r, v)
+        funcCode += BL("p_throw_overflow_error", NE)
+        funcCode += STR(r, regShift(SP, 4, update = false))
+        funcCode += LDR(r, regVal(SP), Base)
+        funcCode += LDR(r1, imm(1), Base)
+        funcCode += ADDS(r, r, r1)
+      }
+
+      funcCode += funcName(condLabel)
+      funcCode += LDR(r, regVal(SP), Base)
+      funcCode += LDR(r1, regShift(SP, 16, update = false), Base)
+      funcCode += CMP(r, r1)
+      funcCode += MOV(r, imm(1), LT)
+      funcCode += MOV(r, imm(0), GE)
+      funcCode += CMP(r, imm(1))
+      funcCode += B(bodyLabel, EQ)
+      funcCode += LDR(r, regShift(SP, 4, update = false), Base)
+      funcCode += MOV(RetReg, r, Base)
+      funcCode += ADD(SP, SP, imm(8))
+      funcCode += POP(PC)
+      funcCode += POP(PC)
+      funcCode += LTORG
+
+      labels("pow") = funcCode.toList
     }
   }
 
-  def fact(ra: RegisterAllocator): Unit ={
+  def fact(ra: RegisterAllocator, va: VfpAllocator, expr: Expr, code: ListBuffer[Mnemonic]): Unit ={
     printString()
     runtimeError()
     intOverflow()
     val condLabel = nextBranchIndex
     val bodyLabel = nextBranchIndex
     if(!labels.contains("fact")){
-      val r = ra.next
+      val r = traverseExpr(expr, ra, va, code)
       labels("fact") = List(
         PUSH(LinkReg),
         SUB(SP, SP, imm(8)),
@@ -328,14 +355,14 @@ object MathLib {
     }
   }
 
-  def fabs(ra: RegisterAllocator): Unit ={
+  def fabs(ra: RegisterAllocator, va: VfpAllocator, expr: Expr, code: ListBuffer[Mnemonic]): Unit ={
     if(!labels.contains("fabs")){
       intOverflow()
       runtimeError()
       printString()
       val cond1Label = nextBranchIndex
       val cond2Label = nextBranchIndex
-      val r = ra.next
+      val r = traverseExpr(expr, ra, va, code)
       val r1 = ra.next
       labels("fabs") = List(
         PUSH(LinkReg),
@@ -369,7 +396,7 @@ object MathLib {
     }
   }
 
-  def sqrt(ra:RegisterAllocator): Unit ={
+  def sqrt(ra: RegisterAllocator, va: VfpAllocator, expr: Expr, code: ListBuffer[Mnemonic]): Unit ={
     if(!labels.contains("sqrt")){
       printString()
       runtimeError()
@@ -377,7 +404,7 @@ object MathLib {
       divByZeroError()
       val condLabel = nextBranchIndex
       val bodyLabel = nextBranchIndex
-      val r = ra.next
+      val r = traverseExpr(expr, ra, va, code)
       val r1 = ra.next
       labels("sqrt") = List(
         PUSH(LinkReg),

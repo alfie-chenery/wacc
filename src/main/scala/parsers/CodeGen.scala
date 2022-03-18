@@ -19,7 +19,7 @@ object CodeGen{
   val variableLocation = new mutable.LinkedHashMap[String, Register]
   var currentShift = 0
 
-  val mathFuncs = List("sin", "cos", "tan", "pow", "fact", "fabs")
+  val mathFuncs = List("sin", "cos", "tan", "pow", "fact", "fabs", "sqrt")
 
   /** Returns the next available 'msg' index in data */
   def getDataMsgIndex: Int = {
@@ -515,12 +515,13 @@ object CodeGen{
           code += MOV(ra.next, RetReg, Base)
         }else{
           name match {
-            case "sin" => sin(ra)
+            case "sin" => sin(ra, va, args.head, code)
             case "cos" => cos(ra)
             case "tan" => tan(ra)
             case "pow" => pow(ra)
             case "fact" => fact(ra)
             case "fabs" => fabs(ra)
+            case "sqrt" => sqrt(ra)
           }
         }
         RetReg
