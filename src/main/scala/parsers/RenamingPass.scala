@@ -171,11 +171,7 @@ object RenamingPass {
           rename(snd, localScope, varsInScope, errors).asInstanceOf[Expr])
 
       case Call(Ident(ident), ArgList(args)) =>
-        //TODO find a way to work out the type of call. Ie is it being stored
-        // in a variable with known type. Without this we cant overload on
-        // return type. Ie currently int x(int) and char x(int) are the same
-        // function
-        val _type = WInt //calculate from call type
+        val _type = WInt //placeholder not actually used - calculate from call type
         val renamedFunc: String = renameFuncCall(_type, ident, args, varsInScope, errors)
 
         if (!varsInScope.contains(renamedFunc)) {
@@ -233,7 +229,9 @@ object RenamingPass {
           }else {
             varsInScope(ident)._2
           }
-        case _ => checkExprType(arg, arg, errors)
+        case _ => checkExprType(arg, arg, new ListBuffer[String])
+        //errors with type checking are caught in semantic pass. If we track errors found here it can incorrectly
+        // find semantic errors as a result of not everything being renamed yet
       }
 
       sb.append("_" + getType(t))
