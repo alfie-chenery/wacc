@@ -703,12 +703,16 @@ object CodeGen{
             code += FMRS(res2, v)
           }
         } else {
-          val v = va.next
-          val v1 = va.next
-          code += FMSR(v, res1)
-          code += FMSR(v1, res2)
-          code += FSUB(v, v, v1)
-          code += FMRS(res1, v)
+          if (t1 == WInt && t2 == WInt) {
+            code += SUB(res2, res1, res2)
+          }else {
+            val v = va.next
+            val v1 = va.next
+            code += FMSR(v, res1)
+            code += FMSR(v1, res2)
+            code += FSUB(v, v, v1)
+            code += FMRS(res1, v)
+          }
         }
         intOverflow()
         code += BL("p_throw_overflow_error", VS)

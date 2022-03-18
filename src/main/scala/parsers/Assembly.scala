@@ -104,28 +104,28 @@ object Assembly {
     override def toString: String = "B" + suffix.toString + " " + label
   }
   case class FUITO(r: Register, i: imm) extends Mnemonic {
-    override def toString: String = "FUITO" + r.toString + ", " + i.toString
+    override def toString: String = "FUITO " + r.toString + ", " + i.toString
   }
   case class FMSR(r1: Register, r2: Register) extends Mnemonic{
-    override def toString: String = "FMSR" + r1.toString + ", " + r2.toString
+    override def toString: String = "FMSR " + r1.toString + ", " + r2.toString
   }
   case class FMRS(r1: Register, r2: Register) extends Mnemonic{
-    override def toString: String = "FMRS" + r1.toString + ", " + r2.toString
+    override def toString: String = "FMRS " + r1.toString + ", " + r2.toString
   }
   case class FMUL(rd: Register, rn: Register, rm: Register) extends Mnemonic{
-    override def toString: String = "FMUL" + rd.toString + ", " + rn.toString + ", " + rm.toString
+    override def toString: String = "FMUL " + rd.toString + ", " + rn.toString + ", " + rm.toString
   }
   case class FCMP(r: Register, o: Operand) extends Mnemonic{
-    override def toString: String = "FCMP" + r.toString + ", " + o.toString
+    override def toString: String = "FCMP " + r.toString + ", " + o.toString
   }
   case class FDIV(rd: Register, rn: Register, rm: Register) extends Mnemonic{
-    override def toString: String = "FDIV" + rd.toString + ", " + rn.toString + ", " + rm.toString
+    override def toString: String = "FDIV " + rd.toString + ", " + rn.toString + ", " + rm.toString
   }
   case class FLDM(rd: Register, o: Operand) extends Mnemonic{
-    override def toString: String = "FLDM" + rd.toString + ", " + o.toString
+    override def toString: String = "FLDM " + rd.toString + ", " + o.toString
   }
   case class FSQRT(rd: Register, rn: Register) extends Mnemonic{
-    override def toString: String = "FLSQRT" + rd.toString + ", " + rn.toString
+    override def toString: String = "FLSQRT " + rd.toString + ", " + rn.toString
   }
 
   sealed trait Operand
