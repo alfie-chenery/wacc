@@ -124,7 +124,7 @@ object Assembly {
   case class FLDM(rd: Register, o: Operand) extends Mnemonic{
     override def toString: String = "FLDM" + rd.toString + ", " + o.toString
   }
-  case class FSQRT(rd: Register, rn: Register){
+  case class FSQRT(rd: Register, rn: Register) extends Mnemonic{
     override def toString: String = "FLSQRT" + rd.toString + ", " + rn.toString
   }
 
