@@ -1,0 +1,12 @@
+# evaluating subtraction
+
+# Output:
+# 5.0
+
+# Program:
+
+begin
+  float x = 15.0 ;
+  float y = 20.0 ;
+  println y - x
+end

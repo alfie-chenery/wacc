@@ -1,0 +1,12 @@
+# evaluating addition
+
+# Output:
+# 35.0
+
+# Program:
+
+begin
+  float x = 15.0 ;
+  float y = 20.0 ;
+  println x + y
+end
