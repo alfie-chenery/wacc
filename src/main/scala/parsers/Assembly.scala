@@ -231,6 +231,9 @@ object Assembly {
   case object reg11 extends ScratchReg{
     override def toString: String = "r11"
   }
+  case object spillReg extends ScratchReg{
+    override def toString: String = "spill"
+  }
   case class vfpReg(num: Int) extends Register{
     override def toString: String = "s" + num.toString
   }

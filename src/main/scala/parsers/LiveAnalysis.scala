@@ -17,10 +17,8 @@ object LiveAnalysis {
                    var defs: mutable.Set[TempReg],
                    succs: mutable.Set[Int]) extends CFGNode(id, instruction, succs)
 
-//  def tempReg(s: mutable.HashSet[Operand]): mutable.HashSet[TempReg] = s.map(e => tempReg2(e) match {
-//    case Some(value) => value
-//    case None =>
-//  })
+  var spillMap: mutable.Map[TempReg, Boolean] = mutable.HashMap[TempReg, Boolean]()
+
   def tempReg(s: mutable.HashSet[Operand]): mutable.HashSet[TempReg] = s.map(tempReg2).collect {
     case Some(value) => value
   }
@@ -211,11 +209,20 @@ object LiveAnalysis {
     val available: List[ScratchReg] = RegisterAllocator.allScratchRegisters
     for ((tempReg, adj) <- ListMap(interferes.toSeq.sortBy(_._2.size): _*)) { // uses sorted tempRegs by degree
       var i: Int = 0
-      while (adj.exists(a => if (tempAllocation.contains(a)) tempAllocation(a) == available(i) else false)) {
+      var spill = false
+      while ( !spill && adj.exists(a => if (tempAllocation.contains(a)) tempAllocation(a) == available(i) else false)) {
         i += 1
+        if (i >= available.size) {
+          spill = true
+        }
       }
-      tempAllocation(tempReg) = available(i)
-      // todo: spillage..?
+      // todo: spillage
+      if (spill) {
+        spillMap(tempReg) = true
+        tempAllocation(tempReg) = spillReg
+      } else {
+        tempAllocation(tempReg) = available(i)
+      }
     }
     tempAllocation
   }
