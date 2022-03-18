@@ -397,7 +397,7 @@ object CodeGen{
         code += MOV(r1, RetReg, Base)
         var location = 4
         for (expr <- exprs) {
-          val ret = traverseExpr(expr, ra, code)
+          val ret = traverseExpr(expr, ra, va, code)
           code += STR(ret, regShift(r1, location, update = false))
           location += typeSize(_type)
         }
@@ -435,12 +435,12 @@ object CodeGen{
         code += BL("malloc", Base)
         code += MOV(ra.next, RetReg, Base)
         val r1 = ra.nextRm
-        val fstReg = traverseExpr(fst, ra, code)
+        val fstReg = traverseExpr(fst, ra, va, code)
         code += LDR(RetReg, imm(typeSize(checkExprType(fst, fst, new ListBuffer[String]))), Base)
         code += BL("malloc", Base)
         code += STR(fstReg, regVal(RetReg))
         code += STR(RetReg, regVal(r1))
-        val sndReg = traverseExpr(snd, ra, code)
+        val sndReg = traverseExpr(snd, ra, va, code)
         code += LDR(RetReg, imm(typeSize(checkExprType(snd, snd, new ListBuffer[String]))), Base)
         code += BL("malloc", Base)
         // TODO this should be STRB for chars
@@ -515,19 +515,19 @@ object CodeGen{
           code += MOV(ra.next, RetReg, Base)
         }else{
           name match {
-            case "sin" => sin(ra, va, args.head, code)
-            case "cos" => cos(ra, va, args.head, code)
-            case "tan" => tan(ra, va, args.head, code)
-            case "pow" => pow(ra, va, args.head, args(2), code)
-            case "fact" => fact(ra, va, args.head, code)
-            case "fabs" => fabs(ra, va, args.head, code)
-            case "sqrt" => sqrt(ra, va, args.head, code)
+            case "sin" => sin(ra, va)
+            case "cos" => cos(ra, va)
+            case "tan" => tan(ra, va)
+            case "pow" => pow(ra, va)
+            case "fact" => fact(ra, va)
+            case "fabs" => fabs(ra, va)
+            case "sqrt" => sqrt(ra, va)
           }
         }
         RetReg
 
       case And(expr1, expr2) =>
-        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, va, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
@@ -541,7 +541,7 @@ object CodeGen{
 
       // TODO factor out repeated code
       case Or(expr1, expr2) =>
-        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, va, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
@@ -555,7 +555,7 @@ object CodeGen{
 
         // TODO check if r1 should be moved with LDR or LDRSB
       case Greater(expr1, expr2) =>
-        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, va, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
@@ -569,7 +569,7 @@ object CodeGen{
 
 
       case GreaterEq(expr1, expr2) =>
-        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, va, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
@@ -582,7 +582,7 @@ object CodeGen{
         r1
 
       case Less(expr1, expr2) =>
-        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, va, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
@@ -595,7 +595,7 @@ object CodeGen{
         r1
 
       case LessEq(expr1, expr2) =>
-        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, va, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
@@ -608,7 +608,7 @@ object CodeGen{
         r1
 
       case Eq(expr1, expr2) =>
-        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, va, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
@@ -621,7 +621,7 @@ object CodeGen{
         r1
 
       case NotEq(expr1, expr2) =>
-        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, va, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
@@ -862,7 +862,7 @@ object CodeGen{
       res1 = r1
     }
     if (spill) code += PUSH(res1)
-    var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
+    var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), new VfpAllocator(va. getAvailable), code)
     if (!res2.isInstanceOf[TempReg]) {
       code += LDR(ra.next, res2, SB)
       res2 = ra.next
