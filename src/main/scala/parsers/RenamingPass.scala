@@ -179,11 +179,13 @@ object RenamingPass {
         val renamedFunc: String = renameFuncCall(_type, ident, args, varsInScope, errors)
 
         if (!varsInScope.contains(renamedFunc)) {
-          errors += s"function $ident not defined"
+          errors += s"function $ident ($renamedFunc) not defined"
+          null
+        } else {
+          val renamedArgs: ListBuffer[Expr] = ListBuffer()
+          args.foreach(renamedArgs += rename(_, localScope, varsInScope, errors).asInstanceOf[Expr])
+          Call(Ident(varsInScope(renamedFunc)._1), ArgList(renamedArgs.toList))
         }
-        val renamedArgs: ListBuffer[Expr] = ListBuffer()
-        args.foreach(renamedArgs += rename(_, localScope, varsInScope, errors).asInstanceOf[Expr])
-        Call(Ident(varsInScope(renamedFunc)._1), ArgList(renamedArgs.toList))
 
       case node: AstNode => node
     }
