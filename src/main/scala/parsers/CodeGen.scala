@@ -659,6 +659,8 @@ object CodeGen{
           code += POP(res1)
           if (t1 == WInt && t2 == WInt) {
             code += ADD(res2, res1, res2)
+            intOverflow()
+            code += BL("p_throw_overflow_error", VS)
           }else{
             val v = va.next
             val v1 = va.next
@@ -670,6 +672,8 @@ object CodeGen{
         } else { // needs separate ADD cases, since the res1 or res2 will be the lower register address depending on whether we're in a spill state
           if (t1 == WInt && t2 == WInt) {
             code += ADD(res1, res1, res2)
+            intOverflow()
+            code += BL("p_throw_overflow_error", VS)
           }else{
             val v = va.next
             val v1 = va.next
@@ -679,13 +683,10 @@ object CodeGen{
             code += FMRS(res1, v)
           }
         }
-        intOverflow()
-        code += BL("p_throw_overflow_error", VS)
         ra.restore()
         r1
 
       case Minus(expr1, expr2) =>
-
         var (r1, res1, res2) = traverseBinExpr(expr1, expr2, ra, va, code, spill)
         val t1 = checkExprType(expr1, node, new ListBuffer[String])
         val t2 = checkExprType(expr2, node, new ListBuffer[String])
@@ -694,6 +695,8 @@ object CodeGen{
           code += POP(res1)
           if (t1 == WInt && t2 == WInt) {
             code += SUB(res2, res1, res2)
+            intOverflow()
+            code += BL("p_throw_overflow_error", VS)
           }else{
             val v = va.next
             val v1 = va.next
@@ -705,6 +708,8 @@ object CodeGen{
         } else {
           if (t1 == WInt && t2 == WInt) {
             code += SUB(res1, res1, res2)
+            intOverflow()
+            code += BL("p_throw_overflow_error", VS)
           }else {
             val v = va.next
             val v1 = va.next
@@ -714,8 +719,6 @@ object CodeGen{
             code += FMRS(res1, v)
           }
         }
-        intOverflow()
-        code += BL("p_throw_overflow_error", VS)
         ra.restore()
         r1
 
@@ -729,6 +732,8 @@ object CodeGen{
           if (t1 == WInt && t2 == WInt) {
             code += SMULL(res1, res2, res1, res2)
             code += CMP(res2, asr(res1, 31))
+            intOverflow()
+            code += BL("p_throw_overflow_error", NE)
           }else{
             val v = va.next
             val v1 = va.next
@@ -743,6 +748,8 @@ object CodeGen{
           if (t1 == WInt && t2 == WInt) {
             code += SMULL(res1, res2, res1, res2)
             code += CMP(res2, asr(res1, 31))
+            intOverflow()
+            code += BL("p_throw_overflow_error", NE)
           }else{
             val v = va.next
             val v1 = va.next
@@ -754,8 +761,6 @@ object CodeGen{
             code += FMRS(res2, v1)
           }
         }
-        intOverflow()
-        code += BL("p_throw_overflow_error", NE)
         ra.restore()
         r1
 
