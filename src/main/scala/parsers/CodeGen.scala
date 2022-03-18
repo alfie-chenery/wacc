@@ -101,7 +101,14 @@ object CodeGen{
         variableLocation += (ident -> regVal(SP))
         code += STR(ret, regVal(SP))
         ra.restore()
-      case Decl(Number, Ident(ident), rhs) =>
+      case Decl(WInt, Ident(ident), rhs) =>
+        val r = ra.next
+        traverseExpr(rhs, ra, va, code)
+        currentShift -= 4
+        val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, update = false)
+        variableLocation += (ident -> location)
+        code += STR(r, location)
+      case Decl(WFloat, Ident(ident), rhs) =>
         val r = ra.next
         traverseExpr(rhs, ra, va, code)
         currentShift -= 4
