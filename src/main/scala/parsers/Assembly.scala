@@ -124,6 +124,9 @@ object Assembly {
   case class FLDM(rd: Register, o: Operand) extends Mnemonic{
     override def toString: String = "FLDM" + rd.toString + ", " + o.toString
   }
+  case class FSQRT(rd: Register, rn: Register){
+    override def toString: String = "FLSQRT" + rd.toString + ", " + rn.toString
+  }
 
   sealed trait Operand
   case class imm(i: Int) extends Operand {

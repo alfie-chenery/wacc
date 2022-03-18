@@ -521,7 +521,7 @@ object CodeGen{
             case "pow" => pow(ra, va)
             case "fact" => fact(ra, va)
             case "fabs" => fabs(ra, va)
-            case "sqrt" => sqrt(ra, va)
+            case "sqrt" => if (checkExprType(args.head, node, new ListBuffer[String]) == WInt) sqrtInt(ra, va) else sqrt(ra, va)
           }
         }
         RetReg

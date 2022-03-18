@@ -312,17 +312,27 @@ object MathLib {
       funcCode += B(condLabel, Base)
 
       val r1 = ra.next
+      val v = va.next
+      val v1 = va.next
 
       funcCode += funcName(bodyLabel)
       funcCode += LDR(r, regShift(SP, 4, update = false), Base)
       funcCode += LDR(r1, regVal(SP), Base)
-      funcCode += SMULL(r, r1, r, r1)
-      funcCode += CMP(r1, asr(r, 31))
+      funcCode += FMSR(v, r)
+      funcCode += FMSR(v1, r1)
+      funcCode += FMUL(v, v, v1)
+      funcCode += FCMP(v1, asr(v, 31))
+      funcCode += FMRS(r, v)
+      funcCode += FMRS(r1, v1)
       funcCode += BL("p_throw_overflow_error", NE)
       funcCode += STR(r, regShift(SP, 4, update = false))
       funcCode += LDR(r, regVal(SP), Base)
       funcCode += LDR(r1, imm(1), Base)
-      funcCode += ADDS(r, r, r1)
+      funcCode += FMSR(v, r)
+      funcCode += FMSR(v1, r1)
+      funcCode += FADD(v, v, v1)
+      funcCode += FMRS(r, v)
+      funcCode += FMRS(r1, v1)
       funcCode += BL("p_throw_overflow_error", VS)
       funcCode += STR(r, regVal(SP))
 
@@ -354,7 +364,8 @@ object MathLib {
       val cond2Label = nextBranchIndex
       val r = ra.next
       val r1 = ra.next
-
+      val v = va.next
+      val v1 = va.next
       val funcCode = new ListBuffer[Mnemonic]
 
       funcCode += PUSH(LinkReg)
@@ -367,8 +378,12 @@ object MathLib {
       funcCode += B(cond1Label, EQ)
       funcCode += LDR(r, regShift(SP, 4, update = false), Base)
       funcCode += LDR(r1, imm(-1), Base)
-      funcCode += SMULL(r, r1, r, r1)
-      funcCode += CMP(r1, asr(r, 31))
+      funcCode += FMSR(v, r)
+      funcCode += FMSR(v1, r1)
+      funcCode += FMUL(v, v, v1)
+      funcCode += FCMP(v1, asr(v, 31))
+      funcCode += FMRS(r, v)
+      funcCode += FMRS(r1, v1)
       funcCode += BL("p_throw_overflow_error", NE)
       funcCode += STR(r, regShift(SP, 4, update = false))
       funcCode += LDR(r, regShift(SP, 4, update = false), Base)
@@ -390,7 +405,22 @@ object MathLib {
   }
 
   def sqrt(ra: RegisterAllocator, va: VfpAllocator): Unit ={
-    if(!labels.contains("sqrt")){
+    val r = ra.next
+    val v = va.next
+    val funcCode = new ListBuffer[Mnemonic]
+    funcCode += PUSH(LinkReg)
+    funcCode += LDR(r, regShift(SP, 4, update = false), Base)
+    funcCode += FMSR(v, r)
+    funcCode += FSQRT(v, v)
+    funcCode += FMRS(r, v)
+    funcCode += MOV(RetReg, r, Base)
+    funcCode += POP(PC)
+    funcCode += LTORG
+    labels("sqrt") = funcCode.toList
+  }
+
+  def sqrtInt(ra: RegisterAllocator, va: VfpAllocator): Unit ={
+    if(!labels.contains("sqrtInt")){
       printString()
       runtimeError()
       intOverflow()
@@ -483,7 +513,7 @@ object MathLib {
       funcCode += POP(PC)
       funcCode += LTORG
 
-      labels("sqrt") = funcCode.toList
+      labels("sqrtInt") = funcCode.toList
     }
   }
 
