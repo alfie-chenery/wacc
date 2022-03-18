@@ -129,19 +129,26 @@ object LiveAnalysis {
       }
     } while (prevLiveIn != liveIn && prevLiveOut != liveOut)
 
+//    for (n <- nodes) {
+//      println(s"${n.instruction} LI ${liveIn(n.id)} LO ${liveOut(n.id)} uses ${n.uses} defs ${n.defs}")
+//    }
+
     // Interference analysis:
     val interferes: mutable.Map[TempReg, mutable.Set[TempReg]] = mutable.HashMap[TempReg, mutable.Set[TempReg]]()
     for (t <- RegisterAllocator.allTempRegisters) {
+      interferes(t) = mutable.HashSet[TempReg]()
+    }
+    for (t <- RegisterAllocator.allTempRegisters) {
       for (n <- nodes) {
         if (liveOut(n.id).contains(t)) {
-          interferes(t) = liveOut(n.id)
+          interferes(t) = interferes(t).union(liveOut(n.id))
         }
       }
     }
 
-    println(s"interference map: $interferes")
+//    println(s"interference map: $interferes")
     val tempAllocation: mutable.Map[TempReg, ScratchReg] = graphColouring(interferes)
-    println(s"register allocation: $tempAllocation")
+//    println(s"register allocation: $tempAllocation")
 
     tempAllocation
   }

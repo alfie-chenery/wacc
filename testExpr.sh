@@ -2,49 +2,49 @@
 
 make
 
-echo andExpr && ./compile src/test/scala/parsers/valid/expressions/andExpr.wacc
-echo andOverOrExpr && ./compile src/test/scala/parsers/valid/expressions/andOverOrExpr.wacc
-echo boolCalc && ./compile src/test/scala/parsers/valid/expressions/boolCalc.wacc
-echo boolExpr1 && ./compile src/test/scala/parsers/valid/expressions/boolExpr1.wacc
-echo charComparisonExpr && ./compile src/test/scala/parsers/valid/expressions/charComparisonExpr.wacc
-echo divExpr && ./compile src/test/scala/parsers/valid/expressions/divExpr.wacc
-echo equalsExpr && ./compile src/test/scala/parsers/valid/expressions/equalsExpr.wacc
-echo equalsOverAnd && ./compile src/test/scala/parsers/valid/expressions/equalsOverAnd.wacc
-echo equalsOverBool && ./compile src/test/scala/parsers/valid/expressions/equalsOverBool.wacc
-echo equalsOverOr && ./compile src/test/scala/parsers/valid/expressions/equalsOverOr.wacc
-echo greaterEqExpr && ./compile src/test/scala/parsers/valid/expressions/greaterEqExpr.wacc
-echo greaterExpr && ./compile src/test/scala/parsers/valid/expressions/greaterExpr.wacc
-echo intCalc && ./compile src/test/scala/parsers/valid/expressions/intCalc.wacc
-echo intExpr1 && ./compile src/test/scala/parsers/valid/expressions/intExpr1.wacc
-echo lessCharExpr && ./compile src/test/scala/parsers/valid/expressions/lessCharExpr.wacc
-echo lessEqExpr && ./compile src/test/scala/parsers/valid/expressions/lessEqExpr.wacc
-echo lessExpr && ./compile src/test/scala/parsers/valid/expressions/lessExpr.wacc
-echo longExpr && ./compile src/test/scala/parsers/valid/expressions/longExpr.wacc
-echo longExpr2 && ./compile src/test/scala/parsers/valid/expressions/longExpr2.wacc
-echo longExpr3 && ./compile src/test/scala/parsers/valid/expressions/longExpr3.wacc
-echo longSplitExpr && ./compile src/test/scala/parsers/valid/expressions/longSplitExpr.wacc
-echo longSplitExpr2 && ./compile src/test/scala/parsers/valid/expressions/longSplitExpr2.wacc
-echo minusExpr && ./compile src/test/scala/parsers/valid/expressions/minusExpr.wacc
-echo minusMinusExpr && ./compile src/test/scala/parsers/valid/expressions/minusMinusExpr.wacc
-echo minusNoWhitespaceExpr && ./compile src/test/scala/parsers/valid/expressions/minusNoWhitespaceExpr.wacc
-echo minusPlusExpr && ./compile src/test/scala/parsers/valid/expressions/minusPlusExpr.wacc
-echo modExpr && ./compile src/test/scala/parsers/valid/expressions/modExpr.wacc
-echo multExpr && ./compile src/test/scala/parsers/valid/expressions/multExpr.wacc
-echo multNoWhitespaceExpr && ./compile src/test/scala/parsers/valid/expressions/multNoWhitespaceExpr.wacc
-echo negBothDiv && ./compile src/test/scala/parsers/valid/expressions/negBothDiv.wacc
-echo negBothMod && ./compile src/test/scala/parsers/valid/expressions/negBothMod.wacc
-echo negDividendDiv && ./compile src/test/scala/parsers/valid/expressions/negDividendDiv.wacc
-echo negDividendMod && ./compile src/test/scala/parsers/valid/expressions/negDividendMod.wacc
-echo negDivisorDiv && ./compile src/test/scala/parsers/valid/expressions/negDivisorDiv.wacc
-echo negDivisorMod && ./compile src/test/scala/parsers/valid/expressions/negDivisorMod.wacc
-echo negExpr && ./compile src/test/scala/parsers/valid/expressions/negExpr.wacc
-echo notequalsExpr && ./compile src/test/scala/parsers/valid/expressions/notequalsExpr.wacc
-echo notExpr && ./compile src/test/scala/parsers/valid/expressions/notExpr.wacc
-echo ordAndchrExpr && ./compile src/test/scala/parsers/valid/expressions/ordAndchrExpr.wacc
-echo orExpr && ./compile src/test/scala/parsers/valid/expressions/orExpr.wacc
-echo plusExpr && ./compile src/test/scala/parsers/valid/expressions/plusExpr.wacc
-echo plusMinusExpr && ./compile src/test/scala/parsers/valid/expressions/plusMinusExpr.wacc
-echo plusNoWhitespaceExpr && ./compile src/test/scala/parsers/valid/expressions/plusNoWhitespaceExpr.wacc
-echo plusPlusExpr && ./compile src/test/scala/parsers/valid/expressions/plusPlusExpr.wacc
-echo sequentialCount && ./compile src/test/scala/parsers/valid/expressions/sequentialCount.wacc
-echo stringEqualsExpr && ./compile src/test/scala/parsers/valid/expressions/stringEqualsExpr.wacc
+echo ---andExpr--- && ./compile src/test/scala/parsers/valid/expressions/andExpr.wacc && ./refEmulate andExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/andExpr.wacc
+echo ---andOverOrExpr--- && ./compile src/test/scala/parsers/valid/expressions/andOverOrExpr.wacc && ./refEmulate andOverOrExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/andOverOrExpr.wacc
+echo ---boolCalc--- && ./compile src/test/scala/parsers/valid/expressions/boolCalc.wacc && ./refEmulate boolCalc.s && ./refCompile -x src/test/scala/parsers/valid/expressions/boolCalc.wacc
+echo ---boolExpr1--- && ./compile src/test/scala/parsers/valid/expressions/boolExpr1.wacc && ./refEmulate boolExpr1.s && ./refCompile -x src/test/scala/parsers/valid/expressions/boolExpr1.wacc
+echo ---charComparisonExpr--- && ./compile src/test/scala/parsers/valid/expressions/charComparisonExpr.wacc && ./refEmulate charComparisonExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/charComparisonExpr.wacc
+echo ---divExpr--- && ./compile src/test/scala/parsers/valid/expressions/divExpr.wacc && ./refEmulate divExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/divExpr.wacc
+echo ---equalsExpr--- && ./compile src/test/scala/parsers/valid/expressions/equalsExpr.wacc && ./refEmulate equalsExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/equalsExpr.wacc
+echo ---equalsOverAnd--- && ./compile src/test/scala/parsers/valid/expressions/equalsOverAnd.wacc && ./refEmulate equalsOverAnd.s && ./refCompile -x src/test/scala/parsers/valid/expressions/equalsOverAnd.wacc
+echo ---equalsOverBool--- && ./compile src/test/scala/parsers/valid/expressions/equalsOverBool.wacc && ./refEmulate equalsOverBool.s && ./refCompile -x src/test/scala/parsers/valid/expressions/equalsOverBool.wacc
+echo ---equalsOverOr--- && ./compile src/test/scala/parsers/valid/expressions/equalsOverOr.wacc && ./refEmulate equalsOverOr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/equalsOverOr.wacc
+echo ---greaterEqExpr--- && ./compile src/test/scala/parsers/valid/expressions/greaterEqExpr.wacc && ./refEmulate greaterEqExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/greaterEqExpr.wacc
+echo ---greaterExpr--- && ./compile src/test/scala/parsers/valid/expressions/greaterExpr.wacc && ./refEmulate greaterExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/greaterExpr.wacc
+echo ---intCalc--- && ./compile src/test/scala/parsers/valid/expressions/intCalc.wacc && ./refEmulate intCalc.s && ./refCompile -x src/test/scala/parsers/valid/expressions/intCalc.wacc
+echo ---intExpr1--- && ./compile src/test/scala/parsers/valid/expressions/intExpr1.wacc && ./refEmulate intExpr1.s && ./refCompile -x src/test/scala/parsers/valid/expressions/intExpr1.wacc
+echo ---lessCharExpr--- && ./compile src/test/scala/parsers/valid/expressions/lessCharExpr.wacc && ./refEmulate lessCharExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/lessCharExpr.wacc
+echo ---lessEqExpr--- && ./compile src/test/scala/parsers/valid/expressions/lessEqExpr.wacc && ./refEmulate lessEqExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/lessEqExpr.wacc
+echo ---lessExpr--- && ./compile src/test/scala/parsers/valid/expressions/lessExpr.wacc && ./refEmulate lessExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/lessExpr.wacc
+echo ---longExpr--- && ./compile src/test/scala/parsers/valid/expressions/longExpr.wacc && ./refEmulate longExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/longExpr.wacc
+echo ---longExpr2--- && ./compile src/test/scala/parsers/valid/expressions/longExpr2.wacc && ./refEmulate longExpr2.s && ./refCompile -x src/test/scala/parsers/valid/expressions/longExpr2.wacc
+echo ---longExpr3--- && ./compile src/test/scala/parsers/valid/expressions/longExpr3.wacc && ./refEmulate longExpr3.s && ./refCompile -x src/test/scala/parsers/valid/expressions/longExpr3.wacc
+echo ---longSplitExpr--- && ./compile src/test/scala/parsers/valid/expressions/longSplitExpr.wacc && ./refEmulate longSplitExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/longSplitExpr.wacc
+echo ---longSplitExpr2--- && ./compile src/test/scala/parsers/valid/expressions/longSplitExpr2.wacc && ./refEmulate longSplitExpr2.s && ./refCompile -x src/test/scala/parsers/valid/expressions/longSplitExpr2.wacc
+echo ---minusExpr--- && ./compile src/test/scala/parsers/valid/expressions/minusExpr.wacc && ./refEmulate minusExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/minusExpr.wacc
+echo ---minusMinusExpr--- && ./compile src/test/scala/parsers/valid/expressions/minusMinusExpr.wacc && ./refEmulate minusMinusExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/minusMinusExpr.wacc
+echo ---minusNoWhitespaceExpr--- && ./compile src/test/scala/parsers/valid/expressions/minusNoWhitespaceExpr.wacc && ./refEmulate minusNoWhitespaceExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/minusNoWhitespaceExpr.wacc
+echo ---minusPlusExpr--- && ./compile src/test/scala/parsers/valid/expressions/minusPlusExpr.wacc && ./refEmulate minusPlusExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/minusPlusExpr.wacc
+echo ---modExpr--- && ./compile src/test/scala/parsers/valid/expressions/modExpr.wacc && ./refEmulate modExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/modExpr.wacc
+echo ---multExpr--- && ./compile src/test/scala/parsers/valid/expressions/multExpr.wacc && ./refEmulate multExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/multExpr.wacc
+echo ---multNoWhitespaceExpr--- && ./compile src/test/scala/parsers/valid/expressions/multNoWhitespaceExpr.wacc && ./refEmulate multNoWhitespaceExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/multNoWhitespaceExpr.wacc
+echo ---negBothDiv--- && ./compile src/test/scala/parsers/valid/expressions/negBothDiv.wacc && ./refEmulate negBothDiv.s && ./refCompile -x src/test/scala/parsers/valid/expressions/negBothDiv.wacc
+echo ---negBothMod--- && ./compile src/test/scala/parsers/valid/expressions/negBothMod.wacc && ./refEmulate negBothMod.s && ./refCompile -x src/test/scala/parsers/valid/expressions/negBothMod.wacc
+echo ---negDividendDiv--- && ./compile src/test/scala/parsers/valid/expressions/negDividendDiv.wacc && ./refEmulate negDividendDiv.s && ./refCompile -x src/test/scala/parsers/valid/expressions/negDividendDiv.wacc
+echo ---negDividendMod--- && ./compile src/test/scala/parsers/valid/expressions/negDividendMod.wacc && ./refEmulate negDividendMod.s && ./refCompile -x src/test/scala/parsers/valid/expressions/negDividendMod.wacc
+echo ---negDivisorDiv--- && ./compile src/test/scala/parsers/valid/expressions/negDivisorDiv.wacc && ./refEmulate negDivisorDiv.s && ./refCompile -x src/test/scala/parsers/valid/expressions/negDivisorDiv.wacc
+echo ---negDivisorMod--- && ./compile src/test/scala/parsers/valid/expressions/negDivisorMod.wacc && ./refEmulate negDivisorMod.s && ./refCompile -x src/test/scala/parsers/valid/expressions/negDivisorMod.wacc
+echo ---negExpr--- && ./compile src/test/scala/parsers/valid/expressions/negExpr.wacc && ./refEmulate negExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/negExpr.wacc
+echo ---notequalsExpr--- && ./compile src/test/scala/parsers/valid/expressions/notequalsExpr.wacc && ./refEmulate notequalsExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/notequalsExpr.wacc
+echo ---notExpr--- && ./compile src/test/scala/parsers/valid/expressions/notExpr.wacc && ./refEmulate notExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/notExpr.wacc
+echo ---ordAndchrExpr--- && ./compile src/test/scala/parsers/valid/expressions/ordAndchrExpr.wacc && ./refEmulate ordAndchrExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/ordAndchrExpr.wacc
+echo ---orExpr--- && ./compile src/test/scala/parsers/valid/expressions/orExpr.wacc && ./refEmulate orExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/orExpr.wacc
+echo ---plusExpr--- && ./compile src/test/scala/parsers/valid/expressions/plusExpr.wacc && ./refEmulate plusExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/plusExpr.wacc
+echo ---plusMinusExpr--- && ./compile src/test/scala/parsers/valid/expressions/plusMinusExpr.wacc && ./refEmulate plusMinusExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/plusMinusExpr.wacc
+echo ---plusNoWhitespaceExpr--- && ./compile src/test/scala/parsers/valid/expressions/plusNoWhitespaceExpr.wacc && ./refEmulate plusNoWhitespaceExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/plusNoWhitespaceExpr.wacc
+echo ---plusPlusExpr--- && ./compile src/test/scala/parsers/valid/expressions/plusPlusExpr.wacc && ./refEmulate plusPlusExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/plusPlusExpr.wacc
+echo ---sequentialCount--- && ./compile src/test/scala/parsers/valid/expressions/sequentialCount.wacc && ./refEmulate sequentialCount.s && ./refCompile -x src/test/scala/parsers/valid/expressions/sequentialCount.wacc
+echo ---stringEqualsExpr--- && ./compile src/test/scala/parsers/valid/expressions/stringEqualsExpr.wacc && ./refEmulate stringEqualsExpr.s && ./refCompile -x src/test/scala/parsers/valid/expressions/stringEqualsExpr.wacc
