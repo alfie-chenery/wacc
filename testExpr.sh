@@ -1,0 +1,50 @@
+#!/bin/zsh
+
+make
+
+echo andExpr && ./compile src/test/scala/parsers/valid/expressions/andExpr.wacc
+echo andOverOrExpr && ./compile src/test/scala/parsers/valid/expressions/andOverOrExpr.wacc
+echo boolCalc && ./compile src/test/scala/parsers/valid/expressions/boolCalc.wacc
+echo boolExpr1 && ./compile src/test/scala/parsers/valid/expressions/boolExpr1.wacc
+echo charComparisonExpr && ./compile src/test/scala/parsers/valid/expressions/charComparisonExpr.wacc
+echo divExpr && ./compile src/test/scala/parsers/valid/expressions/divExpr.wacc
+echo equalsExpr && ./compile src/test/scala/parsers/valid/expressions/equalsExpr.wacc
+echo equalsOverAnd && ./compile src/test/scala/parsers/valid/expressions/equalsOverAnd.wacc
+echo equalsOverBool && ./compile src/test/scala/parsers/valid/expressions/equalsOverBool.wacc
+echo equalsOverOr && ./compile src/test/scala/parsers/valid/expressions/equalsOverOr.wacc
+echo greaterEqExpr && ./compile src/test/scala/parsers/valid/expressions/greaterEqExpr.wacc
+echo greaterExpr && ./compile src/test/scala/parsers/valid/expressions/greaterExpr.wacc
+echo intCalc && ./compile src/test/scala/parsers/valid/expressions/intCalc.wacc
+echo intExpr1 && ./compile src/test/scala/parsers/valid/expressions/intExpr1.wacc
+echo lessCharExpr && ./compile src/test/scala/parsers/valid/expressions/lessCharExpr.wacc
+echo lessEqExpr && ./compile src/test/scala/parsers/valid/expressions/lessEqExpr.wacc
+echo lessExpr && ./compile src/test/scala/parsers/valid/expressions/lessExpr.wacc
+echo longExpr && ./compile src/test/scala/parsers/valid/expressions/longExpr.wacc
+echo longExpr2 && ./compile src/test/scala/parsers/valid/expressions/longExpr2.wacc
+echo longExpr3 && ./compile src/test/scala/parsers/valid/expressions/longExpr3.wacc
+echo longSplitExpr && ./compile src/test/scala/parsers/valid/expressions/longSplitExpr.wacc
+echo longSplitExpr2 && ./compile src/test/scala/parsers/valid/expressions/longSplitExpr2.wacc
+echo minusExpr && ./compile src/test/scala/parsers/valid/expressions/minusExpr.wacc
+echo minusMinusExpr && ./compile src/test/scala/parsers/valid/expressions/minusMinusExpr.wacc
+echo minusNoWhitespaceExpr && ./compile src/test/scala/parsers/valid/expressions/minusNoWhitespaceExpr.wacc
+echo minusPlusExpr && ./compile src/test/scala/parsers/valid/expressions/minusPlusExpr.wacc
+echo modExpr && ./compile src/test/scala/parsers/valid/expressions/modExpr.wacc
+echo multExpr && ./compile src/test/scala/parsers/valid/expressions/multExpr.wacc
+echo multNoWhitespaceExpr && ./compile src/test/scala/parsers/valid/expressions/multNoWhitespaceExpr.wacc
+echo negBothDiv && ./compile src/test/scala/parsers/valid/expressions/negBothDiv.wacc
+echo negBothMod && ./compile src/test/scala/parsers/valid/expressions/negBothMod.wacc
+echo negDividendDiv && ./compile src/test/scala/parsers/valid/expressions/negDividendDiv.wacc
+echo negDividendMod && ./compile src/test/scala/parsers/valid/expressions/negDividendMod.wacc
+echo negDivisorDiv && ./compile src/test/scala/parsers/valid/expressions/negDivisorDiv.wacc
+echo negDivisorMod && ./compile src/test/scala/parsers/valid/expressions/negDivisorMod.wacc
+echo negExpr && ./compile src/test/scala/parsers/valid/expressions/negExpr.wacc
+echo notequalsExpr && ./compile src/test/scala/parsers/valid/expressions/notequalsExpr.wacc
+echo notExpr && ./compile src/test/scala/parsers/valid/expressions/notExpr.wacc
+echo ordAndchrExpr && ./compile src/test/scala/parsers/valid/expressions/ordAndchrExpr.wacc
+echo orExpr && ./compile src/test/scala/parsers/valid/expressions/orExpr.wacc
+echo plusExpr && ./compile src/test/scala/parsers/valid/expressions/plusExpr.wacc
+echo plusMinusExpr && ./compile src/test/scala/parsers/valid/expressions/plusMinusExpr.wacc
+echo plusNoWhitespaceExpr && ./compile src/test/scala/parsers/valid/expressions/plusNoWhitespaceExpr.wacc
+echo plusPlusExpr && ./compile src/test/scala/parsers/valid/expressions/plusPlusExpr.wacc
+echo sequentialCount && ./compile src/test/scala/parsers/valid/expressions/sequentialCount.wacc
+echo stringEqualsExpr && ./compile src/test/scala/parsers/valid/expressions/stringEqualsExpr.wacc

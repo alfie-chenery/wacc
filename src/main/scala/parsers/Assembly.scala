@@ -146,27 +146,35 @@ object Assembly {
   sealed trait TempReg extends Register // to be used as temporary registers before reg allocation
   case object tReg4 extends TempReg{
     override def toString: String = "r4"
+//    override def toString: String = "t4"
   }
   case object tReg5 extends TempReg{
     override def toString: String = "r5"
+//    override def toString: String = "t5"
   }
   case object tReg6 extends TempReg{
     override def toString: String = "r6"
+//    override def toString: String = "t6"
   }
   case object tReg7 extends TempReg{
     override def toString: String = "r7"
+//    override def toString: String = "t7"
   }
   case object tReg8 extends TempReg{
     override def toString: String = "r8"
+//    override def toString: String = "t8"
   }
   case object tReg9 extends TempReg{
     override def toString: String = "r9"
+//    override def toString: String = "t9"
   }
   case object tReg10 extends TempReg{
     override def toString: String = "r10"
+//    override def toString: String = "t10"
   }
   case object tReg11 extends TempReg{
     override def toString: String = "r11"
+//    override def toString: String = "t11"
   }
   sealed trait ScratchReg extends Register
   case object reg4 extends ScratchReg{

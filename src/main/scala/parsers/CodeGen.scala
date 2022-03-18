@@ -827,13 +827,13 @@ object CodeGen{
     //  perhaps registers are the only objects that need to be redefined, for now... (?)
 
     // CFG optimisations operate only on main program, not data or helper functions
-    val cfg = new ControlFlowGraph(code)
+//    val cfg = new ControlFlowGraph(code)
 //    println(s"Original CFG: $cfg")
     // replaces all TempRegs with ScratchRegs in the code according to regMapping
-    LiveAnalysis.liveVariableAnalysis(cfg)
+//    LiveAnalysis.liveVariableAnalysis(cfg)
 //    println(s"CFG after live variable analysis: $cfg")
 
-    code = cfg.toAssembly
+//    code = cfg.toAssembly
 
     if (data.nonEmpty) {
       sb.append(".data\n\n") // todo: could these not be added as mnemonic labels for consistency?
