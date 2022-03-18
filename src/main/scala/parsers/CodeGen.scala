@@ -658,7 +658,7 @@ object CodeGen{
           res1 = ra.getAvailable(1)
           code += POP(res1)
           if (t1 == WInt && t2 == WInt) {
-            code += ADD(res2, res1, res2)
+            code += ADDS(res2, res1, res2)
             intOverflow()
             code += BL("p_throw_overflow_error", VS)
           }else{
@@ -671,7 +671,7 @@ object CodeGen{
           }
         } else { // needs separate ADD cases, since the res1 or res2 will be the lower register address depending on whether we're in a spill state
           if (t1 == WInt && t2 == WInt) {
-            code += ADD(res1, res1, res2)
+            code += ADDS(res1, res1, res2)
             intOverflow()
             code += BL("p_throw_overflow_error", VS)
           }else{
@@ -694,7 +694,7 @@ object CodeGen{
           res1 = ra.getAvailable(1)
           code += POP(res1)
           if (t1 == WInt && t2 == WInt) {
-            code += SUB(res2, res1, res2)
+            code += SUBS(res2, res1, res2)
             intOverflow()
             code += BL("p_throw_overflow_error", VS)
           }else{
@@ -707,7 +707,7 @@ object CodeGen{
           }
         } else {
           if (t1 == WInt && t2 == WInt) {
-            code += SUB(res1, res1, res2)
+            code += SUBS(res1, res1, res2)
             intOverflow()
             code += BL("p_throw_overflow_error", VS)
           }else {
