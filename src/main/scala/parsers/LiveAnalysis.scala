@@ -1,6 +1,8 @@
 package parsers
 
 import parsers.Assembly._
+
+import scala.annotation.tailrec
 //import parsers.ControlFlowGraph.CFGNode
 
 import scala.collection.immutable.ListMap
@@ -15,13 +17,38 @@ object LiveAnalysis {
                    var defs: mutable.Set[TempReg],
                    succs: mutable.Set[Int]) extends CFGNode(id, instruction, succs)
 
-  def tempReg(s: mutable.HashSet[Any]): mutable.HashSet[TempReg] = s.map {
-    case regVal(r) => r
-    case regShift(r, _, _) => r
-    case asr(r, _) => r
-    case lsl(r, _) => r
-    case r => r
-  }.filter(_.isInstanceOf[TempReg]).map(_.asInstanceOf[TempReg])
+//  def tempReg(s: mutable.HashSet[Operand]): mutable.HashSet[TempReg] = s.map(e => tempReg2(e) match {
+//    case Some(value) => value
+//    case None =>
+//  })
+  def tempReg(s: mutable.HashSet[Operand]): mutable.HashSet[TempReg] = s.map(tempReg2).collect {
+    case Some(value) => value
+  }
+
+  @tailrec
+  def tempReg2(o: Operand): Option[TempReg] = {
+    o match {
+      case imm(i) => None
+      case immc(c) => None
+      case label(l) => None
+      case asr(reg, shift) => tempReg2(reg)
+      case lsl(reg, shift) => tempReg2(reg)
+      case Assembly.nullOp => None
+      case suffix: Suffix => None
+      case register: Register => register match {
+        case regShift(reg, shift, update) => tempReg2(reg)
+        case regVal(reg) => tempReg2(reg)
+        case Assembly.RetReg => None
+        case Assembly.reg1 => None
+        case Assembly.reg2 => None
+        case Assembly.SP => None
+        case Assembly.LinkReg => None
+        case Assembly.PC => None
+        case reg: ScratchReg => None
+        case reg: TempReg => Some(reg)
+      }
+    }
+  }
 
   /**
    * @param cfg : ControlFlowGraph
@@ -94,8 +121,8 @@ object LiveAnalysis {
     var prevLiveIn, prevLiveOut: mutable.HashMap[Int, mutable.Set[TempReg]] = mutable.HashMap()
 
     do {
-      prevLiveIn = liveIn
-      prevLiveOut = liveOut
+      prevLiveIn = liveIn.clone()
+      prevLiveOut = liveOut.clone()
       for (n <- nodes.reverse) {
         liveIn(n.id) = n.uses.union(liveOut(n.id).diff(n.defs))
         liveOut(n.id) = n.succs.foldLeft(mutable.Set[TempReg]())((a: mutable.Set[TempReg], i: Int) => liveIn(i).union(a))
@@ -112,10 +139,9 @@ object LiveAnalysis {
       }
     }
 
-//    println(s"interference map: $interferes")
+    println(s"interference map: $interferes")
     val tempAllocation: mutable.Map[TempReg, ScratchReg] = graphColouring(interferes)
-//    val tempAllocation: mutable.Map[TempReg, ScratchReg] = mutable.Map[TempReg, ScratchReg](tReg4->reg4, tReg5->reg5, tReg6->reg6)
-//    println(s"register allocation: $tempAllocation")
+    println(s"register allocation: $tempAllocation")
 
     tempAllocation
   }
