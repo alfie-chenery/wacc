@@ -704,7 +704,7 @@ object CodeGen{
           }
         } else {
           if (t1 == WInt && t2 == WInt) {
-            code += SUB(res2, res1, res2)
+            code += SUB(res1, res1, res2)
           }else {
             val v = va.next
             val v1 = va.next
