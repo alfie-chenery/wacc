@@ -42,11 +42,11 @@ object CodeGen{
 
   }
 
-  def traverse(node: AstNode, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Unit = {
+  def traverse(node: AstNode, ra: RegisterAllocator, va: VfpAllocator, code: ListBuffer[Mnemonic]): Unit = {
     node match {
       case Program(funcs, stat) =>
         for (func <- funcs) {
-          traverse(func, ra, code)
+          traverse(func, ra, va, code)
         }
 
         readCounter = readsInScope(stat)
@@ -61,7 +61,7 @@ object CodeGen{
           code += SUB(SP, SP, imm(assignments % 1024))
         }
 
-        traverse(stat, ra, code)
+        traverse(stat, ra, va, code)
         if (assignments > 0) {
           code += ADD(SP, SP, imm(assignments % 1024))
           for (_ <- 0 until assignments / 1024) code += ADD(SP, SP, imm(1024))
@@ -82,7 +82,7 @@ object CodeGen{
         code += funcName(name)
         code += PUSH(LinkReg)
         if (assignments > 0) code += SUB(SP, SP, imm(assignments))
-        traverse(stat, ra, code)
+        traverse(stat, ra, va, code)
         if (assignments > 0) code += ADD(SP, SP, imm(assignments))
         code += POP(PC)
         code += LTORG
@@ -93,56 +93,56 @@ object CodeGen{
         currentShift -= 4
         val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, update = false)
         variableLocation += (ident -> location)
-        val reg1 = traverseExpr(expr, ra, code)
+        val reg1 = traverseExpr(expr, ra, va, code)
         code += STR(reg1, location)
         ra.restore()
       case Decl(ArrayType(_), Ident(ident), ArrayLiter(exprs)) =>
-        val ret = traverseExpr(ArrayLiter(exprs), ra, code)
+        val ret = traverseExpr(ArrayLiter(exprs), ra, va, code)
         variableLocation += (ident -> regVal(SP))
         code += STR(ret, regVal(SP))
         ra.restore()
       case Decl(Number, Ident(ident), rhs) =>
         val r = ra.next
-        traverseExpr(rhs, ra, code)
+        traverseExpr(rhs, ra, va, code)
         currentShift -= 4
         val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, update = false)
         variableLocation += (ident -> location)
         code += STR(r, location)
       case Decl(WBool, Ident(ident), rhs) =>
         val r = ra.next
-        traverseExpr(rhs, ra, code)
+        traverseExpr(rhs, ra, va, code)
         currentShift -= 1
         val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, update = false)
         variableLocation += (ident -> location)
         code += STRB(r, location)
       case Decl(WChar, Ident(ident), rhs) =>
         val r = ra.next
-        traverseExpr(rhs, ra, code)
+        traverseExpr(rhs, ra, va, code)
         currentShift -= 1
         val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, update = false)
         variableLocation += (ident -> location)
         code += STRB(r, location)
       case Decl(WString, Ident(ident), rhs) =>
         val r = ra.next
-        traverseExpr(rhs, ra, code)
+        traverseExpr(rhs, ra, va, code)
         currentShift -= 4
         val location = if (currentShift == 0) regVal(SP) else regShift(SP, currentShift, update = false)
         variableLocation += (ident -> location)
         code += STR(r, location)
 
       case Assign(Ident(ident), rhs) =>
-        if (typeSize(st(Ident(ident))._2) == 4) code += STR(traverseExpr(rhs, ra, code), variableLocation(ident))
-        else code += STRB(traverseExpr(rhs, ra, code), variableLocation(ident))
+        if (typeSize(st(Ident(ident))._2) == 4) code += STR(traverseExpr(rhs, ra, va, code), variableLocation(ident))
+        else code += STRB(traverseExpr(rhs, ra, va, code), variableLocation(ident))
       case Assign(ArrayElem(ident, expr), rhs) =>
-        val ret = traverseExpr(rhs, ra, code)
+        val ret = traverseExpr(rhs, ra, va, code)
         ra.nextRm
-        val arr = traverseExpr(ArrayElem(ident, expr), ra, code)
+        val arr = traverseExpr(ArrayElem(ident, expr), ra, va, code)
         code += STR(ret, arr)
         //TODO: remove duplication
       case Assign(FstPair(expr), rhs) =>
-        val ret = traverseExpr(rhs, ra, code)
+        val ret = traverseExpr(rhs, ra, va, code)
         ra.nextRm
-        val fst = traverseExpr(FstPair(expr), ra, code)
+        val fst = traverseExpr(FstPair(expr), ra, va, code)
         code.remove(code.length-1)
         // TODO probably factor out this check and not call checkExprType
         if (typeSize(checkExprType(rhs, rhs, new ListBuffer[String])) == 4) code += STR(ret, regVal(fst))
@@ -151,9 +151,9 @@ object CodeGen{
         ra.restore()
 
       case Assign(SndPair(expr), rhs) =>
-        val ret = traverseExpr(rhs, ra, code)
+        val ret = traverseExpr(rhs, ra, va, code)
         ra.nextRm
-        val snd = traverseExpr(SndPair(expr), ra, code)
+        val snd = traverseExpr(SndPair(expr), ra, va, code)
         code.remove(code.length-1)
         if (typeSize(checkExprType(rhs, rhs, new ListBuffer[String])) == 4) code += STR(ret, regVal(snd))
         else code += STRB(ret, regVal(snd))
@@ -161,7 +161,7 @@ object CodeGen{
         ra.restore()
 
       case Free(expr) =>
-        code += MOV(RetReg, traverseExpr(expr, ra, code), Base)
+        code += MOV(RetReg, traverseExpr(expr, ra, va, code), Base)
         val free_msg: String = s"msg_$getDataMsgIndex"
         // TODO This should probably call check null pointer
         data(free_msg) =
@@ -266,11 +266,11 @@ object CodeGen{
 
       case Print(PairLiter) =>
         printReference()
-        val ret = traverseExpr(PairLiter, ra, code)
+        val ret = traverseExpr(PairLiter, ra, va, code)
         code += MOV(RetReg, ret, Base)
         code += BL("p_print_reference", Base)
       case Print(expr: AstNode) =>
-        val ret = traverseExpr(expr, ra, code)
+        val ret = traverseExpr(expr, ra, va, code)
         // TODO change this so it doesn't match explicit types
         SemanticPass.checkExprType(expr, expr, new ListBuffer[String]) match {
           case WString =>
@@ -320,28 +320,28 @@ object CodeGen{
 
       case Println(expr) =>
         printLn()
-        traverse(Print(expr), ra, code)
+        traverse(Print(expr), ra, va, code)
         code += BL("p_print_ln", Base)
 
       case Return(expr) =>
-        code += MOV(RetReg, traverseExpr(expr, ra, code), Base)
+        code += MOV(RetReg, traverseExpr(expr, ra, va, code), Base)
         code += POP(PC)
 
       case Exit(expr) =>
-        code += MOV(RetReg, traverseExpr(expr, ra, code), Base)
+        code += MOV(RetReg, traverseExpr(expr, ra, va, code), Base)
         code += BL("exit", Base)
 
       case IfElse(cond, stat_true, stat_false) =>
         // TODO add stack pointer changes for new scopes
-        val reg = traverseExpr(cond, ra, code)
+        val reg = traverseExpr(cond, ra, va, code)
         code += CMP(reg, imm(0))
         val fun1 = nextBranchIndex
         val fun2 = nextBranchIndex
         code += B(fun1, EQ)
-        traverse(stat_true, ra, code)
+        traverse(stat_true, ra, va, code)
         code += B(fun2, Base)
         code += funcName(fun1)
-        traverse(stat_false, ra, code)
+        traverse(stat_false, ra, va, code)
         code += funcName(fun2)
 
       case While(cond, stat) =>
@@ -350,18 +350,18 @@ object CodeGen{
         val bodyLabel = nextBranchIndex
         code += B(condLabel, Base)
         code += funcName(bodyLabel)
-        traverse(stat, ra, code)
+        traverse(stat, ra, va, code)
         code += funcName(condLabel)
-        traverse(cond, ra, code)
-        val reg = traverseExpr(cond, ra, code)
+        traverse(cond, ra, va, code)
+        val reg = traverseExpr(cond, ra, va, code)
         code += CMP(reg, imm(1))
         code += B(bodyLabel, EQ)
 
-      case Scope(stat) => traverse(stat, ra, code)
+      case Scope(stat) => traverse(stat, ra, va, code)
 
       case Combine(stats) =>
         for (stat <- stats) {
-          traverse(stat, ra, code)
+          traverse(stat, ra, va, code)
         }
 
 
@@ -369,13 +369,13 @@ object CodeGen{
       }
     }
 
-  def traverseExpr(node: AstNode, ra: RegisterAllocator, code: ListBuffer[Mnemonic]): Register = {
+  def traverseExpr(node: AstNode, ra: RegisterAllocator, va: VfpAllocator, code: ListBuffer[Mnemonic]): Register = {
     val spill = ra.size==2 // defines whether we are in a register spill state
     node match {
       case IntLiter(x) =>
         code += LDR(ra.next, imm(x), Base)
         ra.next
-      case Negate(IntLiter(x)) => traverseExpr(IntLiter(-x), ra, code)
+      case Negate(IntLiter(x)) => traverseExpr(IntLiter(-x), ra, va, code)
       case BoolLiter(b) =>
         code += MOV(ra.next, imm(if (b) 1 else 0), Base)
         ra.next
@@ -397,7 +397,7 @@ object CodeGen{
         code += MOV(reg1, RetReg, Base)
         var location = 4
         for (expr <- exprs) {
-          val ret = traverseExpr(expr, ra, code)
+          val ret = traverseExpr(expr, ra, va, code)
           code += STR(ret, regShift(reg1, location, update = false))
           location += typeSize(_type)
         }
@@ -411,7 +411,7 @@ object CodeGen{
 
       // TODO implement these correctly
       case FstPair(expr) =>
-        val ret = traverseExpr(expr, ra, code)
+        val ret = traverseExpr(expr, ra, va, code)
         code += MOV(RetReg, ret, Base)
         checkNullPointer()
         code += BL("p_check_null_pointer", Base)
@@ -421,7 +421,7 @@ object CodeGen{
         code += LDR(ret, regVal(ret), suffix)
         ret
       case SndPair(expr) =>
-        val ret = traverseExpr(expr, ra, code)
+        val ret = traverseExpr(expr, ra, va, code)
         code += MOV(RetReg, ret, Base)
         checkNullPointer()
         code += BL("p_check_null_pointer", Base)
@@ -435,12 +435,12 @@ object CodeGen{
         code += BL("malloc", Base)
         code += MOV(ra.next, RetReg, Base)
         val reg1 = ra.nextRm
-        val fstReg = traverseExpr(fst, ra, code)
+        val fstReg = traverseExpr(fst, ra, va, code)
         code += LDR(RetReg, imm(typeSize(checkExprType(fst, fst, new ListBuffer[String]))), Base)
         code += BL("malloc", Base)
         code += STR(fstReg, regVal(RetReg))
         code += STR(RetReg, regVal(reg1))
-        traverseExpr(snd, ra, code)
+        traverseExpr(snd, ra, va, code)
         code += LDR(RetReg, imm(typeSize(checkExprType(snd, snd, new ListBuffer[String]))), Base)
         code += BL("malloc", Base)
         // TODO this should be STRB for chars
@@ -486,7 +486,7 @@ object CodeGen{
             )
         }
         for (elem <- elems) {
-          val ret = traverseExpr(elem, ra, code)
+          val ret = traverseExpr(elem, ra, va, code)
           code += LDR(arrLoc, regVal(arrLoc), Base)
           code += MOV(RetReg, ret, Base)
           code += MOV(reg(1), arrLoc, Base)
@@ -499,14 +499,14 @@ object CodeGen{
         }
         ra.restore()
         regVal(arrLoc)
-      case ParensExpr(expr) => traverseExpr(expr, ra, code)
+      case ParensExpr(expr) => traverseExpr(expr, ra, va, code)
       case Call(Ident(name), ArgList(args)) =>
         if (!mathFuncs.contains(name)) {
           var totalSize = 0
           for (arg <- args) {
             val size = typeSize(checkExprType(arg, arg, new ListBuffer[String]))
             totalSize += size
-            val reg = traverseExpr(arg, ra, code)
+            val reg = traverseExpr(arg, ra, va, code)
             if (size == 4) code += STR(reg, regShift(SP, -size, update = true))
             else code += STRB(reg, regShift(SP, -size, update = true))
           }
@@ -526,7 +526,7 @@ object CodeGen{
         RetReg
 
       case And(expr1, expr2) =>
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, va, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
@@ -540,7 +540,7 @@ object CodeGen{
 
       // TODO factor out repeated code
       case Or(expr1, expr2) =>
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, va, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
@@ -554,7 +554,7 @@ object CodeGen{
 
         // TODO check if reg1 should be moved with LDR or LDRSB
       case Greater(expr1, expr2) =>
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2,ra, va, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
@@ -568,7 +568,7 @@ object CodeGen{
 
 
       case GreaterEq(expr1, expr2) =>
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, va, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
@@ -581,7 +581,7 @@ object CodeGen{
         reg1
 
       case Less(expr1, expr2) =>
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, va, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
@@ -594,7 +594,7 @@ object CodeGen{
         reg1
 
       case LessEq(expr1, expr2) =>
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, va, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
@@ -607,7 +607,7 @@ object CodeGen{
         reg1
 
       case Eq(expr1, expr2) =>
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, va, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
@@ -620,7 +620,7 @@ object CodeGen{
         reg1
 
       case NotEq(expr1, expr2) =>
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, va, code, spill)
 
         if (spill) {
           res1 = ra.getAvailable(1)
@@ -642,16 +642,34 @@ object CodeGen{
        * the stack and the register freed for use when computing expr2.
        */
       case Plus(expr1, expr2) =>
-        checkExprType(expr1, node, new ListBuffer[String])
-        checkExprType(expr2, node, new ListBuffer[String])
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
+        val t1 = checkExprType(expr1, node, new ListBuffer[String])
+        val t2 = checkExprType(expr2, node, new ListBuffer[String])
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, va, code, spill)
         ra.next
         if (spill) {
           res1 = ra.getAvailable(1)
           code += POP(res1)
-          code += FADDS(res2, res1, res2)
+          if (t1 == WInt && t2 == WInt) {
+            code += ADD(res2, res1, res2)
+          }else{
+            val v = va.next
+            val v1 = va.next
+            code += FMSR(v, res1)
+            code += FMSR(v1, res2)
+            code += FADD(v, v, v1)
+            code += FMRS(res2, v)
+          }
         } else { // needs separate ADD cases, since the res1 or res2 will be the lower register address depending on whether we're in a spill state
-          code += FADDS(res1, res1, res2)
+          if (t1 == WInt && t2 == WInt) {
+            code += ADD(res1, res1, res2)
+          }else{
+            val v = va.next
+            val v1 = va.next
+            code += FMSR(v, res1)
+            code += FMSR(v1, res2)
+            code += FADD(v, v, v1)
+            code += FMRS(res1, v)
+          }
         }
         intOverflow()
         code += BL("p_throw_overflow_error", VS)
@@ -659,14 +677,29 @@ object CodeGen{
         reg1
 
       case Minus(expr1, expr2) =>
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
-
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, va, code, spill)
+        val t1 = checkExprType(expr1, node, new ListBuffer[String])
+        val t2 = checkExprType(expr2, node, new ListBuffer[String])
         if (spill) {
           res1 = ra.getAvailable(1)
           code += POP(res1)
-          code += SUBS(res2, res1, res2)
-        } else { // needs separate ADD cases, since the res1 or res2 will be the lower register address depending on whether we're in a spill state
-          code += SUBS(res1, res1, res2)
+          if (t1 == WInt && t2 == WInt) {
+            code += SUB(res2, res1, res2)
+          }else{
+            val v = va.next
+            val v1 = va.next
+            code += FMSR(v, res1)
+            code += FMSR(v1, res2)
+            code += FSUB(v, v, v1)
+            code += FMRS(res2, v)
+          }
+        } else {
+          val v = va.next
+          val v1 = va.next
+          code += FMSR(v, res1)
+          code += FMSR(v1, res2)
+          code += FSUB(v, v, v1)
+          code += FMRS(res1, v)
         }
         intOverflow()
         code += BL("p_throw_overflow_error", VS)
@@ -674,16 +707,39 @@ object CodeGen{
         reg1
 
       case Mult(expr1, expr2) =>
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
-
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, va, code, spill)
+        val t1 = checkExprType(expr1, node, new ListBuffer[String])
+        val t2 = checkExprType(expr2, node, new ListBuffer[String])
         if (spill) {
           res1 = ra.getAvailable(1)
           code += POP(res1)
-          code += SMULL(res1, res2, res1, res2)
-          code += CMP(res2, asr(res1, 31))
-        } else { // needs separate ADD cases, since the res1 or res2 will be the lower register address depending on whether we're in a spill state
-          code += SMULL(res1, res2, res1, res2)
-          code += CMP(res2, asr(res1, 31))
+          if (t1 == WInt && t2 == WInt) {
+            code += SMULL(res1, res2, res1, res2)
+            code += CMP(res2, asr(res1, 31))
+          }else{
+            val v = va.next
+            val v1 = va.next
+            code += FMSR(v, res1)
+            code += FMSR(v1, res2)
+            FMUL(v, v, v1)
+            FCMP(v1, asr(v, 31))
+            code += FMRS(res1, v)
+            code += FMRS(res2, v1)
+          }
+        } else {
+          if (t1 == WInt && t2 == WInt) {
+            code += SMULL(res1, res2, res1, res2)
+            code += CMP(res2, asr(res1, 31))
+          }else{
+            val v = va.next
+            val v1 = va.next
+            code += FMSR(v, res1)
+            code += FMSR(v1, res2)
+            FMUL(v, v, v1)
+            FCMP(v1, asr(v, 31))
+            code += FMRS(res1, v)
+            code += FMRS(res2, v1)
+          }
         }
         intOverflow()
         code += BL("p_throw_overflow_error", NE)
@@ -691,40 +747,59 @@ object CodeGen{
         reg1
 
       case Div(expr1, expr2) =>
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
-
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, va, code, spill)
+        val t1 = checkExprType(expr1, node, new ListBuffer[String])
+        val t2 = checkExprType(expr2, node, new ListBuffer[String])
         if (spill) {
           res1 = ra.getAvailable(1)
           code += POP(res1)
-          code += MOV(RetReg, res1, Base) // <-- todo?
-          code += MOV(reg(1), res2, Base)
-          divByZeroError()
-          code += BL("p_check_divide_by_zero", Base)
-          code += BL("__aeabi_idiv", Base)
-          code += MOV(res1, RetReg, Base)
+          if (t1 == WInt && t2 == WInt) {
+            code += MOV(RetReg, res1, Base)
+            code += MOV(reg(1), res2, Base)
+            divByZeroError()
+            code += BL("p_check_divide_by_zero", Base)
+            code += BL("__aeabi_idiv", Base)
+            code += MOV(res1, RetReg, Base)
+          }else{
+            val v = va.next
+            val v1 = va.next
+            FMSR(v, res1)
+            FMSR(v1, res2)
+            FDIV(v, v, v1)
+            FMRS(res1, v)
+          }
         } else { // needs separate ADD cases, since the res1 or res2 will be the lower register address depending on whether we're in a spill state
-          code += MOV(RetReg, res1, Base)
-          code += MOV(reg(1), res2, Base)
-          divByZeroError()
-          code += BL("p_check_divide_by_zero", Base)
-          code += BL("__aeabi_idiv", Base)
-          code += MOV(res1, RetReg, Base)
+          if (t1 == WInt && t2 == WInt) {
+            code += MOV(RetReg, res1, Base)
+            code += MOV(reg(1), res2, Base)
+            divByZeroError()
+            code += BL("p_check_divide_by_zero", Base)
+            code += BL("__aeabi_idiv", Base)
+            code += MOV(res1, RetReg, Base)
+          }else{
+            val v = va.next
+            val v1 = va.next
+            FMSR(v, res1)
+            FMSR(v1, res2)
+            FDIV(v, v, v1)
+            FMRS(res1, v)
+          }
         }
         ra.restore()
         reg1
 
       case Mod(expr1, expr2) =>
-        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, code, spill)
-
+        //currently an integer function
+        var (reg1, res1, res2) = traverseBinExpr(expr1, expr2, ra, va, code, spill)
         if (spill) {
           res1 = ra.getAvailable(1)
           code += POP(res1)
-          code += MOV(RetReg, reg1, Base) // <-- todo?
-          code += MOV(reg(1), ra.next, Base)
-          divByZeroError()
-          code += BL("p_check_divide_by_zero", Base)
-          code += BL("__aeabi_idivmod", Base)
-          code += MOV(reg1, reg(1), Base)
+            code += MOV(RetReg, reg1, Base) // <-- todo?
+            code += MOV(reg(1), ra.next, Base)
+            divByZeroError()
+            code += BL("p_check_divide_by_zero", Base)
+            code += BL("__aeabi_idivmod", Base)
+            code += MOV(reg1, reg(1), Base)
         } else { // needs separate ADD cases, since the res1 or res2 will be the lower register address depending on whether we're in a spill state
           code += MOV(RetReg, res1, Base)
           code += MOV(reg(1), res2, Base)
@@ -737,45 +812,55 @@ object CodeGen{
         reg1
 
       case Negate(expr) =>
-        val reg = traverseExpr(expr, ra, code)
+        val t = checkExprType(expr, node, new ListBuffer[String])
+        val reg = traverseExpr(expr, ra, va, code)
         if (!reg.isInstanceOf[reg]) code += LDR(reg, reg, Base)
         intOverflow()
-        code += RSBS(reg, reg, imm(0))
-        code += BL("p_throw_overflow_error", VS)
+        if (t == WInt) {
+          code += RSBS(reg, reg, imm(0))
+          code += BL("p_throw_overflow_error", VS)
+        }else{
+          val v = va.next
+          val v1 = va.next
+          FMSR(v, reg)
+          FLDM(v1, imm(-1))
+          FMUL(v, v, v1)
+          FMRS(reg, v)
+        }
         reg
 
       case Not(expr) =>
-        val reg = traverseExpr(expr, ra, code)
+        val reg = traverseExpr(expr, ra, va, code)
         if (!reg.isInstanceOf[reg]) code += LDR(reg, reg, SB)
         code += EOR(reg, reg, imm(1))
         reg
 
       case Chr(expr) =>
-        val reg = traverseExpr(expr, ra, code)
+        val reg = traverseExpr(expr, ra, va, code)
         reg
 
       case Ord(expr) =>
-        val reg = traverseExpr(expr, ra, code)
+        val reg = traverseExpr(expr, ra, va, code)
         reg
 
       case Len(expr) =>
-        val reg = traverseExpr(expr,ra,code)
+        val reg = traverseExpr(expr, ra, va, code)
         code += LDR(reg, regVal(reg), Base)
         ra.next
 
     }
   }
 
-  def traverseBinExpr(expr1: Expr, expr2: Expr, ra: RegisterAllocator, code: ListBuffer[Mnemonic], spill: Boolean): (Register,Register,Register) = {
+  def traverseBinExpr(expr1: Expr, expr2: Expr, ra: RegisterAllocator, va: VfpAllocator, code: ListBuffer[Mnemonic], spill: Boolean): (Register,Register,Register) = {
     /** Function to reduce duplication in dealing with binary expressions */
-    var res1 = traverseExpr(expr1, ra, code)
+    var res1 = traverseExpr(expr1, ra, va, code)
     val reg1 = if (spill) ra.next else ra.nextRm
     if (!res1.isInstanceOf[reg]) {
       code += LDR(reg1, res1, SB)
       res1 = reg1
     }
     if (spill) code += PUSH(res1)
-    var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), code)
+    var res2 = traverseExpr(expr2, new RegisterAllocator(ra.getAvailable), new VfpAllocator(va.getAvailable), code)
     if (!res2.isInstanceOf[reg]) {
       code += LDR(ra.next, res2, SB)
       res2 = ra.next
@@ -814,10 +899,10 @@ object CodeGen{
     code += MOV(reg1, imm(0), suffix2)
   }
 
-  def compile(node: AstNode, ra: RegisterAllocator = new RegisterAllocator()): String = {
+  def compile(node: AstNode, ra: RegisterAllocator = new RegisterAllocator(), va: VfpAllocator = new VfpAllocator()): String = {
     val sb = new StringBuilder()
     val code: ListBuffer[Mnemonic] = ListBuffer()
-    traverse(node, ra, code)
+    traverse(node, ra, va, code)
 
     if (data.nonEmpty) {
       sb.append(".data\n\n")

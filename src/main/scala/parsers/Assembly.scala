@@ -44,7 +44,9 @@ object Assembly {
   case class SUB(o1: Operand, o2: Operand, o3: Operand) extends Mnemonic {
     override def toString: String = "SUB " + o1.toString + ", " + o2.toString + ", " + o3.toString
   }
-
+  case class FSUB(rd: Register, rn: Register, rm: Register) extends Mnemonic{
+    override def toString: String = "FSUB" + rd.toString + ", " + rn.toString + ", " + rm.toString
+  }
   case class STR(rd: Register, rn: Register) extends Mnemonic {
     override def toString: String = {
       "STR " + rd.toString + ", " + rn.toString
@@ -53,8 +55,8 @@ object Assembly {
   case class ADD(o1: Operand, o2: Operand, o3: Operand) extends Mnemonic {
     override def toString: String = "ADD " + o1.toString + ", " + o2.toString + ", " + o3.toString
   }
-  case class FADDS(rd: Register, rn: Register, rm: Register) extends Mnemonic{
-    override def toString: String = "FADDS" + rd.toString + ", " + rn.toString + ", " + rn.toString
+  case class FADD(rd: Register, rn: Register, rm: Register) extends Mnemonic{
+    override def toString: String = "FADD" + rd.toString + ", " + rn.toString + ", " + rn.toString
   }
   case class MOV(rd: Register, o2: Operand, suffix: Suffix) extends Mnemonic {
     override def toString: String = "MOV" + suffix.toString + " " + rd.toString + ", " + o2.toString
@@ -101,6 +103,24 @@ object Assembly {
   case class FUITO(r: Register, i: imm) extends Mnemonic {
     override def toString: String = "FUITO" + r.toString + ", " + i.toString
   }
+  case class FMSR(r1: Register, r2: Register) extends Mnemonic{
+    override def toString: String = "FMSR" + r1.toString + ", " + r2.toString
+  }
+  case class FMRS(r1: Register, r2: Register) extends Mnemonic{
+    override def toString: String = "FMRS" + r1.toString + ", " + r2.toString
+  }
+  case class FMUL(rd: Register, rn: Register, rm: Register) extends Mnemonic{
+    override def toString: String = "FMUL" + rd.toString + ", " + rn.toString + ", " + rm.toString
+  }
+  case class FCMP(r: Register, o: Operand) extends Mnemonic{
+    override def toString: String = "FCMP" + r.toString + ", " + o.toString
+  }
+  case class FDIV(rd: Register, rn: Register, rm: Register) extends Mnemonic{
+    override def toString: String = "FDIV" + rd.toString + ", " + rn.toString + ", " + rm.toString
+  }
+  case class FLDM(rd: Register, o: Operand) extends Mnemonic{
+    override def toString: String = "FLDM" + rd.toString + ", " + o.toString
+  }
 
   sealed trait Operand
   case class imm(i: Int) extends Operand {
@@ -143,6 +163,9 @@ object Assembly {
   }
   case class reg(num: Int) extends Register{
     override def toString: String = "r" + num.toString
+  }
+  case class vfpReg(num: Int) extends Register{
+    override def toString: String = "s" + num.toString
   }
 
   sealed trait Suffix extends Operand
